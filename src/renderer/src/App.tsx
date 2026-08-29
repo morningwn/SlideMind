@@ -6,6 +6,7 @@ import {
   type CSSProperties
 } from 'react'
 import type { ProjectInfo } from '../../shared/project'
+import { AppTitleBar } from './components/app-title-bar'
 import { ProjectWorkspace } from './components/project-workspace'
 import { SettingsPage } from './components/settings-page'
 
@@ -179,88 +180,97 @@ function App(): React.JSX.Element {
   }
 
   return (
-    <main className="app-shell">
-      {activeProject ? (
-        <ProjectWorkspace key={activeProject.path} project={activeProject} />
-      ) : isSettingsOpen ? (
-        <SettingsPage onBack={() => setIsSettingsOpen(false)} />
-      ) : (
-        <section className="home" aria-labelledby="recent-title">
-          <div className="home-toolbar">
-            <label className="project-search">
-              <SearchIcon />
-              <span className="sr-only">搜索项目</span>
-              <input ref={searchRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索项目" autoComplete="off" />
-              <kbd>{window.desktop.platform === 'darwin' ? '⌘K' : 'Ctrl K'}</kbd>
-            </label>
-            <div className="home-actions">
-              <button className="settings-action" type="button" onClick={() => setIsSettingsOpen(true)}>
-                <SettingsIcon />
-                设置
-              </button>
-              <button className="open-project-action" type="button" onClick={() => void chooseProject()} disabled={openingProject !== null}>
-                <FolderIcon />
-                {openingProject === 'picker' ? '正在选择…' : '选择项目'}
-              </button>
+    <main className={`app-shell app-shell-${window.desktop.platform}`}>
+      <AppTitleBar
+        activeProject={activeProject}
+        isOpeningProject={openingProject !== null}
+        onChooseProject={() => void chooseProject()}
+        onOpenProject={(project) => void openProject(project)}
+        platform={window.desktop.platform}
+        recentProjects={recentProjects}
+      />
+      <div className="app-content">
+        {activeProject ? (
+          <ProjectWorkspace key={activeProject.path} project={activeProject} />
+        ) : isSettingsOpen ? (
+          <SettingsPage onBack={() => setIsSettingsOpen(false)} />
+        ) : (
+          <section className="home" aria-labelledby="recent-title">
+            <div className="home-toolbar">
+              <label className="project-search">
+                <SearchIcon />
+                <span className="sr-only">搜索项目</span>
+                <input ref={searchRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索项目" autoComplete="off" />
+                <kbd>{window.desktop.platform === 'darwin' ? '⌘K' : 'Ctrl K'}</kbd>
+              </label>
+              <div className="home-actions">
+                <button className="settings-action" type="button" onClick={() => setIsSettingsOpen(true)}>
+                  <SettingsIcon />
+                  设置
+                </button>
+                <button className="open-project-action" type="button" onClick={() => void chooseProject()} disabled={openingProject !== null}>
+                  <FolderIcon />
+                  {openingProject === 'picker' ? '正在选择…' : '选择项目'}
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="recent-heading">
-            <h1 id="recent-title">最近项目</h1>
-            {!isLoadingProjects && recentProjects.length > 0 ? <span>{recentProjects.length} 个项目</span> : null}
-          </div>
-
-          {projectError ? (
-            <div className="project-error" role="alert">
-              <span>{projectError}</span>
-              <button type="button" onClick={() => setProjectError('')}>关闭</button>
+            <div className="recent-heading">
+              <h1 id="recent-title">最近项目</h1>
+              {!isLoadingProjects && recentProjects.length > 0 ? <span>{recentProjects.length} 个项目</span> : null}
             </div>
-          ) : null}
 
-          {isLoadingProjects ? (
-            <div className="project-list" aria-label="正在加载最近项目">
-              {[0, 1, 2].map((item) => <span className="project-skeleton" key={item} />)}
-            </div>
-          ) : filteredProjects.length > 0 ? (
-            <div className="project-list">
-              {filteredProjects.map((project) => {
-                const isOpening = openingProject === project.path
-                const style = { '--project-color': projectColor(project.path) } as CSSProperties
-                return (
-                  <article className="project-item" key={project.path} style={style}>
-                    <button className="project-open" type="button" onClick={() => void openProject(project)} disabled={openingProject !== null}>
-                      <span className="project-mark" aria-hidden="true"><span>{projectInitial(project.name)}</span></span>
-                      <span className="project-copy">
-                        <strong>{project.name}</strong>
-                        <small title={project.path}>{project.path}</small>
-                        <span className="project-time">
-                          <ClockIcon />
-                          {isOpening ? '正在打开…' : formatLastOpened(project.lastOpenedAt)}
+            {projectError ? (
+              <div className="project-error" role="alert">
+                <span>{projectError}</span>
+                <button type="button" onClick={() => setProjectError('')}>关闭</button>
+              </div>
+            ) : null}
+
+            {isLoadingProjects ? (
+              <div className="project-list" aria-label="正在加载最近项目">
+                {[0, 1, 2].map((item) => <span className="project-skeleton" key={item} />)}
+              </div>
+            ) : filteredProjects.length > 0 ? (
+              <div className="project-list">
+                {filteredProjects.map((project) => {
+                  const isOpening = openingProject === project.path
+                  const style = { '--project-color': projectColor(project.path) } as CSSProperties
+                  return (
+                    <article className="project-item" key={project.path} style={style}>
+                      <button className="project-open" type="button" onClick={() => void openProject(project)} disabled={openingProject !== null}>
+                        <span className="project-mark" aria-hidden="true"><span>{projectInitial(project.name)}</span></span>
+                        <span className="project-copy">
+                          <strong>{project.name}</strong>
+                          <small title={project.path}>{project.path}</small>
+                          <span className="project-time">
+                            <ClockIcon />
+                            {isOpening ? '正在打开…' : formatLastOpened(project.lastOpenedAt)}
+                          </span>
                         </span>
-                      </span>
-                      <span className="open-arrow" aria-hidden="true">→</span>
-                    </button>
-                    <button className="remove-project" type="button" onClick={() => void removeRecentProject(project)} aria-label={`从最近项目中移除 ${project.name}`} title="移除记录">×</button>
-                  </article>
-                )
-              })}
-            </div>
-          ) : query ? (
-            <div className="empty-state compact-empty">
-              <h2>没有匹配的项目</h2>
-              <p>换一个项目名称或路径试试。</p>
-            </div>
-          ) : (
-            <div className="empty-state">
-              <span className="empty-mark" aria-hidden="true"><span /></span>
-              <h2>从一个项目开始</h2>
-              <p>选择包含演示材料的文件夹，它会出现在最近项目中。</p>
-              <button type="button" onClick={() => void chooseProject()}><FolderIcon />选择项目</button>
-            </div>
-          )}
-        </section>
-      )}
-
+                        <span className="open-arrow" aria-hidden="true">→</span>
+                      </button>
+                      <button className="remove-project" type="button" onClick={() => void removeRecentProject(project)} aria-label={`从最近项目中移除 ${project.name}`} title="移除记录">×</button>
+                    </article>
+                  )
+                })}
+              </div>
+            ) : query ? (
+              <div className="empty-state compact-empty">
+                <h2>没有匹配的项目</h2>
+                <p>换一个项目名称或路径试试。</p>
+              </div>
+            ) : (
+              <div className="empty-state">
+                <span className="empty-mark" aria-hidden="true"><span /></span>
+                <h2>从一个项目开始</h2>
+                <p>选择包含演示材料的文件夹，它会出现在最近项目中。</p>
+                <button type="button" onClick={() => void chooseProject()}><FolderIcon />选择项目</button>
+              </div>
+            )}
+          </section>
+        )}
+      </div>
     </main>
   )
 }

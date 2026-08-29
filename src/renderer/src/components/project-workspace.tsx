@@ -153,9 +153,15 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
   const [fileError, setFileError] = useState('')
   const messageEndRef = useRef<HTMLDivElement>(null)
   const lastSavedConversationSnapshotRef = useRef('')
+  const latestConversationStateRef = useRef<ProjectConversationState>(
+    toPersistedState(conversations, selectedConversationId)
+  )
+  const canFlushConversationsRef = useRef(false)
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
+  latestConversationStateRef.current = toPersistedState(conversations, selectedConversationId)
+  canFlushConversationsRef.current = canPersistConversations && !isConversationLoading
 
   useEffect(() => {
     let active = true
@@ -235,6 +241,18 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
 
     return () => window.clearTimeout(timer)
   }, [canPersistConversations, conversations, isConversationLoading, project.path, selectedConversationId])
+
+  useEffect(() => () => {
+    if (!canFlushConversationsRef.current) return
+
+    const state = latestConversationStateRef.current
+    const snapshot = JSON.stringify(state)
+    if (snapshot === lastSavedConversationSnapshotRef.current) return
+
+    void window.projects.saveConversations(project.path, state).catch((error: unknown) => {
+      console.warn('Unable to flush project conversations:', error)
+    })
+  }, [project.path])
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })

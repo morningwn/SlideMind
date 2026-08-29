@@ -6,6 +6,7 @@ import { registerAgentIpc } from './agent/ipc'
 import { ProjectConversationStore } from './project/conversation-store'
 import { registerProjectIpc } from './project/ipc'
 import { RecentProjectStore } from './project/recent-project-store'
+import { getTitleBarWindowOptions } from './window-options'
 
 const APP_URL_PROTOCOLS = new Set(['http:', 'https:'])
 
@@ -79,6 +80,7 @@ function createWindow(): BrowserWindow {
     title: 'SlideMind',
     backgroundColor: '#f3f6fb',
     icon: join(__dirname, '../../assets/icon.png'),
+    ...getTitleBarWindowOptions(process.platform),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

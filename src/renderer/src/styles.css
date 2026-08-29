@@ -70,8 +70,116 @@ button:disabled {
 
 .app-shell {
   --page-gutter: clamp(28px, 4.5vw, 68px);
+  display: grid;
+  grid-template-rows: 46px minmax(0, 1fr);
   width: 100%;
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
+}
+
+.app-content {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.app-title-bar {
+  position: relative;
+  z-index: 100;
+  display: flex;
+  min-width: 0;
+  height: 46px;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid #dce3ef;
+  background: #f3f6fb;
+  user-select: none;
+  -webkit-app-region: drag;
+}
+
+.app-title-bar-darwin {
+  padding-left: 78px;
+}
+
+.app-title-bar-win32,
+.app-title-bar-linux {
+  padding-right: calc(
+    100vw - env(titlebar-area-x, 0px) -
+    env(titlebar-area-width, calc(100vw - 138px)) + 10px
+  );
+}
+
+.title-bar-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.title-bar-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  box-shadow: 0 2px 7px rgb(24 40 86 / 18%);
+  pointer-events: none;
+}
+
+.title-bar-project {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.title-bar-project select {
+  width: min(320px, 42vw);
+  height: 30px;
+  padding: 0 25px 0 8px;
+  overflow: hidden;
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  outline: 0;
+  color: #33415a;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 680;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+
+.title-bar-project select:hover:not(:disabled) {
+  border-color: #d7deeb;
+  background: rgb(255 255 255 / 72%);
+}
+
+.title-bar-project select:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.title-bar-project select:focus-visible {
+  border-color: #a9bce4;
+  outline: 2px solid rgb(47 97 233 / 18%);
+  outline-offset: 0;
+}
+
+.title-bar-project svg {
+  position: absolute;
+  right: 7px;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: #718097;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+  pointer-events: none;
 }
 
 .empty-mark {
@@ -487,7 +595,7 @@ button:disabled {
 
 .settings-page {
   width: 100%;
-  min-height: 100vh;
+  min-height: 100%;
   padding: 24px var(--page-gutter) 64px;
 }
 
@@ -809,7 +917,7 @@ button:disabled {
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
   width: 100%;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
   background: var(--surface);
 }
