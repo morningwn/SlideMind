@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Menu, shell } from 'electron'
+import { app, BrowserWindow, dialog, Menu, shell } from 'electron'
 import { join } from 'node:path'
 import { BaseAgentService } from './agent/base-agent'
 import { AgentConfigStore } from './agent/config-store'
@@ -108,6 +108,18 @@ function createWindow(): BrowserWindow {
         void shell.openExternal(url)
       }
     }
+  })
+
+  mainWindow.webContents.on('will-prevent-unload', (event) => {
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'warning',
+      buttons: ['不保存并退出', '取消'],
+      defaultId: 1,
+      cancelId: 1,
+      title: '存在未保存的文件',
+      message: '部分文件尚未保存。确定放弃修改并退出吗？'
+    })
+    if (choice === 0) event.preventDefault()
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {

@@ -12,6 +12,7 @@ import type {
   ProjectFileEntry
 } from '../../../shared/project'
 import { AgentModelSelect } from './agent-model-select'
+import { DocumentEditor, type OpenTextDocument } from './document-editor'
 
 interface ChatMessage extends ConversationMessage {
   isStreaming?: boolean
@@ -25,6 +26,7 @@ interface Conversation {
 
 interface ProjectWorkspaceProps {
   project: OpenedProject
+  onDirtyChange: (isDirty: boolean) => void
 }
 
 interface FileTreeLevelProps {
@@ -33,6 +35,10 @@ interface FileTreeLevelProps {
   entriesByDirectory: Readonly<Record<string, ProjectFileEntry[]>>
   expandedPaths: ReadonlySet<string>
   loadingPaths: ReadonlySet<string>
+  activeFilePath: string | null
+  selectedFilePath: string | null
+  onOpenFile: (entry: ProjectFileEntry) => void
+  onSelectFile: (path: string) => void
   onToggle: (entry: ProjectFileEntry) => void
 }
 
@@ -88,6 +94,10 @@ function FileTreeLevel({
   entriesByDirectory,
   expandedPaths,
   loadingPaths,
+  activeFilePath,
+  selectedFilePath,
+  onOpenFile,
+  onSelectFile,
   onToggle
 }: FileTreeLevelProps): React.JSX.Element {
   const entries = entriesByDirectory[directoryPath] ?? []
@@ -101,15 +111,22 @@ function FileTreeLevel({
         return (
           <div className="file-tree-branch" key={entry.path}>
             <button
-              className={`file-tree-item ${isDirectory ? 'file-tree-directory' : ''}`}
+              className={`file-tree-item${isDirectory ? ' file-tree-directory' : ''}${entry.path === selectedFilePath ? ' file-tree-item-selected' : ''}${entry.path === activeFilePath ? ' file-tree-item-active' : ''}`}
               style={{ '--tree-depth': depth } as React.CSSProperties}
               type="button"
               role="treeitem"
               aria-expanded={isDirectory ? isExpanded : undefined}
               onClick={() => {
                 if (isDirectory) onToggle(entry)
+                else onSelectFile(entry.path)
               }}
-              tabIndex={isDirectory ? 0 : -1}
+              onDoubleClick={() => {
+                if (!isDirectory) onOpenFile(entry)
+              }}
+              onKeyDown={(event) => {
+                if (!isDirectory && event.key === 'Enter') onOpenFile(entry)
+              }}
+              tabIndex={0}
             >
               <span className="tree-chevron" aria-hidden="true">
                 {isDirectory ? (isLoading ? '·' : isExpanded ? '⌄' : '›') : ''}
@@ -126,6 +143,10 @@ function FileTreeLevel({
                 entriesByDirectory={entriesByDirectory}
                 expandedPaths={expandedPaths}
                 loadingPaths={loadingPaths}
+                activeFilePath={activeFilePath}
+                selectedFilePath={selectedFilePath}
+                onOpenFile={onOpenFile}
+                onSelectFile={onSelectFile}
                 onToggle={onToggle}
               />
             ) : null}
@@ -136,7 +157,7 @@ function FileTreeLevel({
   )
 }
 
-export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.Element {
+export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspaceProps): React.JSX.Element {
   const [conversations, setConversations] = useState<Conversation[]>(() => [createConversation()])
   const [selectedConversationId, setSelectedConversationId] = useState(() => conversations[0].id)
   const [draft, setDraft] = useState('')
@@ -151,6 +172,10 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set(['']))
   const [fileError, setFileError] = useState('')
+  const [openDocuments, setOpenDocuments] = useState<OpenTextDocument[]>([])
+  const [activeDocumentPath, setActiveDocumentPath] = useState<string | null>(null)
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
+  const [openingFilePaths, setOpeningFilePaths] = useState<Set<string>>(new Set())
   const messageEndRef = useRef<HTMLDivElement>(null)
   const lastSavedConversationSnapshotRef = useRef('')
   const latestConversationStateRef = useRef<ProjectConversationState>(
@@ -160,8 +185,27 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
+  const activeDocument = openDocuments.find((document) => document.path === activeDocumentPath)
+  const hasDirtyDocuments = openDocuments.some(
+    (document) => document.content !== document.savedContent
+  )
   latestConversationStateRef.current = toPersistedState(conversations, selectedConversationId)
   canFlushConversationsRef.current = canPersistConversations && !isConversationLoading
+
+  useEffect(() => {
+    onDirtyChange(hasDirtyDocuments)
+  }, [hasDirtyDocuments, onDirtyChange])
+
+  useEffect(() => {
+    function protectUnsavedDocuments(event: BeforeUnloadEvent): void {
+      if (!hasDirtyDocuments) return
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', protectUnsavedDocuments)
+    return () => window.removeEventListener('beforeunload', protectUnsavedDocuments)
+  }, [hasDirtyDocuments])
 
   useEffect(() => {
     let active = true
@@ -299,6 +343,7 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
 
   function startConversation(): void {
     if (isConversationLoading) return
+    setActiveDocumentPath(null)
     const existingDraft = conversations.find((conversation) =>
       loadedConversationIds.has(conversation.id) && conversation.messages.length === 0
     )
@@ -318,6 +363,7 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
   }
 
   async function selectConversation(conversationId: string): Promise<void> {
+    setActiveDocumentPath(null)
     setSelectedConversationId(conversationId)
     setChatError('')
     if (loadedConversationIds.has(conversationId) || loadingConversationIds.has(conversationId)) {
@@ -374,6 +420,151 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
         next.delete(entry.path)
         return next
       })
+    }
+  }
+
+  async function openFile(entry: ProjectFileEntry): Promise<void> {
+    const existingDocument = openDocuments.find((document) => document.path === entry.path)
+    if (existingDocument) {
+      setActiveDocumentPath(existingDocument.path)
+      setSelectedFilePath(existingDocument.path)
+      return
+    }
+    if (openingFilePaths.has(entry.path)) return
+
+    setOpeningFilePaths((current) => new Set(current).add(entry.path))
+    setSelectedFilePath(entry.path)
+    setFileError('')
+    try {
+      const file = await window.projects.readTextFile(project.handle, entry.path)
+      const document: OpenTextDocument = {
+        ...file,
+        name: entry.name,
+        savedContent: file.content,
+        isSaving: false,
+        conflict: false,
+        error: ''
+      }
+      setOpenDocuments((current) =>
+        current.some((candidate) => candidate.path === file.path)
+          ? current
+          : [...current, document]
+      )
+      setActiveDocumentPath(file.path)
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : '无法打开文件')
+    } finally {
+      setOpeningFilePaths((current) => {
+        const next = new Set(current)
+        next.delete(entry.path)
+        return next
+      })
+    }
+  }
+
+  function updateDocument(path: string, content: string): void {
+    setOpenDocuments((current) => current.map((document) =>
+      document.path === path ? { ...document, content, error: '' } : document
+    ))
+  }
+
+  async function saveDocument(path: string): Promise<void> {
+    const document = openDocuments.find((candidate) => candidate.path === path)
+    if (
+      !document ||
+      document.isSaving ||
+      document.conflict ||
+      document.content === document.savedContent
+    ) return
+
+    const savedContent = document.content
+    setOpenDocuments((current) => current.map((candidate) =>
+      candidate.path === path ? { ...candidate, isSaving: true, error: '' } : candidate
+    ))
+    try {
+      const result = await window.projects.saveTextFile(project.handle, {
+        path,
+        content: savedContent,
+        revision: document.revision,
+        hasBom: document.hasBom
+      })
+      setOpenDocuments((current) => current.map((candidate) => {
+        if (candidate.path !== path) return candidate
+        if (!result.ok) {
+          return {
+            ...candidate,
+            isSaving: false,
+            conflict: true,
+            error: '文件已被其他程序修改。重新载入会放弃当前未保存内容。'
+          }
+        }
+        return {
+          ...candidate,
+          savedContent,
+          revision: result.revision,
+          isSaving: false,
+          conflict: false,
+          error: ''
+        }
+      }))
+    } catch (error) {
+      setOpenDocuments((current) => current.map((candidate) =>
+        candidate.path === path
+          ? {
+              ...candidate,
+              isSaving: false,
+              error: error instanceof Error ? error.message : '无法保存文件'
+            }
+          : candidate
+      ))
+    }
+  }
+
+  async function reloadDocument(path: string): Promise<void> {
+    const document = openDocuments.find((candidate) => candidate.path === path)
+    if (!document) return
+    if (
+      document.content !== document.savedContent &&
+      !window.confirm(`重新载入 ${document.name}？当前未保存内容将丢失。`)
+    ) return
+
+    try {
+      const file = await window.projects.readTextFile(project.handle, path)
+      setOpenDocuments((current) => current.map((candidate) =>
+        candidate.path === path
+          ? {
+              ...candidate,
+              ...file,
+              savedContent: file.content,
+              isSaving: false,
+              conflict: false,
+              error: ''
+            }
+          : candidate
+      ))
+    } catch (error) {
+      setOpenDocuments((current) => current.map((candidate) =>
+        candidate.path === path
+          ? { ...candidate, error: error instanceof Error ? error.message : '无法重新载入文件' }
+          : candidate
+      ))
+    }
+  }
+
+  function closeDocument(path: string): void {
+    const documentIndex = openDocuments.findIndex((document) => document.path === path)
+    const document = openDocuments[documentIndex]
+    if (!document) return
+    if (
+      document.content !== document.savedContent &&
+      !window.confirm(`关闭 ${document.name}？当前未保存内容将丢失。`)
+    ) return
+
+    const remaining = openDocuments.filter((candidate) => candidate.path !== path)
+    setOpenDocuments(remaining)
+    if (activeDocumentPath === path) {
+      const nextDocument = remaining[Math.min(documentIndex, remaining.length - 1)]
+      setActiveDocumentPath(nextDocument?.path ?? null)
     }
   }
 
@@ -500,6 +691,10 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
                 entriesByDirectory={entriesByDirectory}
                 expandedPaths={expandedPaths}
                 loadingPaths={loadingPaths}
+                activeFilePath={activeDocumentPath}
+                selectedFilePath={selectedFilePath}
+                onOpenFile={(entry) => void openFile(entry)}
+                onSelectFile={setSelectedFilePath}
                 onToggle={(entry) => void toggleDirectory(entry)}
               />
             )}
@@ -507,65 +702,124 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
         </section>
       </aside>
 
-      <section className="chat-panel" aria-labelledby="active-conversation-title">
-        <header className="chat-heading">
-          <div>
-            <h1 id="active-conversation-title">{selectedConversation.title}</h1>
-            <span>{project.name}</span>
-          </div>
-        </header>
-
-        <div className="message-stream" aria-live="polite">
-          {loadingConversationIds.has(selectedConversation.id) ? (
-            <p className="sidebar-loading">正在加载 Pi 会话…</p>
-          ) : selectedConversation.messages.length === 0 ? (
-            <div className="chat-empty">
-              <span className="chat-empty-mark" aria-hidden="true"><i /><i /><i /></span>
-              <h2>从项目材料开始思考</h2>
-              <p>描述你的演示目标、受众或手头的问题，SlideMind 会和你一起梳理叙事。</p>
-            </div>
-          ) : (
-            <div className="message-list">
-              {selectedConversation.messages.map((message) => (
-                <article
-                  className={`chat-message chat-message-${message.role}${message.isStreaming && !message.text ? ' chat-message-loading' : ''}${message.isStreaming && message.text ? ' chat-message-streaming' : ''}`}
-                  key={message.id}
+      <section className="workspace-main">
+        <nav className="workspace-tabs" aria-label="打开的内容" role="tablist">
+          <button
+            className={`workspace-tab workspace-chat-tab${activeDocument ? '' : ' workspace-tab-active'}`}
+            type="button"
+            role="tab"
+            aria-selected={!activeDocument}
+            onClick={() => setActiveDocumentPath(null)}
+          >
+            <ConversationIcon />
+            <span>{selectedConversation.title}</span>
+          </button>
+          {openDocuments.map((document) => {
+            const isDirty = document.content !== document.savedContent
+            const isActive = document.path === activeDocument?.path
+            return (
+              <div
+                className={`workspace-document-tab${isActive ? ' workspace-tab-active' : ''}`}
+                key={document.path}
+                role="presentation"
+              >
+                <button
+                  className="workspace-document-tab-main"
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  title={document.path}
+                  onClick={() => {
+                    setActiveDocumentPath(document.path)
+                    setSelectedFilePath(document.path)
+                  }}
                 >
-                  <span>{message.role === 'user' ? '你' : 'SM'}</span>
-                  {message.isStreaming && !message.text ? (
-                    <p><i /><i /><i /></p>
-                  ) : (
-                    <p>{message.text}</p>
-                  )}
-                </article>
-              ))}
-            </div>
-          )}
-          <div ref={messageEndRef} />
-        </div>
-
-        <form className="chat-composer" onSubmit={(event) => void sendMessage(event)}>
-          {conversationError ? <p className="composer-error" role="alert">{conversationError}</p> : null}
-          {chatError ? <p className="composer-error" role="alert">{chatError}</p> : null}
-          <div className="composer-box">
-            <textarea
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={handleComposerKeyDown}
-              placeholder="输入消息，和 SlideMind 一起梳理演示…"
-              rows={2}
-              disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
-              aria-label="对话消息"
-            />
-            <div className="composer-footer">
-              <span>Enter 发送 · Shift Enter 换行</span>
-              <div className="composer-actions">
-                <AgentModelSelect disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} />
-                <button className="composer-send" type="submit" disabled={!draft.trim() || isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} aria-label="发送消息">↑</button>
+                  <FileIcon />
+                  <span>{document.name}</span>
+                  {isDirty ? <i aria-label="未保存" /> : null}
+                </button>
+                <button
+                  className="workspace-tab-close"
+                  type="button"
+                  aria-label={`关闭 ${document.name}`}
+                  onClick={() => closeDocument(document.path)}
+                >×</button>
               </div>
+            )
+          })}
+        </nav>
+
+        {activeDocument ? (
+          <DocumentEditor
+            key={activeDocument.path}
+            document={activeDocument}
+            onChange={(content) => updateDocument(activeDocument.path, content)}
+            onReload={() => void reloadDocument(activeDocument.path)}
+            onSave={() => void saveDocument(activeDocument.path)}
+            projectHandle={project.handle}
+          />
+        ) : (
+          <section className="chat-panel" aria-labelledby="active-conversation-title">
+            <header className="chat-heading">
+              <div>
+                <h1 id="active-conversation-title">{selectedConversation.title}</h1>
+                <span>{project.name}</span>
+              </div>
+            </header>
+
+            <div className="message-stream" aria-live="polite">
+              {loadingConversationIds.has(selectedConversation.id) ? (
+                <p className="sidebar-loading">正在加载 Pi 会话…</p>
+              ) : selectedConversation.messages.length === 0 ? (
+                <div className="chat-empty">
+                  <span className="chat-empty-mark" aria-hidden="true"><i /><i /><i /></span>
+                  <h2>从项目材料开始思考</h2>
+                  <p>描述你的演示目标、受众或手头的问题，SlideMind 会和你一起梳理叙事。</p>
+                </div>
+              ) : (
+                <div className="message-list">
+                  {selectedConversation.messages.map((message) => (
+                    <article
+                      className={`chat-message chat-message-${message.role}${message.isStreaming && !message.text ? ' chat-message-loading' : ''}${message.isStreaming && message.text ? ' chat-message-streaming' : ''}`}
+                      key={message.id}
+                    >
+                      <span>{message.role === 'user' ? '你' : 'SM'}</span>
+                      {message.isStreaming && !message.text ? (
+                        <p><i /><i /><i /></p>
+                      ) : (
+                        <p>{message.text}</p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              )}
+              <div ref={messageEndRef} />
             </div>
-          </div>
-        </form>
+
+            <form className="chat-composer" onSubmit={(event) => void sendMessage(event)}>
+              {conversationError ? <p className="composer-error" role="alert">{conversationError}</p> : null}
+              {chatError ? <p className="composer-error" role="alert">{chatError}</p> : null}
+              <div className="composer-box">
+                <textarea
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  onKeyDown={handleComposerKeyDown}
+                  placeholder="输入消息，和 SlideMind 一起梳理演示…"
+                  rows={2}
+                  disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
+                  aria-label="对话消息"
+                />
+                <div className="composer-footer">
+                  <span>Enter 发送 · Shift Enter 换行</span>
+                  <div className="composer-actions">
+                    <AgentModelSelect disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} />
+                    <button className="composer-send" type="submit" disabled={!draft.trim() || isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} aria-label="发送消息">↑</button>
+                  </div>
+                </div>
+              </div>
+            </form>
+          </section>
+        )}
       </section>
     </section>
   )

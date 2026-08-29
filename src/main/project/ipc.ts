@@ -4,12 +4,14 @@ import { ProjectConversationStore } from './conversation-store'
 import { RecentProjectStore, resolveProject } from './recent-project-store'
 import { listProjectDirectory } from './project-files'
 import { ProjectRootRegistry } from './project-root-registry'
+import { ProjectTextFileStore } from './project-text-files'
 
 export function registerProjectIpc(
   store: RecentProjectStore,
   conversationStore: ProjectConversationStore,
   projectRoots: ProjectRootRegistry
 ): void {
+  const textFileStore = new ProjectTextFileStore()
   ipcMain.handle('project:list-recent', () => store.list())
 
   ipcMain.handle('project:choose-folder', async (): Promise<OpenedProject | null> => {
@@ -55,6 +57,32 @@ export function registerProjectIpc(
     'project:list-directory',
     (_event, projectHandle: unknown, relativePath: unknown) =>
       listProjectDirectory(projectRoots.resolve(projectHandle), relativePath)
+  )
+
+  ipcMain.handle(
+    'project:read-text-file',
+    (_event, projectHandle: unknown, relativePath: unknown) =>
+      textFileStore.read(projectRoots.resolve(projectHandle), relativePath)
+  )
+
+  ipcMain.handle(
+    'project:save-text-file',
+    (_event, projectHandle: unknown, input: unknown) =>
+      textFileStore.save(projectRoots.resolve(projectHandle), input)
+  )
+
+  ipcMain.handle(
+    'project:read-preview-asset',
+    (
+      _event,
+      projectHandle: unknown,
+      documentPath: unknown,
+      assetPath: unknown
+    ) => textFileStore.readPreviewAsset(
+      projectRoots.resolve(projectHandle),
+      documentPath,
+      assetPath
+    )
   )
 
   ipcMain.handle(

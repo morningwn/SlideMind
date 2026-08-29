@@ -81,6 +81,7 @@ function App(): React.JSX.Element {
   const [openingProject, setOpeningProject] = useState<string | null>(null)
   const [projectError, setProjectError] = useState('')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [hasUnsavedDocuments, setHasUnsavedDocuments] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -134,12 +135,20 @@ function App(): React.JSX.Element {
   }, [query, recentProjects])
 
   async function chooseProject(): Promise<void> {
+    if (
+      activeProject &&
+      hasUnsavedDocuments &&
+      !window.confirm('当前项目有未保存的文件。切换项目将丢失这些修改，是否继续？')
+    ) return
+
     setOpeningProject('picker')
     setProjectError('')
     try {
       const project = await window.projects.chooseFolder()
       if (project) {
         rememberProject(project)
+        if (project.path === activeProject?.path) return
+        setHasUnsavedDocuments(false)
         setActiveProject(project)
       }
     } catch (error) {
@@ -150,11 +159,19 @@ function App(): React.JSX.Element {
   }
 
   async function openProject(project: ProjectInfo): Promise<void> {
+    if (project.path === activeProject?.path) return
+    if (
+      activeProject &&
+      hasUnsavedDocuments &&
+      !window.confirm('当前项目有未保存的文件。切换项目将丢失这些修改，是否继续？')
+    ) return
+
     setOpeningProject(project.path)
     setProjectError('')
     try {
       const openedProject = await window.projects.open(project.path)
       rememberProject(openedProject)
+      setHasUnsavedDocuments(false)
       setActiveProject(openedProject)
     } catch (error) {
       setProjectError(error instanceof Error ? error.message : '无法打开项目')
@@ -191,7 +208,11 @@ function App(): React.JSX.Element {
       />
       <div className="app-content">
         {activeProject ? (
-          <ProjectWorkspace key={activeProject.path} project={activeProject} />
+          <ProjectWorkspace
+            key={activeProject.path}
+            project={activeProject}
+            onDirtyChange={setHasUnsavedDocuments}
+          />
         ) : isSettingsOpen ? (
           <SettingsPage onBack={() => setIsSettingsOpen(false)} />
         ) : (

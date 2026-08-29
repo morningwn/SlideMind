@@ -5,7 +5,11 @@ import type {
   AgentStreamEvent,
   SaveAgentConfigInput
 } from '../shared/agent'
-import type { ProjectApi, ProjectConversationState } from '../shared/project'
+import type {
+  ProjectApi,
+  ProjectConversationState,
+  SaveProjectTextFileInput
+} from '../shared/project'
 
 const desktopApi = Object.freeze({
   platform: process.platform,
@@ -40,6 +44,12 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
   removeRecent: (path: string) => ipcRenderer.invoke('project:remove-recent', path),
   listDirectory: (projectHandle: string, relativePath: string) =>
     ipcRenderer.invoke('project:list-directory', projectHandle, relativePath),
+  readTextFile: (projectHandle: string, relativePath: string) =>
+    ipcRenderer.invoke('project:read-text-file', projectHandle, relativePath),
+  readPreviewAsset: (projectHandle: string, documentPath: string, assetPath: string) =>
+    ipcRenderer.invoke('project:read-preview-asset', projectHandle, documentPath, assetPath),
+  saveTextFile: (projectHandle: string, input: SaveProjectTextFileInput) =>
+    ipcRenderer.invoke('project:save-text-file', projectHandle, input),
   loadConversations: (projectHandle: string) =>
     ipcRenderer.invoke('project:load-conversations', projectHandle),
   loadConversationMessages: (projectHandle: string, conversationId: string) =>

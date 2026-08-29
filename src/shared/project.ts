@@ -14,6 +14,28 @@ export interface ProjectFileEntry {
   path: string
 }
 
+export type ProjectTextFileKind = 'markdown' | 'text'
+
+export interface ProjectTextFile {
+  path: string
+  kind: ProjectTextFileKind
+  content: string
+  revision: string
+  lineEnding: 'lf' | 'crlf'
+  hasBom: boolean
+}
+
+export interface SaveProjectTextFileInput {
+  path: string
+  content: string
+  revision: string
+  hasBom: boolean
+}
+
+export type SaveProjectTextFileResult =
+  | { ok: true; revision: string }
+  | { ok: false; reason: 'conflict'; currentRevision: string }
+
 export interface ConversationMessage {
   id: string
   role: 'assistant' | 'user'
@@ -36,6 +58,16 @@ export interface ProjectApi {
   open(path: string): Promise<OpenedProject>
   removeRecent(path: string): Promise<ProjectInfo[]>
   listDirectory(projectHandle: string, relativePath: string): Promise<ProjectFileEntry[]>
+  readTextFile(projectHandle: string, relativePath: string): Promise<ProjectTextFile>
+  readPreviewAsset(
+    projectHandle: string,
+    documentPath: string,
+    assetPath: string
+  ): Promise<string>
+  saveTextFile(
+    projectHandle: string,
+    input: SaveProjectTextFileInput
+  ): Promise<SaveProjectTextFileResult>
   loadConversations(projectHandle: string): Promise<ProjectConversationState | null>
   loadConversationMessages(
     projectHandle: string,
