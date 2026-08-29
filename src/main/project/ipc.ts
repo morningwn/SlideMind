@@ -11,7 +11,7 @@ export function registerProjectIpc(store: RecentProjectStore): void {
     const options: Electron.OpenDialogOptions = {
       title: '选择 SlideMind 项目',
       buttonLabel: '打开项目',
-      properties: ['openDirectory']
+      properties: ['openDirectory', 'createDirectory']
     }
     const result = owner
       ? await dialog.showOpenDialog(owner, options)
