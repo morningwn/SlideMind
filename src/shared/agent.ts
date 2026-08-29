@@ -38,9 +38,22 @@ export interface AgentPromptResult {
   modelId: string
 }
 
+export interface AgentPromptInput {
+  requestId: string
+  conversationId: string
+  projectPath: string
+  input: string
+}
+
+export interface AgentStreamEvent {
+  requestId: string
+  conversationId: string
+  delta: string
+}
+
 export interface AgentApi {
   getConfig(): Promise<AgentConfigStatus>
   saveConfig(input: SaveAgentConfigInput): Promise<AgentConfigStatus>
-  prompt(input: string): Promise<AgentPromptResult>
+  prompt(input: AgentPromptInput): Promise<AgentPromptResult>
+  onStream(listener: (event: AgentStreamEvent) => void): () => void
 }
-

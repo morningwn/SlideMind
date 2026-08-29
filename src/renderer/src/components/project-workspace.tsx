@@ -6,11 +6,13 @@ import {
   type KeyboardEvent
 } from 'react'
 import type { ProjectFileEntry, ProjectInfo } from '../../../shared/project'
+import { AgentSettings } from './agent-settings'
 
 interface ChatMessage {
   id: string
   role: 'assistant' | 'user'
   text: string
+  isStreaming?: boolean
 }
 
 interface Conversation {
@@ -155,7 +157,22 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [selectedConversation.messages.length, isSending])
+  }, [selectedConversation.messages, isSending])
+
+  useEffect(() => window.agent.onStream((event) => {
+    setConversations((current) => current.map((conversation) =>
+      conversation.id === event.conversationId
+        ? {
+            ...conversation,
+            messages: conversation.messages.map((message) =>
+              message.id === event.requestId
+                ? { ...message, text: `${message.text}${event.delta}` }
+                : message
+            )
+          }
+        : conversation
+    ))
+  }), [])
 
   function startConversation(): void {
     const conversation = createConversation()
@@ -205,7 +222,14 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
     if (!prompt || isSending) return
 
     const conversationId = selectedConversation.id
+    const requestId = crypto.randomUUID()
     const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', text: prompt }
+    const assistantMessage: ChatMessage = {
+      id: requestId,
+      role: 'assistant',
+      text: '',
+      isStreaming: true
+    }
     setDraft('')
     setChatError('')
     setIsSending(true)
@@ -214,24 +238,39 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
         ? {
             ...conversation,
             title: conversation.messages.length === 0 ? prompt.slice(0, 24) : conversation.title,
-            messages: [...conversation.messages, userMessage]
+            messages: [...conversation.messages, userMessage, assistantMessage]
           }
         : conversation
     ))
 
     try {
-      const result = await window.agent.prompt(prompt)
-      const assistantMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        text: result.text
-      }
+      const result = await window.agent.prompt({
+        requestId,
+        conversationId,
+        projectPath: project.path,
+        input: prompt
+      })
       setConversations((current) => current.map((conversation) =>
         conversation.id === conversationId
-          ? { ...conversation, messages: [...conversation.messages, assistantMessage] }
+          ? {
+              ...conversation,
+              messages: conversation.messages.map((message) =>
+                message.id === requestId
+                  ? { ...message, text: result.text, isStreaming: false }
+                  : message
+              )
+            }
           : conversation
       ))
     } catch (error) {
+      setConversations((current) => current.map((conversation) =>
+        conversation.id === conversationId
+          ? {
+              ...conversation,
+              messages: conversation.messages.filter((message) => message.id !== requestId)
+            }
+          : conversation
+      ))
       setChatError(error instanceof Error ? error.message : '暂时无法获取回复')
     } finally {
       setIsSending(false)
@@ -314,16 +353,18 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
           ) : (
             <div className="message-list">
               {selectedConversation.messages.map((message) => (
-                <article className={`chat-message chat-message-${message.role}`} key={message.id}>
+                <article
+                  className={`chat-message chat-message-${message.role}${message.isStreaming && !message.text ? ' chat-message-loading' : ''}${message.isStreaming && message.text ? ' chat-message-streaming' : ''}`}
+                  key={message.id}
+                >
                   <span>{message.role === 'user' ? '你' : 'SM'}</span>
-                  <p>{message.text}</p>
+                  {message.isStreaming && !message.text ? (
+                    <p><i /><i /><i /></p>
+                  ) : (
+                    <p>{message.text}</p>
+                  )}
                 </article>
               ))}
-              {isSending ? (
-                <article className="chat-message chat-message-assistant chat-message-loading">
-                  <span>SM</span><p><i /><i /><i /></p>
-                </article>
-              ) : null}
             </div>
           )}
           <div ref={messageEndRef} />
@@ -342,8 +383,11 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
               aria-label="对话消息"
             />
             <div className="composer-footer">
-              <span>Enter 发送 · Shift Enter 换行</span>
-              <button type="submit" disabled={!draft.trim() || isSending} aria-label="发送消息">↑</button>
+              <div>
+                <AgentSettings />
+                <span>Enter 发送 · Shift Enter 换行</span>
+              </div>
+              <button className="composer-send" type="submit" disabled={!draft.trim() || isSending} aria-label="发送消息">↑</button>
             </div>
           </div>
         </form>

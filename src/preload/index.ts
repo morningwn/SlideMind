@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AgentApi, SaveAgentConfigInput } from '../shared/agent'
+import type {
+  AgentApi,
+  AgentPromptInput,
+  AgentStreamEvent,
+  SaveAgentConfigInput
+} from '../shared/agent'
 import type { ProjectApi } from '../shared/project'
 
 const desktopApi = Object.freeze({
@@ -16,7 +21,14 @@ contextBridge.exposeInMainWorld('desktop', desktopApi)
 const agentApi: Readonly<AgentApi> = Object.freeze({
   getConfig: () => ipcRenderer.invoke('agent:get-config'),
   saveConfig: (input: SaveAgentConfigInput) => ipcRenderer.invoke('agent:save-config', input),
-  prompt: (input: string) => ipcRenderer.invoke('agent:prompt', input)
+  prompt: (input: AgentPromptInput) => ipcRenderer.invoke('agent:prompt', input),
+  onStream: (listener: (event: AgentStreamEvent) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, streamEvent: AgentStreamEvent): void => {
+      listener(streamEvent)
+    }
+    ipcRenderer.on('agent:stream', handler)
+    return () => ipcRenderer.removeListener('agent:stream', handler)
+  }
 })
 
 contextBridge.exposeInMainWorld('agent', agentApi)

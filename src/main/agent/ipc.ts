@@ -23,7 +23,13 @@ export function registerAgentIpc(configStore: AgentConfigStore, agentService: Ba
 
   ipcMain.handle('agent:prompt', (event, input: unknown) => {
     assertTrustedRenderer(event)
-    return agentService.prompt(input)
+    return agentService.prompt(input, (prompt, delta) => {
+      if (event.sender.isDestroyed()) return
+      event.sender.send('agent:stream', {
+        requestId: prompt.requestId,
+        conversationId: prompt.conversationId,
+        delta
+      })
+    })
   })
 }
-

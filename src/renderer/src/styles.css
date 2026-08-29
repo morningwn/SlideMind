@@ -830,8 +830,24 @@ button.file-tree-directory {
 .chat-message-loading i:nth-child(2) { animation-delay: 160ms; }
 .chat-message-loading i:nth-child(3) { animation-delay: 320ms; }
 
+.chat-message-streaming p::after {
+  display: inline-block;
+  width: 5px;
+  height: 14px;
+  margin-left: 3px;
+  border-radius: 2px;
+  background: #8795ac;
+  content: '';
+  vertical-align: -2px;
+  animation: stream-caret 700ms ease-in-out infinite alternate;
+}
+
 @keyframes message-pulse {
   to { opacity: 0.3; transform: translateY(-2px); }
+}
+
+@keyframes stream-caret {
+  to { opacity: 0.2; }
 }
 
 .chat-composer {
@@ -890,12 +906,18 @@ button.file-tree-directory {
   padding: 0 9px 9px 15px;
 }
 
-.composer-footer > span {
+.composer-footer > div {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.composer-footer > div > span {
   color: #9aa5b5;
   font-size: 9px;
 }
 
-.composer-footer button {
+.composer-send {
   display: grid;
   width: 30px;
   height: 30px;
@@ -909,9 +931,158 @@ button.file-tree-directory {
   font-size: 17px;
 }
 
-.composer-footer button:disabled {
+.composer-send:disabled {
   cursor: default;
   opacity: 0.35;
+}
+
+.composer-agent-settings {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 6px;
+  color: #6f7c90;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+}
+
+.composer-agent-settings:hover {
+  color: #3f5ea9;
+  background: #f0f4fd;
+}
+
+.composer-agent-settings i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d59a32;
+}
+
+.composer-agent-configured i {
+  background: #48ad87;
+}
+
+.agent-settings-dialog {
+  width: min(430px, calc(100vw - 40px));
+  padding: 0;
+  border: 1px solid #dce3ed;
+  border-radius: 18px;
+  color: var(--ink);
+  background: white;
+  box-shadow: 0 28px 80px rgb(31 48 82 / 22%);
+}
+
+.agent-settings-dialog::backdrop {
+  background: rgb(29 39 58 / 24%);
+  backdrop-filter: blur(3px);
+}
+
+.agent-settings-dialog form {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+}
+
+.agent-settings-dialog header,
+.agent-settings-dialog footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-settings-dialog header span {
+  color: var(--blue);
+  font-size: 9px;
+  font-weight: 780;
+  letter-spacing: 0.12em;
+}
+
+.agent-settings-dialog h2 {
+  margin: 3px 0 0;
+  font-size: 19px;
+}
+
+.agent-settings-dialog header > button {
+  padding: 4px 8px;
+  border: 0;
+  color: #8d98a9;
+  background: transparent;
+  cursor: pointer;
+  font-size: 22px;
+}
+
+.agent-settings-dialog label {
+  display: grid;
+  gap: 7px;
+  color: #536178;
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.agent-settings-dialog select,
+.agent-settings-dialog input {
+  width: 100%;
+  height: 40px;
+  padding: 0 11px;
+  border: 1px solid #d5deeb;
+  border-radius: 9px;
+  outline: none;
+  color: var(--ink);
+  background: #fbfcfe;
+  font: inherit;
+  font-size: 12px;
+}
+
+.agent-settings-dialog select:focus,
+.agent-settings-dialog input:focus {
+  border-color: #8ea9e9;
+  box-shadow: 0 0 0 3px rgb(47 97 233 / 9%);
+}
+
+.agent-settings-dialog label small {
+  color: #98a3b4;
+  font-size: 9px;
+  font-weight: 450;
+}
+
+.agent-settings-dialog form > p {
+  margin: -8px 0 0;
+  color: #bd3d35;
+  font-size: 11px;
+}
+
+.agent-settings-dialog footer {
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.agent-settings-dialog footer button {
+  min-width: 76px;
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid #d5deeb;
+  border-radius: 8px;
+  color: #5e6a7c;
+  background: white;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.agent-settings-dialog footer button[type='submit'] {
+  border-color: var(--blue);
+  color: white;
+  background: var(--blue);
+}
+
+.agent-settings-dialog footer button:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 @media (max-width: 700px) {
