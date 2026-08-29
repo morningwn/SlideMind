@@ -7,6 +7,7 @@ import {
 } from 'react'
 import type { ProjectInfo } from '../../shared/project'
 import { ProjectWorkspace } from './components/project-workspace'
+import { SettingsPage } from './components/settings-page'
 
 const projectColors = ['#6f7cff', '#d59a32', '#48ad87', '#bd62c9', '#31a6bc', '#d8628c']
 
@@ -62,6 +63,15 @@ function ClockIcon(): React.JSX.Element {
   )
 }
 
+function SettingsIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.2 13.5a7.8 7.8 0 0 0 0-3l2-1.5-2-3.4-2.4 1a8 8 0 0 0-2.6-1.5L14 2.5h-4l-.3 2.6a8 8 0 0 0-2.6 1.5l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 3l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 2.6 1.5l.3 2.6h4l.3-2.6a8 8 0 0 0 2.6-1.5l2.4 1 2-3.4z" />
+    </svg>
+  )
+}
+
 function App(): React.JSX.Element {
   const [recentProjects, setRecentProjects] = useState<ProjectInfo[]>([])
   const [activeProject, setActiveProject] = useState<ProjectInfo | null>(null)
@@ -69,6 +79,7 @@ function App(): React.JSX.Element {
   const [isLoadingProjects, setIsLoadingProjects] = useState(true)
   const [openingProject, setOpeningProject] = useState<string | null>(null)
   const [projectError, setProjectError] = useState('')
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -94,20 +105,24 @@ function App(): React.JSX.Element {
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent): void {
       const shortcutModifier = window.desktop.platform === 'darwin' ? event.metaKey : event.ctrlKey
-      if (shortcutModifier && event.key.toLowerCase() === 'o') {
+      if (shortcutModifier && event.key.toLowerCase() === 'o' && !isSettingsOpen) {
         event.preventDefault()
         if (!activeProject && !openingProject) void chooseProject()
       }
 
-      if (shortcutModifier && event.key.toLowerCase() === 'k' && !activeProject) {
+      if (shortcutModifier && event.key.toLowerCase() === 'k' && !activeProject && !isSettingsOpen) {
         event.preventDefault()
         searchRef.current?.focus()
+      }
+
+      if (event.key === 'Escape' && isSettingsOpen) {
+        setIsSettingsOpen(false)
       }
     }
 
     window.addEventListener('keydown', handleShortcut)
     return () => window.removeEventListener('keydown', handleShortcut)
-  }, [activeProject, openingProject])
+  }, [activeProject, isSettingsOpen, openingProject])
 
   const filteredProjects = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase()
@@ -167,6 +182,8 @@ function App(): React.JSX.Element {
     <main className="app-shell">
       {activeProject ? (
         <ProjectWorkspace project={activeProject} />
+      ) : isSettingsOpen ? (
+        <SettingsPage onBack={() => setIsSettingsOpen(false)} />
       ) : (
         <section className="home" aria-labelledby="recent-title">
           <div className="home-toolbar">
@@ -176,10 +193,16 @@ function App(): React.JSX.Element {
               <input ref={searchRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索项目" autoComplete="off" />
               <kbd>{window.desktop.platform === 'darwin' ? '⌘K' : 'Ctrl K'}</kbd>
             </label>
-            <button className="open-project-action" type="button" onClick={() => void chooseProject()} disabled={openingProject !== null}>
-              <FolderIcon />
-              {openingProject === 'picker' ? '正在选择…' : '选择项目'}
-            </button>
+            <div className="home-actions">
+              <button className="settings-action" type="button" onClick={() => setIsSettingsOpen(true)}>
+                <SettingsIcon />
+                设置
+              </button>
+              <button className="open-project-action" type="button" onClick={() => void chooseProject()} disabled={openingProject !== null}>
+                <FolderIcon />
+                {openingProject === 'picker' ? '正在选择…' : '选择项目'}
+              </button>
+            </div>
           </div>
 
           <div className="recent-heading">
