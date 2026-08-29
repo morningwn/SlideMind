@@ -1153,14 +1153,25 @@ button.file-tree-directory {
   white-space: pre-wrap;
 }
 
+.chat-message-user {
+  grid-template-columns: minmax(0, 1fr) 29px;
+}
+
 .chat-message-user > span {
+  grid-column: 2;
+  grid-row: 1;
   border-color: #cdd9f2;
+  border-radius: 8px 8px 3px 8px;
   color: white;
   background: var(--blue);
 }
 
 .chat-message-user p {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: end;
   border-color: #d9e3f8;
+  border-radius: 13px 4px 13px 13px;
   background: #eef3ff;
 }
 
