@@ -74,28 +74,6 @@ button:disabled {
   min-height: 100vh;
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 72px;
-  padding: 0 var(--page-gutter);
-  border-bottom: 1px solid var(--line);
-}
-
-.brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 11px;
-  padding: 5px;
-  border: 0;
-  color: var(--ink);
-  background: transparent;
-  font-weight: 730;
-  letter-spacing: -0.025em;
-}
-
-.brand-mark,
 .empty-mark,
 .canvas-mark {
   position: relative;
@@ -108,7 +86,6 @@ button:disabled {
   box-shadow: 6px 5px 0 rgb(47 97 233 / 14%);
 }
 
-.brand-mark span,
 .empty-mark span,
 .canvas-mark span {
   position: absolute;
@@ -119,40 +96,6 @@ button:disabled {
   border-radius: 2px;
   background: white;
   box-shadow: 0 6px 0 rgb(255 255 255 / 72%);
-}
-
-.model-settings {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  min-height: 35px;
-  padding: 0 12px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  color: var(--ink);
-  background: rgb(255 255 255 / 68%);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 650;
-  transition: border-color 150ms ease, background 150ms ease;
-}
-
-.model-settings:hover {
-  border-color: #b9c8e2;
-  background: white;
-}
-
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #47ba82;
-  box-shadow: 0 0 0 4px rgb(71 186 130 / 11%);
-}
-
-.status-dot-pending {
-  background: var(--coral);
-  box-shadow: 0 0 0 4px rgb(255 118 108 / 11%);
 }
 
 .home,
@@ -589,232 +532,6 @@ button:disabled {
   font-size: 13px;
 }
 
-.toast {
-  position: fixed;
-  right: 28px;
-  bottom: 26px;
-  z-index: 10;
-  max-width: 360px;
-  padding: 12px 16px;
-  border: 1px solid #263754;
-  border-radius: 10px;
-  color: white;
-  background: var(--ink);
-  box-shadow: 0 12px 30px rgb(21 35 61 / 25%);
-  font-size: 13px;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(10px);
-  transition: opacity 180ms ease, transform 180ms ease;
-}
-
-.toast-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.model-dialog {
-  width: min(780px, calc(100vw - 40px));
-  max-width: none;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  color: var(--ink);
-  background: var(--surface);
-  box-shadow: 0 32px 90px rgb(14 27 51 / 32%);
-}
-
-.model-dialog::backdrop {
-  background: rgb(16 29 52 / 52%);
-  backdrop-filter: blur(6px);
-}
-
-.model-dialog-card {
-  display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
-  min-height: 510px;
-}
-
-.model-dialog-aside {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: 36px 28px 31px;
-  color: white;
-  background:
-    linear-gradient(150deg, rgb(255 255 255 / 8%) 0 1px, transparent 1px 100%) 0 0 / 24px 24px,
-    var(--blue);
-}
-
-.agent-orbit {
-  position: relative;
-  display: grid;
-  width: 88px;
-  height: 88px;
-  place-items: center;
-  border: 1px solid rgb(255 255 255 / 28%);
-  border-radius: 50%;
-}
-
-.agent-orbit::before,
-.agent-orbit::after {
-  position: absolute;
-  border-radius: 50%;
-  content: "";
-}
-
-.agent-orbit::before {
-  inset: 15px;
-  border: 1px solid rgb(255 255 255 / 34%);
-}
-
-.agent-orbit::after {
-  top: 4px;
-  left: 61px;
-  width: 11px;
-  height: 11px;
-  border: 3px solid var(--blue);
-  background: var(--coral);
-}
-
-.agent-orbit span {
-  font-family: "Iowan Old Style", "Songti SC", Georgia, serif;
-  font-size: 24px;
-  font-style: italic;
-  font-weight: 650;
-}
-
-.model-dialog-aside strong,
-.model-dialog-aside small,
-.provider-field strong,
-.provider-field small {
-  display: block;
-}
-
-.model-dialog-aside strong {
-  margin-bottom: 5px;
-  font-family: "Iowan Old Style", "Songti SC", Georgia, serif;
-  font-size: 18px;
-}
-
-.model-dialog-aside small {
-  color: rgb(255 255 255 / 65%);
-  font-size: 11px;
-}
-
-.model-config-form {
-  display: flex;
-  flex-direction: column;
-  padding: 36px 38px 30px;
-}
-
-.eyebrow {
-  margin: 0 0 9px;
-  color: var(--blue);
-  font-size: 10px;
-  font-weight: 780;
-  letter-spacing: 0.15em;
-}
-
-.dialog-heading h2 {
-  margin: 0;
-  font-family: "Iowan Old Style", "Songti SC", Georgia, serif;
-  font-size: 29px;
-  font-weight: 590;
-  letter-spacing: -0.03em;
-}
-
-.dialog-heading > p:last-child {
-  margin: 12px 0 24px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.65;
-}
-
-.config-field {
-  display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-  min-height: 70px;
-  border-top: 1px solid var(--line);
-}
-
-.config-field > span:first-child {
-  color: #46536a;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.config-field input,
-.config-field select,
-.provider-field {
-  width: 100%;
-  min-height: 42px;
-  padding: 0 12px;
-  border: 1px solid #cfd8e7;
-  border-radius: 8px;
-  color: var(--ink);
-  background: #f8fafd;
-  font-size: 12px;
-}
-
-.provider-field {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.provider-field strong {
-  margin-bottom: 2px;
-  font-size: 12px;
-}
-
-.provider-field small {
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.config-error {
-  margin: 5px 0 0 90px;
-  color: #bd3d35;
-  font-size: 11px;
-}
-
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: auto;
-  padding-top: 22px;
-}
-
-.primary-action,
-.secondary-action {
-  min-height: 41px;
-  padding: 0 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 680;
-}
-
-.primary-action {
-  display: inline-flex;
-  gap: 18px;
-  align-items: center;
-  border: 1px solid #3c6ce9;
-  color: white;
-  background: var(--blue);
-}
-
-.secondary-action {
-  border: 1px solid var(--line);
-  color: var(--ink);
-  background: white;
-}
-
 @media (max-width: 700px) {
   .app-shell {
     --page-gutter: 20px;
@@ -837,20 +554,6 @@ button:disabled {
     margin-top: 38px;
   }
 
-  .model-settings {
-    max-width: 150px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .model-dialog-card {
-    display: block;
-  }
-
-  .model-dialog-aside {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
