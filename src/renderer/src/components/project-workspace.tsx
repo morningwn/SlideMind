@@ -11,6 +11,7 @@ import type {
   ProjectFileEntry,
   ProjectInfo
 } from '../../../shared/project'
+import { ensureConversationDraft } from '../lib/conversation-state'
 import { AgentModelSelect } from './agent-model-select'
 
 interface ChatMessage extends ConversationMessage {
@@ -256,11 +257,11 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
 
   function startConversation(): void {
     if (isConversationLoading) return
-    const conversation = createConversation()
-    setConversations((current) => [conversation, ...current])
-    setSelectedConversationId(conversation.id)
+    const nextState = ensureConversationDraft(conversations, createConversation)
+    setConversations(nextState.conversations)
+    setSelectedConversationId(nextState.selectedConversationId)
     setChatError('')
-    setDraft('')
+    if (nextState.selectedConversationId !== selectedConversationId) setDraft('')
   }
 
   async function toggleDirectory(entry: ProjectFileEntry): Promise<void> {
@@ -384,17 +385,19 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
             >＋</button>
           </header>
           <div className="conversation-list">
-            {conversations.map((conversation) => (
-              <button
-                className={conversation.id === selectedConversation.id ? 'conversation-item conversation-item-active' : 'conversation-item'}
-                type="button"
-                key={conversation.id}
-                onClick={() => setSelectedConversationId(conversation.id)}
-              >
-                <ConversationIcon />
-                <span>{conversation.title}</span>
-              </button>
-            ))}
+            {conversations
+              .filter((conversation) => conversation.messages.length > 0)
+              .map((conversation) => (
+                <button
+                  className={conversation.id === selectedConversation.id ? 'conversation-item conversation-item-active' : 'conversation-item'}
+                  type="button"
+                  key={conversation.id}
+                  onClick={() => setSelectedConversationId(conversation.id)}
+                >
+                  <ConversationIcon />
+                  <span>{conversation.title}</span>
+                </button>
+              ))}
           </div>
         </section>
 
