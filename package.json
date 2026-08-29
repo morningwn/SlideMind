@@ -11,6 +11,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
+    "postinstall": "install-electron",
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
