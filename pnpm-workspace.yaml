@@ -3,4 +3,5 @@ allowBuilds:
   electron: true
   electron-winstaller: true
   esbuild: true
+  pi-permission-system: false
   protobufjs: false

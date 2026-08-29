@@ -13,6 +13,7 @@ import {
   resolvePiConversationsDirectory
 } from '../project/project-storage'
 import type { AgentConfigStore, AgentConfiguration } from './config-store'
+import { preparePermissionSystem, type PermissionSystemSetup } from './permission-policy'
 
 const MAX_AGENT_SESSIONS = 50
 const SESSION_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/
@@ -93,6 +94,7 @@ export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
 export class BaseAgentService {
   private readonly sessions = new Map<string, AgentSessionRecord>()
   private modelRuntimePromise?: Promise<ModelRuntime>
+  private permissionSystemPromise?: Promise<PermissionSystemSetup>
 
   constructor(
     private readonly configStore: AgentConfigStore,
@@ -153,6 +155,7 @@ export class BaseAgentService {
       SessionManager
     } = await loadPiRuntime()
     const modelRuntime = await this.getModelRuntime()
+    const permissionSystem = await this.getPermissionSystem()
     await modelRuntime.setRuntimeApiKey(DEEPSEEK_PROVIDER_ID, config.apiKey)
     const model = modelRuntime.getModel(DEEPSEEK_PROVIDER_ID, config.modelId)
 
@@ -178,6 +181,7 @@ export class BaseAgentService {
     const resourceLoader = new DefaultResourceLoader({
       cwd: projectPath,
       agentDir: this.agentDirectory,
+      additionalExtensionPaths: [permissionSystem.extensionPath],
       noExtensions: true,
       noSkills: true,
       noPromptTemplates: true,
@@ -186,6 +190,11 @@ export class BaseAgentService {
       systemPrompt: `${SYSTEM_PROMPT}\n\n当前对话所属项目目录（JSON 字符串）：${JSON.stringify(projectPath)}`
     })
     await resourceLoader.reload()
+    const extensions = resourceLoader.getExtensions()
+    if (extensions.errors.length > 0 || extensions.extensions.length !== 1) {
+      const details = extensions.errors.map((entry) => entry.error).join('; ')
+      throw new Error(`权限系统加载失败${details ? `：${details}` : ''}`)
+    }
 
     const { session } = await createAgentSession({
       cwd: projectPath,
@@ -193,7 +202,7 @@ export class BaseAgentService {
       modelRuntime,
       model,
       thinkingLevel: 'off',
-      noTools: 'all',
+      tools: ['read', 'write', 'edit', 'grep', 'find', 'ls'],
       resourceLoader,
       sessionManager
     })
@@ -268,5 +277,10 @@ export class BaseAgentService {
       }))
     }
     return this.modelRuntimePromise
+  }
+
+  private getPermissionSystem(): Promise<PermissionSystemSetup> {
+    this.permissionSystemPromise ??= preparePermissionSystem(this.agentDirectory)
+    return this.permissionSystemPromise
   }
 }
