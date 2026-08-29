@@ -54,6 +54,15 @@ function FolderIcon(): React.JSX.Element {
   )
 }
 
+function ClockIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="8" />
+      <path d="M12 7.5V12l3 2" />
+    </svg>
+  )
+}
+
 function App(): React.JSX.Element {
   const [notice, setNotice] = useState('')
   const [agentConfig, setAgentConfig] = useState<AgentConfigStatus | null>(null)
@@ -225,10 +234,10 @@ function App(): React.JSX.Element {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <button className="brand" type="button" onClick={() => setActiveProject(null)} aria-label="返回 SlideMind 首页">
+        <div className="brand" aria-label="SlideMind">
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <span>SlideMind</span>
-        </button>
+        </div>
         <button className="model-settings" type="button" onClick={openModelConfig}>
           <span className={`status-dot ${agentConfig?.configured ? '' : 'status-dot-pending'}`} aria-hidden="true" />
           {agentConfig?.configured ? agentConfig.modelName : '配置 AI 模型'}
@@ -238,15 +247,9 @@ function App(): React.JSX.Element {
       {activeProject ? (
         <section className="workspace" aria-labelledby="workspace-title">
           <div className="workspace-heading">
-            <button className="back-action" type="button" onClick={() => setActiveProject(null)}>
-              <span aria-hidden="true">←</span>
-              最近项目
-            </button>
-            <div>
-              <p>当前项目</p>
-              <h1 id="workspace-title">{activeProject.name}</h1>
-              <span>{activeProject.path}</span>
-            </div>
+            <p>当前项目</p>
+            <h1 id="workspace-title">{activeProject.name}</h1>
+            <span>{activeProject.path}</span>
           </div>
           <div className="workspace-canvas">
             <span className="canvas-mark" aria-hidden="true"><span /></span>
@@ -270,10 +273,7 @@ function App(): React.JSX.Element {
           </div>
 
           <div className="recent-heading">
-            <div>
-              <p>工作台</p>
-              <h1 id="recent-title">最近项目</h1>
-            </div>
+            <h1 id="recent-title">最近项目</h1>
             {!isLoadingProjects && recentProjects.length > 0 ? <span>{recentProjects.length} 个项目</span> : null}
           </div>
 
@@ -301,7 +301,7 @@ function App(): React.JSX.Element {
                         <strong>{project.name}</strong>
                         <small title={project.path}>{project.path}</small>
                         <span className="project-time">
-                          <span className="slide-rail" aria-hidden="true"><i /><i /><i /></span>
+                          <ClockIcon />
                           {isOpening ? '正在打开…' : formatLastOpened(project.lastOpenedAt)}
                         </span>
                       </span>
