@@ -25,7 +25,9 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
   listRecent: () => ipcRenderer.invoke('project:list-recent'),
   chooseFolder: () => ipcRenderer.invoke('project:choose-folder'),
   open: (path: string) => ipcRenderer.invoke('project:open', path),
-  removeRecent: (path: string) => ipcRenderer.invoke('project:remove-recent', path)
+  removeRecent: (path: string) => ipcRenderer.invoke('project:remove-recent', path),
+  listDirectory: (projectPath: string, relativePath: string) =>
+    ipcRenderer.invoke('project:list-directory', projectPath, relativePath)
 })
 
 contextBridge.exposeInMainWorld('projects', projectApi)

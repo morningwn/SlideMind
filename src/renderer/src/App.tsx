@@ -6,6 +6,7 @@ import {
   type CSSProperties
 } from 'react'
 import type { ProjectInfo } from '../../shared/project'
+import { ProjectWorkspace } from './components/project-workspace'
 
 const projectColors = ['#6f7cff', '#d59a32', '#48ad87', '#bd62c9', '#31a6bc', '#d8628c']
 
@@ -165,18 +166,7 @@ function App(): React.JSX.Element {
   return (
     <main className="app-shell">
       {activeProject ? (
-        <section className="workspace" aria-labelledby="workspace-title">
-          <div className="workspace-heading">
-            <p>当前项目</p>
-            <h1 id="workspace-title">{activeProject.name}</h1>
-            <span>{activeProject.path}</span>
-          </div>
-          <div className="workspace-canvas">
-            <span className="canvas-mark" aria-hidden="true"><span /></span>
-            <h2>项目已打开</h2>
-            <p>演示文稿编辑器将在这个工作区中继续构建。</p>
-          </div>
-        </section>
+        <ProjectWorkspace project={activeProject} />
       ) : (
         <section className="home" aria-labelledby="recent-title">
           <div className="home-toolbar">

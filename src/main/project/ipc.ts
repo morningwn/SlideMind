@@ -1,6 +1,7 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { ProjectInfo } from '../../shared/project'
 import { RecentProjectStore, resolveProject } from './recent-project-store'
+import { listProjectDirectory } from './project-files'
 
 export function registerProjectIpc(store: RecentProjectStore): void {
   ipcMain.handle('project:list-recent', () => store.list())
@@ -36,4 +37,10 @@ export function registerProjectIpc(store: RecentProjectStore): void {
 
     return store.remove(path)
   })
+
+  ipcMain.handle(
+    'project:list-directory',
+    (_event, projectPath: unknown, relativePath: unknown) =>
+      listProjectDirectory(projectPath, relativePath)
+  )
 }
