@@ -4,7 +4,7 @@ SlideMind 是一个面向 macOS 与 Windows 的 Electron 桌面应用工程。�
 
 ## 环境要求
 
-- Node.js 22.12 或更高版本
+- Node.js 22.19 或更高版本
 - pnpm 11.15.1
 
 ## 本地开发
@@ -30,15 +30,24 @@ pnpm package:win   # Windows NSIS 安装包，x64
 ```text
 src/
 ├── main/       # Electron 主进程与窗口生命周期
-├── preload/    # 受限、只读的渲染层桥接接口
-└── renderer/   # React + Vite 用户界面
+├── preload/    # 受限的渲染层桥接接口
+├── renderer/   # React + Vite 用户界面
+└── shared/     # 主进程与渲染层共享的 IPC 类型
 ```
+
+## Agent 与模型配置
+
+- 基础 agent 由 `@earendil-works/pi-agent-core` 驱动，在 Electron 主进程中按需创建。
+- 当前服务商为 DeepSeek，可选择 DeepSeek V4 Flash 或 DeepSeek V4 Pro。
+- 首次启动且尚未配置模型时，应用会主动打开模型配置窗口；之后可从右上角再次进入。
+- API Key 通过 Electron 系统安全存储加密，并写入应用的 `userData/agent-config.json`。渲染进程只能读取非敏感配置状态，无法读取已保存的 Key。
+- preload 已暴露受限的 `window.agent.prompt(input)` 接口，供后续编辑器功能调用基础 agent。
 
 ## 安全边界
 
 - 渲染进程启用沙箱和 `contextIsolation`。
 - 渲染进程不直接访问 Node.js。
-- preload 只暴露冻结的运行时信息。
+- preload 只暴露冻结的运行时信息和经过校验的 agent IPC 方法。
 - 新窗口和外部导航只允许交给系统浏览器打开 HTTP(S) 地址。
 
 ## 签名与发布

@@ -1,14 +1,21 @@
 /// <reference types="vite/client" />
 
-interface DesktopApi {
-  platform: string
-  versions: Readonly<{
-    electron: string
-    chrome: string
-    node: string
-  }>
-}
+import type { AgentApi } from '../../shared/agent'
 
-interface Window {
-  desktop: Readonly<DesktopApi>
+export {}
+
+declare global {
+  interface DesktopApi {
+    platform: string
+    versions: Readonly<{
+      electron: string
+      chrome: string
+      node: string
+    }>
+  }
+
+  interface Window {
+    desktop: Readonly<DesktopApi>
+    agent: Readonly<AgentApi>
+  }
 }

@@ -1,5 +1,8 @@
 import { app, BrowserWindow, Menu, shell } from 'electron'
 import { join } from 'node:path'
+import { BaseAgentService } from './agent/base-agent'
+import { AgentConfigStore } from './agent/config-store'
+import { registerAgentIpc } from './agent/ipc'
 
 const APP_URL_PROTOCOLS = new Set(['http:', 'https:'])
 
@@ -111,6 +114,10 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  const configStore = new AgentConfigStore(join(app.getPath('userData'), 'agent-config.json'))
+  const agentService = new BaseAgentService(configStore)
+
+  registerAgentIpc(configStore, agentService)
   installApplicationMenu()
   createWindow()
 

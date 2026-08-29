@@ -1,4 +1,5 @@
-import { useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type PointerEvent } from 'react'
+import type { AgentConfigStatus } from '../../shared/agent'
 import { getPlatformLabel } from './lib/platform'
 
 const recentDecks = [
@@ -8,9 +9,49 @@ const recentDecks = [
 
 function App(): React.JSX.Element {
   const [notice, setNotice] = useState('')
+  const [agentConfig, setAgentConfig] = useState<AgentConfigStatus | null>(null)
+  const [isConfigOpen, setIsConfigOpen] = useState(false)
+  const [isSavingConfig, setIsSavingConfig] = useState(false)
+  const [configError, setConfigError] = useState('')
+  const [modelId, setModelId] = useState('')
+  const [apiKey, setApiKey] = useState('')
   const stackRef = useRef<HTMLDivElement>(null)
+  const configDialogRef = useRef<HTMLDialogElement>(null)
   const platform = getPlatformLabel(window.desktop.platform)
   const shortcutModifier = window.desktop.platform === 'darwin' ? '⌘' : 'Ctrl'
+
+  useEffect(() => {
+    let active = true
+
+    void window.agent
+      .getConfig()
+      .then((config) => {
+        if (!active) return
+        setAgentConfig(config)
+        setModelId(config.modelId)
+        setIsConfigOpen(!config.configured)
+      })
+      .catch((error: unknown) => {
+        if (!active) return
+        setConfigError(error instanceof Error ? error.message : '无法读取模型配置')
+        setIsConfigOpen(true)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const dialog = configDialogRef.current
+    if (!dialog) return
+
+    if (isConfigOpen && !dialog.open) {
+      dialog.showModal()
+    } else if (!isConfigOpen && dialog.open) {
+      dialog.close()
+    }
+  }, [isConfigOpen])
 
   function handlePointerMove(event: PointerEvent<HTMLDivElement>): void {
     const element = stackRef.current
@@ -35,6 +76,38 @@ function App(): React.JSX.Element {
     window.setTimeout(() => setNotice(''), 2400)
   }
 
+  function openModelConfig(): void {
+    setModelId(agentConfig?.modelId ?? '')
+    setApiKey('')
+    setConfigError('')
+    setIsConfigOpen(true)
+  }
+
+  function closeModelConfig(): void {
+    if (isSavingConfig) return
+    setApiKey('')
+    setConfigError('')
+    setIsConfigOpen(false)
+  }
+
+  async function saveModelConfig(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault()
+    setIsSavingConfig(true)
+    setConfigError('')
+
+    try {
+      const config = await window.agent.saveConfig({ modelId, apiKey })
+      setAgentConfig(config)
+      setApiKey('')
+      setIsConfigOpen(false)
+      announce(`已启用 ${config.modelName}`)
+    } catch (error) {
+      setConfigError(error instanceof Error ? error.message : '模型配置保存失败')
+    } finally {
+      setIsSavingConfig(false)
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -44,9 +117,17 @@ function App(): React.JSX.Element {
           </span>
           <span>SlideMind</span>
         </a>
-        <div className="runtime-badge" title={`Electron ${window.desktop.versions.electron}`}>
-          <span className="status-dot" aria-hidden="true" />
-          {platform} 已就绪
+        <div className="topbar-actions">
+          <div className="runtime-badge" title={`Electron ${window.desktop.versions.electron}`}>
+            {platform}
+          </div>
+          <button className="model-settings" type="button" onClick={openModelConfig}>
+            <span
+              className={`status-dot ${agentConfig?.configured ? '' : 'status-dot-pending'}`}
+              aria-hidden="true"
+            />
+            {agentConfig?.configured ? agentConfig.modelName : '配置 AI 模型'}
+          </button>
         </div>
       </header>
 
@@ -147,6 +228,85 @@ function App(): React.JSX.Element {
       <div className={`toast ${notice ? 'toast-visible' : ''}`} role="status" aria-live="polite">
         {notice}
       </div>
+
+      <dialog
+        ref={configDialogRef}
+        className="model-dialog"
+        aria-labelledby="model-dialog-title"
+        onCancel={(event) => {
+          event.preventDefault()
+          closeModelConfig()
+        }}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) closeModelConfig()
+        }}
+      >
+        <div className="model-dialog-card">
+          <aside className="model-dialog-aside" aria-hidden="true">
+            <span className="agent-orbit"><span>AI</span></span>
+            <div>
+              <strong>SlideMind Agent</strong>
+              <small>由 Pi 驱动</small>
+            </div>
+          </aside>
+
+          <form className="model-config-form" onSubmit={(event) => void saveModelConfig(event)}>
+            <div className="dialog-heading">
+              <p className="eyebrow">AI 引擎</p>
+              <h2 id="model-dialog-title">
+                {agentConfig?.configured ? '调整模型配置' : '开始前，配置模型'}
+              </h2>
+              <p>
+                SlideMind 暂时使用 DeepSeek。API Key 会加密保存在这台设备上，保存后不会回传给页面代码。
+              </p>
+            </div>
+
+            <label className="config-field">
+              <span>服务商</span>
+              <span className="provider-field">
+                <strong>DeepSeek</strong>
+                <small>api.deepseek.com</small>
+              </span>
+            </label>
+
+            <label className="config-field">
+              <span>模型</span>
+              <select value={modelId} onChange={(event) => setModelId(event.target.value)} required>
+                {(agentConfig?.models ?? []).map((model) => (
+                  <option value={model.id} key={model.id}>
+                    {model.name} — {model.description}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="config-field">
+              <span>API Key</span>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                placeholder={agentConfig?.configured ? '留空以继续使用已保存的 Key' : 'sk-...'}
+                autoComplete="off"
+                spellCheck={false}
+                required={!agentConfig?.configured}
+              />
+            </label>
+
+            {configError ? <p className="config-error" role="alert">{configError}</p> : null}
+
+            <div className="dialog-actions">
+              <button className="secondary-action" type="button" onClick={closeModelConfig} disabled={isSavingConfig}>
+                {agentConfig?.configured ? '取消' : '稍后配置'}
+              </button>
+              <button className="primary-action" type="submit" disabled={isSavingConfig || !modelId}>
+                {isSavingConfig ? '正在保存…' : '保存并启用'}
+                <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </dialog>
     </main>
   )
 }
