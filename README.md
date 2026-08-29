@@ -1,6 +1,6 @@
 # SlideMind
 
-SlideMind 是一个面向 macOS 与 Windows 的 Electron 桌面应用工程。当前包含安全的主进程边界、React 启动页、双平台安装包配置和持续集成构建。
+SlideMind 是一个面向 macOS 与 Windows 的 Electron 桌面应用工程。当前包含安全的主进程边界、项目启动台、双平台安装包配置和持续集成构建。
 
 ## 环境要求
 
@@ -39,9 +39,16 @@ src/
 
 - 基础 agent 由 `@earendil-works/pi-agent-core` 驱动，在 Electron 主进程中按需创建。
 - 当前服务商为 DeepSeek，可选择 DeepSeek V4 Flash 或 DeepSeek V4 Pro。
-- 首次启动且尚未配置模型时，应用会主动打开模型配置窗口；之后可从右上角再次进入。
+- 模型配置入口位于启动台右上角，不会阻塞项目选择；后续可从这里再次进入。
 - API Key 通过 Electron 系统安全存储加密，并写入应用的 `userData/agent-config.json`。渲染进程只能读取非敏感配置状态，无法读取已保存的 Key。
 - preload 已暴露受限的 `window.agent.prompt(input)` 接口，供后续编辑器功能调用基础 agent。
+
+## 项目启动台
+
+- 首页展示本机最近打开的项目，并支持按项目名称或路径搜索。
+- “选择项目”会打开系统文件夹选择器；选择成功后进入项目工作区。
+- 最近项目按打开时间排序，去重后保存在应用的 `userData/recent-projects.json`。
+- preload 只暴露类型化的项目列表、选择、打开与移除记录接口，渲染进程不直接访问文件系统。
 
 ## 安全边界
 

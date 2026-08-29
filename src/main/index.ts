@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import { BaseAgentService } from './agent/base-agent'
 import { AgentConfigStore } from './agent/config-store'
 import { registerAgentIpc } from './agent/ipc'
+import { registerProjectIpc } from './project/ipc'
+import { RecentProjectStore } from './project/recent-project-store'
 
 const APP_URL_PROTOCOLS = new Set(['http:', 'https:'])
 
@@ -116,8 +118,12 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(() => {
   const configStore = new AgentConfigStore(join(app.getPath('userData'), 'agent-config.json'))
   const agentService = new BaseAgentService(configStore)
+  const recentProjectStore = new RecentProjectStore(
+    join(app.getPath('userData'), 'recent-projects.json')
+  )
 
   registerAgentIpc(configStore, agentService)
+  registerProjectIpc(recentProjectStore)
   installApplicationMenu()
   createWindow()
 
