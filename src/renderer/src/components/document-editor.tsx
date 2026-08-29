@@ -14,6 +14,8 @@ import {
 import { basicSetup } from 'codemirror'
 import type { ProjectTextFileKind } from '../../../shared/project'
 
+export type MarkdownViewMode = 'edit' | 'split' | 'preview'
+
 export interface OpenTextDocument {
   path: string
   name: string
@@ -26,6 +28,7 @@ export interface OpenTextDocument {
   isSaving: boolean
   conflict: boolean
   error: string
+  viewMode: MarkdownViewMode
 }
 
 interface DocumentEditorProps {
@@ -44,8 +47,6 @@ interface SourceEditorProps {
   onSave: () => void
   value: string
 }
-
-type MarkdownViewMode = 'edit' | 'split' | 'preview'
 
 function SourceEditor({
   ariaLabel,
@@ -218,13 +219,11 @@ export function DocumentEditor({
   onSave,
   projectHandle
 }: DocumentEditorProps): React.JSX.Element {
-  const [viewMode, setViewMode] = useState<MarkdownViewMode>('split')
   const [splitPercent, setSplitPercent] = useState(50)
   const splitRef = useRef<HTMLDivElement>(null)
-  const isDirty = document.content !== document.savedContent
 
   function beginResize(event: ReactPointerEvent<HTMLButtonElement>): void {
-    if (viewMode !== 'split') return
+    if (document.viewMode !== 'split') return
     event.preventDefault()
     const container = splitRef.current
     if (!container) return
@@ -249,48 +248,9 @@ export function DocumentEditor({
     setSplitPercent((current) => Math.min(68, Math.max(32, current + direction * 4)))
   }
 
-  const status = document.isSaving
-    ? '正在保存…'
-    : document.conflict
-      ? '发现外部修改'
-      : isDirty
-        ? '尚未保存'
-        : '已保存'
-
   return (
     <section className="document-panel" aria-labelledby="active-document-title">
-      <header className="document-heading">
-        <div>
-          <h1 id="active-document-title">{document.name}</h1>
-          <span title={document.path}>{document.path}</span>
-        </div>
-        <div className="document-heading-actions">
-          {document.kind === 'markdown' ? (
-            <div className="document-view-switch" aria-label="Markdown 查看方式">
-              {(['edit', 'split', 'preview'] as const).map((mode) => (
-                <button
-                  className={viewMode === mode ? 'document-view-active' : ''}
-                  key={mode}
-                  type="button"
-                  aria-pressed={viewMode === mode}
-                  onClick={() => setViewMode(mode)}
-                >
-                  {mode === 'edit' ? '编辑' : mode === 'split' ? '分栏' : '预览'}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <span className={`document-save-status${isDirty ? ' document-save-status-dirty' : ''}`}>
-            <i aria-hidden="true" />{status}
-          </span>
-          <button
-            className="document-save-button"
-            type="button"
-            onClick={onSave}
-            disabled={!isDirty || document.isSaving || document.conflict}
-          >保存</button>
-        </div>
-      </header>
+      <h1 id="active-document-title" className="sr-only">{document.name}</h1>
 
       {document.error ? (
         <div className="document-error" role="alert">
@@ -301,7 +261,7 @@ export function DocumentEditor({
 
       {document.kind === 'markdown' ? (
         <div
-          className={`markdown-workbench markdown-workbench-${viewMode}`}
+          className={`markdown-workbench markdown-workbench-${document.viewMode}`}
           ref={splitRef}
           style={{ '--editor-split': `${splitPercent}%` } as React.CSSProperties}
         >
@@ -316,7 +276,7 @@ export function DocumentEditor({
               value={document.content}
             />
           </section>
-          {viewMode === 'split' ? (
+          {document.viewMode === 'split' ? (
             <button
               className="markdown-split-handle"
               type="button"

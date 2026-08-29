@@ -1154,13 +1154,19 @@ button.file-tree-item:not(.file-tree-directory) {
   background: white;
 }
 
+.workspace-bar {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  border-bottom: 1px solid var(--line);
+  background: #f7f9fc;
+}
+
 .workspace-tabs {
   display: flex;
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  border-bottom: 1px solid var(--line);
-  background: #f7f9fc;
   scrollbar-width: thin;
 }
 
@@ -1234,6 +1240,14 @@ button.file-tree-item:not(.file-tree-directory) {
   background: var(--coral);
 }
 
+.workspace-document-tab-main > .document-status-saving {
+  background: var(--blue);
+}
+
+.workspace-document-tab-main > .document-status-conflict {
+  background: #c33f38;
+}
+
 .workspace-tab-close {
   width: 27px;
   padding: 0;
@@ -1265,6 +1279,65 @@ button.file-tree-item:not(.file-tree-directory) {
   content: '';
 }
 
+.workspace-document-actions,
+.workspace-view-switch {
+  display: flex;
+  align-items: center;
+}
+
+.workspace-document-actions {
+  min-width: max-content;
+  gap: 8px;
+  padding: 0 7px 0 9px;
+  border-left: 1px solid #e2e8f1;
+  box-shadow: -10px 0 18px rgb(45 60 90 / 4%);
+}
+
+.workspace-view-switch {
+  height: 28px;
+  padding: 3px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #eef2f8;
+}
+
+.workspace-view-switch button {
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  color: #7b8799;
+  background: transparent;
+  cursor: pointer;
+  font-size: 9px;
+}
+
+.workspace-view-switch .workspace-view-active {
+  color: #24488e;
+  background: white;
+  box-shadow: 0 1px 4px rgb(38 55 88 / 12%);
+  font-weight: 700;
+}
+
+.workspace-save-button {
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--blue);
+  border-radius: 7px;
+  color: white;
+  background: var(--blue);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 680;
+}
+
+.workspace-save-button:disabled {
+  border-color: #d8e0ec;
+  color: #95a0b1;
+  background: #edf1f6;
+  cursor: default;
+}
+
 .document-panel {
   display: flex;
   min-width: 0;
@@ -1272,118 +1345,6 @@ button.file-tree-item:not(.file-tree-directory) {
   flex-direction: column;
   overflow: hidden;
   background: white;
-}
-
-.document-heading {
-  display: flex;
-  min-height: 64px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 0 18px 0 24px;
-  border-bottom: 1px solid var(--line);
-  background: rgb(255 255 255 / 92%);
-}
-
-.document-heading > div:first-child {
-  min-width: 0;
-}
-
-.document-heading h1 {
-  margin: 0 0 4px;
-  overflow: hidden;
-  color: #24324b;
-  font-size: 13px;
-  font-weight: 720;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.document-heading > div:first-child > span {
-  display: block;
-  max-width: 420px;
-  overflow: hidden;
-  color: var(--muted);
-  font-family: "SFMono-Regular", Consolas, monospace;
-  font-size: 9px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.document-heading-actions,
-.document-view-switch,
-.document-save-status {
-  display: flex;
-  align-items: center;
-}
-
-.document-heading-actions {
-  flex: 0 0 auto;
-  gap: 10px;
-}
-
-.document-view-switch {
-  height: 30px;
-  padding: 3px;
-  border: 1px solid #dbe3ef;
-  border-radius: 9px;
-  background: #f4f7fb;
-}
-
-.document-view-switch button {
-  height: 22px;
-  padding: 0 9px;
-  border: 0;
-  border-radius: 6px;
-  color: #7b8799;
-  background: transparent;
-  cursor: pointer;
-  font-size: 9px;
-}
-
-.document-view-switch .document-view-active {
-  color: #24488e;
-  background: white;
-  box-shadow: 0 1px 4px rgb(38 55 88 / 12%);
-  font-weight: 700;
-}
-
-.document-save-status {
-  gap: 6px;
-  color: #718097;
-  font-size: 9px;
-  white-space: nowrap;
-}
-
-.document-save-status i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #48ad87;
-}
-
-.document-save-status-dirty i {
-  background: var(--coral);
-}
-
-.document-save-button {
-  height: 30px;
-  padding: 0 13px;
-  border: 1px solid var(--blue);
-  border-radius: 8px;
-  color: white;
-  background: var(--blue);
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 680;
-}
-
-.document-save-button:disabled {
-  border-color: #d8e0ec;
-  color: #95a0b1;
-  background: #edf1f6;
-  cursor: default;
 }
 
 .document-error {
@@ -1659,37 +1620,12 @@ button.file-tree-item:not(.file-tree-directory) {
 
 .chat-panel {
   display: grid;
-  grid-template-rows: 64px minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   background:
     radial-gradient(circle at 78% 0, rgb(47 97 233 / 5%), transparent 24rem),
     white;
-}
-
-.chat-heading {
-  display: flex;
-  align-items: center;
-  padding: 0 clamp(26px, 4vw, 58px);
-  border-bottom: 1px solid var(--line);
-  background: rgb(255 255 255 / 82%);
-}
-
-.chat-heading h1 {
-  max-width: 580px;
-  margin: 0 0 3px;
-  overflow: hidden;
-  color: #24324b;
-  font-size: 13px;
-  font-weight: 720;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-heading span {
-  display: block;
-  color: var(--muted);
-  font-size: 10px;
 }
 
 .message-stream {

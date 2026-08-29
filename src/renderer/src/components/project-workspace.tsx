@@ -12,7 +12,11 @@ import type {
   ProjectFileEntry
 } from '../../../shared/project'
 import { AgentModelSelect } from './agent-model-select'
-import { DocumentEditor, type OpenTextDocument } from './document-editor'
+import {
+  DocumentEditor,
+  type MarkdownViewMode,
+  type OpenTextDocument
+} from './document-editor'
 
 interface ChatMessage extends ConversationMessage {
   isStreaming?: boolean
@@ -443,7 +447,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         savedContent: file.content,
         isSaving: false,
         conflict: false,
-        error: ''
+        error: '',
+        viewMode: file.kind === 'markdown' ? 'split' : 'edit'
       }
       setOpenDocuments((current) =>
         current.some((candidate) => candidate.path === file.path)
@@ -465,6 +470,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   function updateDocument(path: string, content: string): void {
     setOpenDocuments((current) => current.map((document) =>
       document.path === path ? { ...document, content, error: '' } : document
+    ))
+  }
+
+  function updateDocumentViewMode(path: string, viewMode: MarkdownViewMode): void {
+    setOpenDocuments((current) => current.map((document) =>
+      document.path === path ? { ...document, viewMode } : document
     ))
   }
 
@@ -703,51 +714,98 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       </aside>
 
       <section className="workspace-main">
-        <nav className="workspace-tabs" aria-label="打开的内容" role="tablist">
-          <button
-            className={`workspace-tab workspace-chat-tab${activeDocument ? '' : ' workspace-tab-active'}`}
-            type="button"
-            role="tab"
-            aria-selected={!activeDocument}
-            onClick={() => setActiveDocumentPath(null)}
-          >
-            <ConversationIcon />
-            <span>{selectedConversation.title}</span>
-          </button>
-          {openDocuments.map((document) => {
-            const isDirty = document.content !== document.savedContent
-            const isActive = document.path === activeDocument?.path
-            return (
-              <div
-                className={`workspace-document-tab${isActive ? ' workspace-tab-active' : ''}`}
-                key={document.path}
-                role="presentation"
-              >
-                <button
-                  className="workspace-document-tab-main"
-                  type="button"
-                  role="tab"
-                  aria-selected={isActive}
-                  title={document.path}
-                  onClick={() => {
-                    setActiveDocumentPath(document.path)
-                    setSelectedFilePath(document.path)
-                  }}
+        <header className="workspace-bar">
+          <nav className="workspace-tabs" aria-label="打开的内容" role="tablist">
+            <button
+              className={`workspace-tab workspace-chat-tab${activeDocument ? '' : ' workspace-tab-active'}`}
+              type="button"
+              role="tab"
+              aria-selected={!activeDocument}
+              onClick={() => setActiveDocumentPath(null)}
+            >
+              <ConversationIcon />
+              <span>{selectedConversation.title}</span>
+            </button>
+            {openDocuments.map((document) => {
+              const isDirty = document.content !== document.savedContent
+              const isActive = document.path === activeDocument?.path
+              const status = document.conflict
+                ? '保存冲突'
+                : document.isSaving
+                  ? '正在保存'
+                  : isDirty
+                    ? '未保存'
+                    : '已保存'
+              return (
+                <div
+                  className={`workspace-document-tab${isActive ? ' workspace-tab-active' : ''}`}
+                  key={document.path}
+                  role="presentation"
                 >
-                  <FileIcon />
-                  <span>{document.name}</span>
-                  {isDirty ? <i aria-label="未保存" /> : null}
-                </button>
-                <button
-                  className="workspace-tab-close"
-                  type="button"
-                  aria-label={`关闭 ${document.name}`}
-                  onClick={() => closeDocument(document.path)}
-                >×</button>
-              </div>
-            )
-          })}
-        </nav>
+                  <button
+                    className="workspace-document-tab-main"
+                    type="button"
+                    role="tab"
+                    aria-label={`${document.name}，${status}`}
+                    aria-selected={isActive}
+                    title={document.path}
+                    onClick={() => {
+                      setActiveDocumentPath(document.path)
+                      setSelectedFilePath(document.path)
+                    }}
+                  >
+                    <FileIcon />
+                    <span>{document.name}</span>
+                    {isDirty ? (
+                      <i
+                        className={`${document.isSaving ? 'document-status-saving' : ''}${document.conflict ? ' document-status-conflict' : ''}`}
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                  </button>
+                  <button
+                    className="workspace-tab-close"
+                    type="button"
+                    aria-label={`关闭 ${document.name}`}
+                    onClick={() => closeDocument(document.path)}
+                  >×</button>
+                </div>
+              )
+            })}
+          </nav>
+
+          {activeDocument ? (
+            <div className="workspace-document-actions">
+              {activeDocument.kind === 'markdown' ? (
+                <div className="workspace-view-switch" aria-label="Markdown 查看方式">
+                  {(['edit', 'split', 'preview'] as const).map((mode) => (
+                    <button
+                      className={activeDocument.viewMode === mode ? 'workspace-view-active' : ''}
+                      key={mode}
+                      type="button"
+                      aria-pressed={activeDocument.viewMode === mode}
+                      onClick={() => updateDocumentViewMode(activeDocument.path, mode)}
+                    >
+                      {mode === 'edit' ? '编辑' : mode === 'split' ? '分栏' : '预览'}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <button
+                className="workspace-save-button"
+                type="button"
+                title="保存 (Ctrl/⌘S)"
+                aria-label={`保存 ${activeDocument.name}`}
+                onClick={() => void saveDocument(activeDocument.path)}
+                disabled={
+                  activeDocument.content === activeDocument.savedContent ||
+                  activeDocument.isSaving ||
+                  activeDocument.conflict
+                }
+              >保存</button>
+            </div>
+          ) : null}
+        </header>
 
         {activeDocument ? (
           <DocumentEditor
@@ -760,12 +818,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           />
         ) : (
           <section className="chat-panel" aria-labelledby="active-conversation-title">
-            <header className="chat-heading">
-              <div>
-                <h1 id="active-conversation-title">{selectedConversation.title}</h1>
-                <span>{project.name}</span>
-              </div>
-            </header>
+            <h1 id="active-conversation-title" className="sr-only">
+              {selectedConversation.title}
+            </h1>
 
             <div className="message-stream" aria-live="polite">
               {loadingConversationIds.has(selectedConversation.id) ? (
