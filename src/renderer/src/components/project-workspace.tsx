@@ -6,7 +6,7 @@ import {
   type KeyboardEvent
 } from 'react'
 import type { ProjectFileEntry, ProjectInfo } from '../../../shared/project'
-import { AgentSettings } from './agent-settings'
+import { AgentModelSelect } from './agent-model-select'
 
 interface ChatMessage {
   id: string
@@ -383,11 +383,11 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
               aria-label="对话消息"
             />
             <div className="composer-footer">
-              <div>
-                <AgentSettings />
-                <span>Enter 发送 · Shift Enter 换行</span>
+              <span>Enter 发送 · Shift Enter 换行</span>
+              <div className="composer-actions">
+                <AgentModelSelect disabled={isSending} />
+                <button className="composer-send" type="submit" disabled={!draft.trim() || isSending} aria-label="发送消息">↑</button>
               </div>
-              <button className="composer-send" type="submit" disabled={!draft.trim() || isSending} aria-label="发送消息">↑</button>
             </div>
           </div>
         </form>
