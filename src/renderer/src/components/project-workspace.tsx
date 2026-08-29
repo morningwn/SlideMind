@@ -7,11 +7,10 @@ import {
 } from 'react'
 import type {
   ConversationMessage,
+  OpenedProject,
   ProjectConversationState,
-  ProjectFileEntry,
-  ProjectInfo
+  ProjectFileEntry
 } from '../../../shared/project'
-import { ensureConversationDraft } from '../lib/conversation-state'
 import { AgentModelSelect } from './agent-model-select'
 
 interface ChatMessage extends ConversationMessage {
@@ -25,7 +24,7 @@ interface Conversation {
 }
 
 interface ProjectWorkspaceProps {
-  project: ProjectInfo
+  project: OpenedProject
 }
 
 interface FileTreeLevelProps {
@@ -53,8 +52,7 @@ function toPersistedState(
     selectedConversationId,
     conversations: conversations.map((conversation) => ({
       id: conversation.id,
-      title: conversation.title,
-      messages: conversation.messages.map(({ id, role, text }) => ({ id, role, text }))
+      title: conversation.title
     }))
   }
 }
@@ -147,6 +145,8 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
   const [conversationError, setConversationError] = useState('')
   const [isConversationLoading, setIsConversationLoading] = useState(true)
   const [canPersistConversations, setCanPersistConversations] = useState(false)
+  const [loadedConversationIds, setLoadedConversationIds] = useState<Set<string>>(new Set())
+  const [loadingConversationIds, setLoadingConversationIds] = useState<Set<string>>(new Set())
   const [entriesByDirectory, setEntriesByDirectory] = useState<Record<string, ProjectFileEntry[]>>({})
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set(['']))
@@ -166,7 +166,7 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
   useEffect(() => {
     let active = true
     void window.projects
-      .listDirectory(project.path, '')
+      .listDirectory(project.handle, '')
       .then((entries) => {
         if (active) setEntriesByDirectory({ '': entries })
       })
@@ -180,7 +180,7 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
     return () => {
       active = false
     }
-  }, [project.path])
+  }, [project.handle])
 
   useEffect(() => {
     let active = true
@@ -188,37 +188,61 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
     setCanPersistConversations(false)
     setConversationError('')
 
-    void window.projects
-      .loadConversations(project.path)
-      .then((storedState) => {
+    setLoadedConversationIds(new Set())
+    setLoadingConversationIds(new Set())
+
+    void (async () => {
+      try {
+        const storedState = await window.projects.loadConversations(project.handle)
         if (!active) return
 
         if (storedState) {
-          setConversations(storedState.conversations)
+          const storedConversations = storedState.conversations.map((conversation) => ({
+            ...conversation,
+            messages: []
+          }))
+          setConversations(storedConversations)
           setSelectedConversationId(storedState.selectedConversationId)
           lastSavedConversationSnapshotRef.current = JSON.stringify(storedState)
+          setLoadingConversationIds(new Set([storedState.selectedConversationId]))
+
+          const messages = await window.projects.loadConversationMessages(
+            project.handle,
+            storedState.selectedConversationId
+          )
+          if (!active) return
+          setConversations((current) => current.map((conversation) =>
+            conversation.id === storedState.selectedConversationId
+              ? { ...conversation, messages }
+              : conversation
+          ))
+          setLoadedConversationIds(new Set([storedState.selectedConversationId]))
+          setLoadingConversationIds(new Set())
         } else {
           const conversation = createConversation()
           setConversations([conversation])
           setSelectedConversationId(conversation.id)
+          setLoadedConversationIds(new Set([conversation.id]))
           lastSavedConversationSnapshotRef.current = ''
         }
         setCanPersistConversations(true)
-      })
-      .catch((error: unknown) => {
+      } catch (error) {
         if (!active) return
         setConversationError(
           `${error instanceof Error ? error.message : '无法加载项目会话'}；已停止自动保存以保护原记录`
         )
-      })
-      .finally(() => {
-        if (active) setIsConversationLoading(false)
-      })
+      } finally {
+        if (active) {
+          setLoadingConversationIds(new Set())
+          setIsConversationLoading(false)
+        }
+      }
+    })()
 
     return () => {
       active = false
     }
-  }, [project.path])
+  }, [project.handle])
 
   useEffect(() => {
     if (!canPersistConversations || isConversationLoading) return
@@ -229,7 +253,7 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
 
     const timer = window.setTimeout(() => {
       void window.projects
-        .saveConversations(project.path, state)
+        .saveConversations(project.handle, state)
         .then(() => {
           lastSavedConversationSnapshotRef.current = snapshot
           setConversationError('')
@@ -240,7 +264,7 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
     }, 300)
 
     return () => window.clearTimeout(timer)
-  }, [canPersistConversations, conversations, isConversationLoading, project.path, selectedConversationId])
+  }, [canPersistConversations, conversations, isConversationLoading, project.handle, selectedConversationId])
 
   useEffect(() => () => {
     if (!canFlushConversationsRef.current) return
@@ -249,10 +273,10 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
     const snapshot = JSON.stringify(state)
     if (snapshot === lastSavedConversationSnapshotRef.current) return
 
-    void window.projects.saveConversations(project.path, state).catch((error: unknown) => {
+    void window.projects.saveConversations(project.handle, state).catch((error: unknown) => {
       console.warn('Unable to flush project conversations:', error)
     })
-  }, [project.path])
+  }, [project.handle])
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -275,11 +299,48 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
 
   function startConversation(): void {
     if (isConversationLoading) return
-    const nextState = ensureConversationDraft(conversations, createConversation)
-    setConversations(nextState.conversations)
-    setSelectedConversationId(nextState.selectedConversationId)
+    const existingDraft = conversations.find((conversation) =>
+      loadedConversationIds.has(conversation.id) && conversation.messages.length === 0
+    )
+    if (existingDraft) {
+      setSelectedConversationId(existingDraft.id)
+      setDraft('')
+      setChatError('')
+      return
+    }
+
+    const conversation = createConversation()
+    setConversations((current) => [conversation, ...current])
+    setSelectedConversationId(conversation.id)
+    setLoadedConversationIds((current) => new Set(current).add(conversation.id))
     setChatError('')
-    if (nextState.selectedConversationId !== selectedConversationId) setDraft('')
+    setDraft('')
+  }
+
+  async function selectConversation(conversationId: string): Promise<void> {
+    setSelectedConversationId(conversationId)
+    setChatError('')
+    if (loadedConversationIds.has(conversationId) || loadingConversationIds.has(conversationId)) {
+      return
+    }
+
+    setLoadingConversationIds((current) => new Set(current).add(conversationId))
+    try {
+      const messages = await window.projects.loadConversationMessages(project.handle, conversationId)
+      setConversations((current) => current.map((conversation) =>
+        conversation.id === conversationId ? { ...conversation, messages } : conversation
+      ))
+      setLoadedConversationIds((current) => new Set(current).add(conversationId))
+      setConversationError('')
+    } catch (error) {
+      setConversationError(error instanceof Error ? error.message : '无法加载 Pi 会话')
+    } finally {
+      setLoadingConversationIds((current) => {
+        const next = new Set(current)
+        next.delete(conversationId)
+        return next
+      })
+    }
   }
 
   async function toggleDirectory(entry: ProjectFileEntry): Promise<void> {
@@ -298,7 +359,7 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
     setLoadingPaths((current) => new Set(current).add(entry.path))
     setFileError('')
     try {
-      const entries = await window.projects.listDirectory(project.path, entry.path)
+      const entries = await window.projects.listDirectory(project.handle, entry.path)
       setEntriesByDirectory((current) => ({ ...current, [entry.path]: entries }))
     } catch (error) {
       setFileError(error instanceof Error ? error.message : '无法读取项目文件')
@@ -319,7 +380,12 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
   async function sendMessage(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
     const prompt = draft.trim()
-    if (!prompt || isSending || isConversationLoading) return
+    if (
+      !prompt ||
+      isSending ||
+      isConversationLoading ||
+      loadingConversationIds.has(selectedConversation.id)
+    ) return
 
     const conversationId = selectedConversation.id
     const requestId = crypto.randomUUID()
@@ -347,9 +413,8 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
       const result = await window.agent.prompt({
         requestId,
         conversationId,
-        projectPath: project.path,
-        input: prompt,
-        history: selectedConversation.messages.map(({ role, text }) => ({ role, text }))
+        projectHandle: project.handle,
+        input: prompt
       })
       setConversations((current) => current.map((conversation) =>
         conversation.id === conversationId
@@ -403,14 +468,12 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
             >＋</button>
           </header>
           <div className="conversation-list">
-            {conversations
-              .filter((conversation) => conversation.messages.length > 0)
-              .map((conversation) => (
+            {conversations.map((conversation) => (
                 <button
                   className={conversation.id === selectedConversation.id ? 'conversation-item conversation-item-active' : 'conversation-item'}
                   type="button"
                   key={conversation.id}
-                  onClick={() => setSelectedConversationId(conversation.id)}
+                  onClick={() => void selectConversation(conversation.id)}
                 >
                   <ConversationIcon />
                   <span>{conversation.title}</span>
@@ -453,7 +516,9 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
         </header>
 
         <div className="message-stream" aria-live="polite">
-          {selectedConversation.messages.length === 0 ? (
+          {loadingConversationIds.has(selectedConversation.id) ? (
+            <p className="sidebar-loading">正在加载 Pi 会话…</p>
+          ) : selectedConversation.messages.length === 0 ? (
             <div className="chat-empty">
               <span className="chat-empty-mark" aria-hidden="true"><i /><i /><i /></span>
               <h2>从项目材料开始思考</h2>
@@ -489,14 +554,14 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
               onKeyDown={handleComposerKeyDown}
               placeholder="输入消息，和 SlideMind 一起梳理演示…"
               rows={2}
-              disabled={isSending || isConversationLoading}
+              disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
               aria-label="对话消息"
             />
             <div className="composer-footer">
               <span>Enter 发送 · Shift Enter 换行</span>
               <div className="composer-actions">
-                <AgentModelSelect disabled={isSending || isConversationLoading} />
-                <button className="composer-send" type="submit" disabled={!draft.trim() || isSending || isConversationLoading} aria-label="发送消息">↑</button>
+                <AgentModelSelect disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} />
+                <button className="composer-send" type="submit" disabled={!draft.trim() || isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} aria-label="发送消息">↑</button>
               </div>
             </div>
           </div>

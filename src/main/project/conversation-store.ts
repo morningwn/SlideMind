@@ -1,55 +1,58 @@
-import { lstat, mkdir, readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises'
+import type { AgentMessage } from '@earendil-works/pi-agent-core'
+import type { SessionManager as PiSessionManager } from '@earendil-works/pi-coding-agent'
 import { randomUUID } from 'node:crypto'
-import { join, sep } from 'node:path'
+import { lstat, readFile, rename, unlink, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type {
   ConversationMessage,
   ProjectConversation,
   ProjectConversationState
 } from '../../shared/project'
 import { resolveProject } from './recent-project-store'
+import {
+  findPiSessionFile,
+  resolvePiConversationsDirectory,
+  resolveProjectStorageDirectory
+} from './project-storage'
 
 interface StoredProjectConversations extends ProjectConversationState {
-  version: 1
+  version: 2
 }
 
-const STORAGE_DIRECTORY = '.slideMind'
+interface PiSessionRuntime {
+  SessionManager: typeof import('@earendil-works/pi-coding-agent').SessionManager
+}
+
 const STORAGE_FILE = 'conversations.json'
 const MAX_CONVERSATIONS = 500
 const MAX_MESSAGES_PER_CONVERSATION = 10_000
+const MAX_MESSAGE_LENGTH = 2_000_000
 const MAX_ID_LENGTH = 200
 const MAX_TITLE_LENGTH = 500
-const MAX_MESSAGE_LENGTH = 2_000_000
+const SESSION_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/
 
-function isBoundedString(value: unknown, maximumLength: number, allowEmpty = false): value is string {
-  return (
-    typeof value === 'string' &&
-    value.length <= maximumLength &&
-    (allowEmpty || value.trim().length > 0)
-  )
+let piSessionRuntimePromise: Promise<PiSessionRuntime> | undefined
+
+async function loadPiSessionRuntime(): Promise<PiSessionRuntime> {
+  piSessionRuntimePromise ??= import('@earendil-works/pi-coding-agent').then((runtime) => ({
+    SessionManager: runtime.SessionManager
+  }))
+  return piSessionRuntimePromise
 }
 
-function isConversationMessage(value: unknown): value is ConversationMessage {
-  if (!value || typeof value !== 'object') return false
+function isBoundedString(value: unknown, maximumLength: number): value is string {
+  return typeof value === 'string' && value.length <= maximumLength && value.trim().length > 0
+}
 
-  const candidate = value as Record<string, unknown>
-  return (
-    isBoundedString(candidate.id, MAX_ID_LENGTH) &&
-    (candidate.role === 'assistant' || candidate.role === 'user') &&
-    isBoundedString(candidate.text, MAX_MESSAGE_LENGTH, true)
-  )
+function isConversationId(value: unknown): value is string {
+  return isBoundedString(value, MAX_ID_LENGTH) && SESSION_ID_PATTERN.test(value)
 }
 
 function isProjectConversation(value: unknown): value is ProjectConversation {
   if (!value || typeof value !== 'object') return false
 
   const candidate = value as Record<string, unknown>
-  return (
-    isBoundedString(candidate.id, MAX_ID_LENGTH) &&
-    isBoundedString(candidate.title, MAX_TITLE_LENGTH) &&
-    Array.isArray(candidate.messages) &&
-    candidate.messages.length <= MAX_MESSAGES_PER_CONVERSATION &&
-    candidate.messages.every(isConversationMessage)
-  )
+  return isConversationId(candidate.id) && isBoundedString(candidate.title, MAX_TITLE_LENGTH)
 }
 
 function isProjectConversationState(value: unknown): value is ProjectConversationState {
@@ -61,7 +64,7 @@ function isProjectConversationState(value: unknown): value is ProjectConversatio
     candidate.conversations.length === 0 ||
     candidate.conversations.length > MAX_CONVERSATIONS ||
     !candidate.conversations.every(isProjectConversation) ||
-    !isBoundedString(candidate.selectedConversationId, MAX_ID_LENGTH)
+    !isConversationId(candidate.selectedConversationId)
   ) {
     return false
   }
@@ -74,46 +77,44 @@ function isStoredProjectConversations(value: unknown): value is StoredProjectCon
   return (
     Boolean(value) &&
     typeof value === 'object' &&
-    (value as Record<string, unknown>).version === 1 &&
+    (value as Record<string, unknown>).version === 2 &&
     isProjectConversationState(value)
   )
 }
 
-function isInsideProject(projectPath: string, candidatePath: string): boolean {
-  return candidatePath === projectPath || candidatePath.startsWith(`${projectPath}${sep}`)
+function extractText(message: AgentMessage): string | null {
+  if (message.role !== 'assistant' && message.role !== 'user') return null
+
+  const content: unknown = message.content
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return null
+
+  return content
+    .filter((block): block is { type: 'text'; text: string } => (
+      Boolean(block) &&
+      typeof block === 'object' &&
+      (block as Record<string, unknown>).type === 'text' &&
+      typeof (block as Record<string, unknown>).text === 'string'
+    ))
+    .map((block) => block.text)
+    .join('')
 }
 
-async function ensureSafeStorageDirectory(projectPath: string): Promise<string> {
-  const storagePath = join(projectPath, STORAGE_DIRECTORY)
+function projectMessages(sessionManager: PiSessionManager): ConversationMessage[] {
+  const messages: ConversationMessage[] = []
+  for (const entry of sessionManager.getBranch()) {
+    if (entry.type !== 'message') continue
 
-  try {
-    const stats = await lstat(storagePath)
-    if (stats.isSymbolicLink() || !stats.isDirectory()) {
-      throw new Error('项目会话存储目录无效')
+    const text = extractText(entry.message)
+    if (text === null || (entry.message.role !== 'assistant' && entry.message.role !== 'user')) {
+      continue
     }
-  } catch (error) {
-    const code = error instanceof Error && 'code' in error ? error.code : undefined
-    if (code !== 'ENOENT') throw error
-    await mkdir(storagePath, { mode: 0o700 })
-  }
-
-  const canonicalStoragePath = await realpath(storagePath)
-  if (!isInsideProject(projectPath, canonicalStoragePath)) {
-    throw new Error('项目会话存储目录超出项目范围')
-  }
-
-  return canonicalStoragePath
-}
-
-async function rejectSymbolicLink(path: string): Promise<void> {
-  try {
-    if ((await lstat(path)).isSymbolicLink()) {
-      throw new Error('项目会话记录文件无效')
+    if (text.length > MAX_MESSAGE_LENGTH || messages.length >= MAX_MESSAGES_PER_CONVERSATION) {
+      throw new Error('Pi 会话记录超出显示限制')
     }
-  } catch (error) {
-    const code = error instanceof Error && 'code' in error ? error.code : undefined
-    if (code !== 'ENOENT') throw error
+    messages.push({ id: entry.id, role: entry.message.role, text })
   }
+  return messages
 }
 
 export class ProjectConversationStore {
@@ -124,15 +125,12 @@ export class ProjectConversationStore {
     const pendingWrite = this.writeQueues.get(project.path)
     if (pendingWrite) await pendingWrite
 
-    const storagePath = join(project.path, STORAGE_DIRECTORY)
-    const conversationPath = join(storagePath, STORAGE_FILE)
+    const storagePath = await resolveProjectStorageDirectory(project.path, false)
+    if (!storagePath) return null
 
+    const conversationPath = join(storagePath, STORAGE_FILE)
     try {
-      const storageStats = await lstat(storagePath)
-      if (storageStats.isSymbolicLink() || !storageStats.isDirectory()) {
-        throw new Error('项目会话存储目录无效')
-      }
-      await rejectSymbolicLink(conversationPath)
+      await this.rejectSymbolicLink(conversationPath)
       const stored: unknown = JSON.parse(await readFile(conversationPath, 'utf8'))
       if (!isStoredProjectConversations(stored)) {
         throw new Error('项目会话记录格式无效')
@@ -150,6 +148,30 @@ export class ProjectConversationStore {
     }
   }
 
+  async loadMessages(
+    projectPathInput: unknown,
+    conversationIdInput: unknown
+  ): Promise<ConversationMessage[]> {
+    const project = await resolveProject(projectPathInput)
+    if (!isConversationId(conversationIdInput)) throw new Error('项目会话标识无效')
+
+    const conversationsDirectory = await resolvePiConversationsDirectory(project.path, false)
+    if (!conversationsDirectory) return []
+
+    const { SessionManager } = await loadPiSessionRuntime()
+    const sessionPath = await findPiSessionFile(conversationsDirectory, conversationIdInput)
+    if (!sessionPath) return []
+    const sessionManager = SessionManager.open(
+      sessionPath,
+      conversationsDirectory,
+      project.path
+    )
+    if (sessionManager.getSessionId() !== conversationIdInput) {
+      throw new Error('Pi 会话记录标识不匹配')
+    }
+    return projectMessages(sessionManager)
+  }
+
   save(projectPathInput: unknown, stateInput: unknown): Promise<void> {
     if (!isProjectConversationState(stateInput)) {
       return Promise.reject(new Error('项目会话记录无效'))
@@ -157,12 +179,13 @@ export class ProjectConversationStore {
 
     const state = structuredClone(stateInput)
     return this.enqueue(projectPathInput, async (projectPath) => {
-      const storagePath = await ensureSafeStorageDirectory(projectPath)
-      const conversationPath = join(storagePath, STORAGE_FILE)
-      await rejectSymbolicLink(conversationPath)
+      const storagePath = await resolveProjectStorageDirectory(projectPath, true)
+      if (!storagePath) throw new Error('无法创建项目会话存储目录')
 
+      const conversationPath = join(storagePath, STORAGE_FILE)
+      await this.rejectSymbolicLink(conversationPath)
       const temporaryPath = join(storagePath, `${STORAGE_FILE}.${process.pid}-${randomUUID()}.tmp`)
-      const stored: StoredProjectConversations = { version: 1, ...state }
+      const stored: StoredProjectConversations = { version: 2, ...state }
 
       try {
         await writeFile(temporaryPath, `${JSON.stringify(stored, null, 2)}\n`, {
@@ -182,20 +205,31 @@ export class ProjectConversationStore {
     projectPathInput: unknown,
     operation: (projectPath: string) => Promise<void>
   ): Promise<void> {
-    const project = await resolveProject(projectPathInput)
-    const previousWrite = this.writeQueues.get(project.path) ?? Promise.resolve()
+    const queueKey = typeof projectPathInput === 'string' ? projectPathInput : ''
+    const previousWrite = this.writeQueues.get(queueKey) ?? Promise.resolve()
     const result = previousWrite.then(
-      () => operation(project.path),
-      () => operation(project.path)
+      async () => operation((await resolveProject(projectPathInput)).path),
+      async () => operation((await resolveProject(projectPathInput)).path)
     )
     const queue = result.then(
       () => undefined,
       () => undefined
     )
-    this.writeQueues.set(project.path, queue)
+    this.writeQueues.set(queueKey, queue)
     void queue.finally(() => {
-      if (this.writeQueues.get(project.path) === queue) this.writeQueues.delete(project.path)
+      if (this.writeQueues.get(queueKey) === queue) this.writeQueues.delete(queueKey)
     })
     return result
+  }
+
+  private async rejectSymbolicLink(path: string): Promise<void> {
+    try {
+      if ((await lstat(path)).isSymbolicLink()) {
+        throw new Error('项目会话记录文件无效')
+      }
+    } catch (error) {
+      const code = error instanceof Error && 'code' in error ? error.code : undefined
+      if (code !== 'ENOENT') throw error
+    }
   }
 }

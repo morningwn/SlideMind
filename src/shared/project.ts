@@ -4,6 +4,10 @@ export interface ProjectInfo {
   lastOpenedAt: string
 }
 
+export interface OpenedProject extends ProjectInfo {
+  handle: string
+}
+
 export interface ProjectFileEntry {
   kind: 'directory' | 'file'
   name: string
@@ -19,7 +23,6 @@ export interface ConversationMessage {
 export interface ProjectConversation {
   id: string
   title: string
-  messages: ConversationMessage[]
 }
 
 export interface ProjectConversationState {
@@ -29,10 +32,14 @@ export interface ProjectConversationState {
 
 export interface ProjectApi {
   listRecent(): Promise<ProjectInfo[]>
-  chooseFolder(): Promise<ProjectInfo | null>
-  open(path: string): Promise<ProjectInfo>
+  chooseFolder(): Promise<OpenedProject | null>
+  open(path: string): Promise<OpenedProject>
   removeRecent(path: string): Promise<ProjectInfo[]>
-  listDirectory(projectPath: string, relativePath: string): Promise<ProjectFileEntry[]>
-  loadConversations(projectPath: string): Promise<ProjectConversationState | null>
-  saveConversations(projectPath: string, state: ProjectConversationState): Promise<void>
+  listDirectory(projectHandle: string, relativePath: string): Promise<ProjectFileEntry[]>
+  loadConversations(projectHandle: string): Promise<ProjectConversationState | null>
+  loadConversationMessages(
+    projectHandle: string,
+    conversationId: string
+  ): Promise<ConversationMessage[]>
+  saveConversations(projectHandle: string, state: ProjectConversationState): Promise<void>
 }

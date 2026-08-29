@@ -6,21 +6,13 @@ describe('normalizeAgentPromptInput', () => {
     expect(normalizeAgentPromptInput({
       requestId: ' request-1 ',
       conversationId: ' conversation-1 ',
-      projectPath: ' /workspace/slides ',
-      input: ' 建立一份产品发布演示 ',
-      history: [
-        { role: 'user', text: '目标受众是管理层' },
-        { role: 'assistant', text: '可以突出业务影响。' }
-      ]
+      projectHandle: ' project-handle-1 ',
+      input: ' 建立一份产品发布演示 '
     })).toEqual({
       requestId: 'request-1',
       conversationId: 'conversation-1',
-      projectPath: '/workspace/slides',
-      input: '建立一份产品发布演示',
-      history: [
-        { role: 'user', text: '目标受众是管理层' },
-        { role: 'assistant', text: '可以突出业务影响。' }
-      ]
+      projectHandle: 'project-handle-1',
+      input: '建立一份产品发布演示'
     })
   })
 
@@ -28,32 +20,38 @@ describe('normalizeAgentPromptInput', () => {
     expect(() => normalizeAgentPromptInput({
       requestId: '',
       conversationId: 'conversation-1',
-      projectPath: '/workspace/slides',
+      projectHandle: 'project-handle-1',
+      input: 'hello'
+    })).toThrow('Agent 会话标识无效')
+
+    expect(() => normalizeAgentPromptInput({
+      requestId: 'request-1',
+      conversationId: '../conversation-1',
+      projectHandle: 'project-handle-1',
       input: 'hello'
     })).toThrow('Agent 会话标识无效')
   })
 
-  it('rejects invalid project paths', () => {
+  it('rejects invalid project handles', () => {
     expect(() => normalizeAgentPromptInput({
       requestId: 'request-1',
       conversationId: 'conversation-1',
-      projectPath: '/workspace/slides\0hidden',
+      projectHandle: 'project-handle\0hidden',
       input: 'hello'
-    })).toThrow('项目路径无效')
+    })).toThrow('项目授权无效')
 
     expect(() => normalizeAgentPromptInput({
       requestId: 'request-1',
       conversationId: 'conversation-1',
-      projectPath: 'relative/project',
       input: 'hello'
-    })).toThrow('项目路径无效')
+    })).toThrow('项目授权无效')
   })
 
   it('rejects empty and oversized prompts', () => {
     const baseInput = {
       requestId: 'request-1',
       conversationId: 'conversation-1',
-      projectPath: '/workspace/slides'
+      projectHandle: 'project-handle-1'
     }
 
     expect(() => normalizeAgentPromptInput({ ...baseInput, input: '   ' }))
@@ -62,13 +60,4 @@ describe('normalizeAgentPromptInput', () => {
       .toThrow('输入内容长度超出限制')
   })
 
-  it('rejects invalid conversation history', () => {
-    expect(() => normalizeAgentPromptInput({
-      requestId: 'request-1',
-      conversationId: 'conversation-1',
-      projectPath: '/workspace/slides',
-      input: 'hello',
-      history: [{ role: 'system', text: 'hidden instruction' }]
-    })).toThrow('Agent 历史记录无效')
-  })
 })

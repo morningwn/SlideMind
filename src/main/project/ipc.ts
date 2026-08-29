@@ -1,16 +1,18 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
-import type { ProjectInfo } from '../../shared/project'
+import type { OpenedProject, ProjectInfo } from '../../shared/project'
 import { ProjectConversationStore } from './conversation-store'
 import { RecentProjectStore, resolveProject } from './recent-project-store'
 import { listProjectDirectory } from './project-files'
+import { ProjectRootRegistry } from './project-root-registry'
 
 export function registerProjectIpc(
   store: RecentProjectStore,
-  conversationStore: ProjectConversationStore
+  conversationStore: ProjectConversationStore,
+  projectRoots: ProjectRootRegistry
 ): void {
   ipcMain.handle('project:list-recent', () => store.list())
 
-  ipcMain.handle('project:choose-folder', async (): Promise<ProjectInfo | null> => {
+  ipcMain.handle('project:choose-folder', async (): Promise<OpenedProject | null> => {
     const owner = BrowserWindow.getFocusedWindow()
     const options: Electron.OpenDialogOptions = {
       title: '选择 SlideMind 项目',
@@ -25,13 +27,20 @@ export function registerProjectIpc(
 
     const project = await resolveProject(result.filePaths[0])
     await store.record(project)
-    return project
+    return projectRoots.grant(project)
   })
 
-  ipcMain.handle('project:open', async (_event, path: unknown): Promise<ProjectInfo> => {
-    const project = await resolveProject(path)
+  ipcMain.handle('project:open', async (_event, path: unknown): Promise<OpenedProject> => {
+    if (typeof path !== 'string' || !path.trim() || path.length > 4096 || path.includes('\0')) {
+      throw new Error('项目路径无效')
+    }
+
+    const recentProject = (await store.list()).find((project) => project.path === path)
+    if (!recentProject) throw new Error('项目未获授权，请重新选择项目文件夹')
+
+    const project = await resolveProject(recentProject.path)
     await store.record(project)
-    return project
+    return projectRoots.grant(project)
   })
 
   ipcMain.handle('project:remove-recent', async (_event, path: unknown): Promise<ProjectInfo[]> => {
@@ -44,17 +53,24 @@ export function registerProjectIpc(
 
   ipcMain.handle(
     'project:list-directory',
-    (_event, projectPath: unknown, relativePath: unknown) =>
-      listProjectDirectory(projectPath, relativePath)
+    (_event, projectHandle: unknown, relativePath: unknown) =>
+      listProjectDirectory(projectRoots.resolve(projectHandle), relativePath)
   )
 
   ipcMain.handle(
     'project:load-conversations',
-    (_event, projectPath: unknown) => conversationStore.load(projectPath)
+    (_event, projectHandle: unknown) => conversationStore.load(projectRoots.resolve(projectHandle))
+  )
+
+  ipcMain.handle(
+    'project:load-conversation-messages',
+    (_event, projectHandle: unknown, conversationId: unknown) =>
+      conversationStore.loadMessages(projectRoots.resolve(projectHandle), conversationId)
   )
 
   ipcMain.handle(
     'project:save-conversations',
-    (_event, projectPath: unknown, state: unknown) => conversationStore.save(projectPath, state)
+    (_event, projectHandle: unknown, state: unknown) =>
+      conversationStore.save(projectRoots.resolve(projectHandle), state)
   )
 }

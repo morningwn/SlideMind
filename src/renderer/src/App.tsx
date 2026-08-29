@@ -5,7 +5,7 @@ import {
   useState,
   type CSSProperties
 } from 'react'
-import type { ProjectInfo } from '../../shared/project'
+import type { OpenedProject, ProjectInfo } from '../../shared/project'
 import { AppTitleBar } from './components/app-title-bar'
 import { ProjectWorkspace } from './components/project-workspace'
 import { SettingsPage } from './components/settings-page'
@@ -75,7 +75,7 @@ function SettingsIcon(): React.JSX.Element {
 
 function App(): React.JSX.Element {
   const [recentProjects, setRecentProjects] = useState<ProjectInfo[]>([])
-  const [activeProject, setActiveProject] = useState<ProjectInfo | null>(null)
+  const [activeProject, setActiveProject] = useState<OpenedProject | null>(null)
   const [query, setQuery] = useState('')
   const [isLoadingProjects, setIsLoadingProjects] = useState(true)
   const [openingProject, setOpeningProject] = useState<string | null>(null)

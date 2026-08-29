@@ -38,12 +38,14 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
   chooseFolder: () => ipcRenderer.invoke('project:choose-folder'),
   open: (path: string) => ipcRenderer.invoke('project:open', path),
   removeRecent: (path: string) => ipcRenderer.invoke('project:remove-recent', path),
-  listDirectory: (projectPath: string, relativePath: string) =>
-    ipcRenderer.invoke('project:list-directory', projectPath, relativePath),
-  loadConversations: (projectPath: string) =>
-    ipcRenderer.invoke('project:load-conversations', projectPath),
-  saveConversations: (projectPath: string, state: ProjectConversationState) =>
-    ipcRenderer.invoke('project:save-conversations', projectPath, state)
+  listDirectory: (projectHandle: string, relativePath: string) =>
+    ipcRenderer.invoke('project:list-directory', projectHandle, relativePath),
+  loadConversations: (projectHandle: string) =>
+    ipcRenderer.invoke('project:load-conversations', projectHandle),
+  loadConversationMessages: (projectHandle: string, conversationId: string) =>
+    ipcRenderer.invoke('project:load-conversation-messages', projectHandle, conversationId),
+  saveConversations: (projectHandle: string, state: ProjectConversationState) =>
+    ipcRenderer.invoke('project:save-conversations', projectHandle, state)
 })
 
 contextBridge.exposeInMainWorld('projects', projectApi)

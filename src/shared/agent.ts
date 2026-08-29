@@ -38,17 +38,11 @@ export interface AgentPromptResult {
   modelId: string
 }
 
-export interface AgentHistoryMessage {
-  role: 'assistant' | 'user'
-  text: string
-}
-
 export interface AgentPromptInput {
   requestId: string
   conversationId: string
-  projectPath: string
+  projectHandle: string
   input: string
-  history: AgentHistoryMessage[]
 }
 
 export interface AgentStreamEvent {

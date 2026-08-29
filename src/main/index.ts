@@ -6,6 +6,7 @@ import { registerAgentIpc } from './agent/ipc'
 import { ProjectConversationStore } from './project/conversation-store'
 import { registerProjectIpc } from './project/ipc'
 import { RecentProjectStore } from './project/recent-project-store'
+import { ProjectRootRegistry } from './project/project-root-registry'
 import { getTitleBarWindowOptions } from './window-options'
 
 const APP_URL_PROTOCOLS = new Set(['http:', 'https:'])
@@ -120,14 +121,19 @@ function createWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   const configStore = new AgentConfigStore(join(app.getPath('userData'), 'agent-config.json'))
-  const agentService = new BaseAgentService(configStore)
+  const projectRoots = new ProjectRootRegistry()
+  const agentService = new BaseAgentService(
+    configStore,
+    projectRoots,
+    join(app.getPath('userData'), 'pi-agent')
+  )
   const recentProjectStore = new RecentProjectStore(
     join(app.getPath('userData'), 'recent-projects.json')
   )
   const conversationStore = new ProjectConversationStore()
 
   registerAgentIpc(configStore, agentService)
-  registerProjectIpc(recentProjectStore, conversationStore)
+  registerProjectIpc(recentProjectStore, conversationStore, projectRoots)
   installApplicationMenu()
   createWindow()
 

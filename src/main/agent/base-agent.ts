@@ -1,44 +1,46 @@
-import type { Agent, AgentMessage } from '@earendil-works/pi-agent-core'
+import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import type { AssistantMessage } from '@earendil-works/pi-ai'
-import { isAbsolute } from 'node:path'
+import type { AgentSession as PiAgentSession, ModelRuntime } from '@earendil-works/pi-coding-agent'
+import { join } from 'node:path'
 import {
   DEEPSEEK_PROVIDER_ID,
-  type AgentHistoryMessage,
   type AgentPromptInput,
   type AgentPromptResult
 } from '../../shared/agent'
+import type { ProjectRootRegistry } from '../project/project-root-registry'
+import {
+  findPiSessionFile,
+  resolvePiConversationsDirectory
+} from '../project/project-storage'
 import type { AgentConfigStore, AgentConfiguration } from './config-store'
 
 const MAX_AGENT_SESSIONS = 50
-const MAX_HISTORY_MESSAGES = 10_000
-const MAX_HISTORY_MESSAGE_LENGTH = 2_000_000
+const SESSION_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/
 const SYSTEM_PROMPT = `你是 SlideMind 的基础演示创作 agent。
 你的职责是帮助用户梳理材料、建立清晰叙事、规划演示结构并打磨表达。
 信息不足时先指出缺口；不要虚构事实；输出应简洁、可执行。`
 
-interface AgentSession {
-  agent?: Agent
+interface AgentSessionRecord {
+  agent?: PiAgentSession
   lastUsedAt: number
   queue: Promise<void>
 }
 
 interface PiRuntime {
-  Agent: typeof import('@earendil-works/pi-agent-core').Agent
-  createModels: typeof import('@earendil-works/pi-ai').createModels
-  deepseekProvider: typeof import('@earendil-works/pi-ai/providers/deepseek').deepseekProvider
+  createAgentSession: typeof import('@earendil-works/pi-coding-agent').createAgentSession
+  DefaultResourceLoader: typeof import('@earendil-works/pi-coding-agent').DefaultResourceLoader
+  ModelRuntime: typeof import('@earendil-works/pi-coding-agent').ModelRuntime
+  SessionManager: typeof import('@earendil-works/pi-coding-agent').SessionManager
 }
 
 let piRuntimePromise: Promise<PiRuntime> | undefined
 
 async function loadPiRuntime(): Promise<PiRuntime> {
-  piRuntimePromise ??= Promise.all([
-    import('@earendil-works/pi-agent-core'),
-    import('@earendil-works/pi-ai'),
-    import('@earendil-works/pi-ai/providers/deepseek')
-  ]).then(([agentCore, piAi, deepseek]) => ({
-    Agent: agentCore.Agent,
-    createModels: piAi.createModels,
-    deepseekProvider: deepseek.deepseekProvider
+  piRuntimePromise ??= import('@earendil-works/pi-coding-agent').then((codingAgent) => ({
+    createAgentSession: codingAgent.createAgentSession,
+    DefaultResourceLoader: codingAgent.DefaultResourceLoader,
+    ModelRuntime: codingAgent.ModelRuntime,
+    SessionManager: codingAgent.SessionManager
   }))
 
   return piRuntimePromise
@@ -46,17 +48,6 @@ async function loadPiRuntime(): Promise<PiRuntime> {
 
 function isAssistantMessage(message: AgentMessage): message is AssistantMessage {
   return message.role === 'assistant'
-}
-
-function isAgentHistoryMessage(value: unknown): value is AgentHistoryMessage {
-  if (!value || typeof value !== 'object') return false
-
-  const candidate = value as Record<string, unknown>
-  return (
-    (candidate.role === 'assistant' || candidate.role === 'user') &&
-    typeof candidate.text === 'string' &&
-    candidate.text.length <= MAX_HISTORY_MESSAGE_LENGTH
-  )
 }
 
 export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
@@ -69,21 +60,23 @@ export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
   const conversationId = typeof candidate.conversationId === 'string'
     ? candidate.conversationId.trim()
     : ''
-  const projectPath = typeof candidate.projectPath === 'string' ? candidate.projectPath.trim() : ''
+  const projectHandle = typeof candidate.projectHandle === 'string'
+    ? candidate.projectHandle.trim()
+    : ''
   const prompt = typeof candidate.input === 'string' ? candidate.input.trim() : ''
-  const history = candidate.history === undefined ? [] : candidate.history
 
-  if (!requestId || requestId.length > 200 || !conversationId || conversationId.length > 200) {
+  if (
+    !requestId ||
+    requestId.length > 200 ||
+    !conversationId ||
+    conversationId.length > 200 ||
+    !SESSION_ID_PATTERN.test(conversationId)
+  ) {
     throw new Error('Agent 会话标识无效')
   }
 
-  if (
-    !projectPath ||
-    projectPath.length > 4096 ||
-    projectPath.includes('\0') ||
-    !isAbsolute(projectPath)
-  ) {
-    throw new Error('项目路径无效')
+  if (!projectHandle || projectHandle.length > 200 || projectHandle.includes('\0')) {
+    throw new Error('项目授权无效')
   }
 
   if (!prompt) {
@@ -94,24 +87,23 @@ export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
     throw new Error('输入内容长度超出限制')
   }
 
-  if (
-    !Array.isArray(history) ||
-    history.length > MAX_HISTORY_MESSAGES ||
-    !history.every(isAgentHistoryMessage)
-  ) {
-    throw new Error('Agent 历史记录无效')
-  }
-
-  return { requestId, conversationId, projectPath, input: prompt, history }
+  return { requestId, conversationId, projectHandle, input: prompt }
 }
 
 export class BaseAgentService {
-  private readonly sessions = new Map<string, AgentSession>()
+  private readonly sessions = new Map<string, AgentSessionRecord>()
+  private modelRuntimePromise?: Promise<ModelRuntime>
 
-  constructor(private readonly configStore: AgentConfigStore) {}
+  constructor(
+    private readonly configStore: AgentConfigStore,
+    private readonly projectRoots: ProjectRootRegistry,
+    private readonly agentDirectory: string
+  ) {}
 
   reset(): void {
-    for (const session of this.sessions.values()) session.agent?.abort()
+    for (const session of this.sessions.values()) {
+      if (session.agent) void session.agent.abort().finally(() => session.agent?.dispose())
+    }
     this.sessions.clear()
   }
 
@@ -126,7 +118,14 @@ export class BaseAgentService {
       return Promise.reject(error)
     }
 
-    const sessionKey = `${prompt.projectPath}\0${prompt.conversationId}`
+    let projectPath: string
+    try {
+      projectPath = this.projectRoots.resolve(prompt.projectHandle)
+    } catch (error) {
+      return Promise.reject(error)
+    }
+
+    const sessionKey = `${prompt.projectHandle}\0${prompt.conversationId}`
     let session = this.sessions.get(sessionKey)
     if (!session) {
       this.evictOldestSession()
@@ -134,7 +133,7 @@ export class BaseAgentService {
       this.sessions.set(sessionKey, session)
     }
 
-    const run = session.queue.then(() => this.runPrompt(session, prompt, onDelta))
+    const run = session.queue.then(() => this.runPrompt(session, prompt, projectPath, onDelta))
     const queue = run.then(
       () => undefined,
       () => undefined
@@ -146,60 +145,65 @@ export class BaseAgentService {
   private async createAgent(
     config: AgentConfiguration,
     projectPath: string,
-    conversationId: string,
-    history: AgentHistoryMessage[]
-  ): Promise<Agent> {
-    const { Agent: PiAgent, createModels, deepseekProvider } = await loadPiRuntime()
-    const models = createModels()
-    models.setProvider(deepseekProvider())
-    const model = models.getModel(DEEPSEEK_PROVIDER_ID, config.modelId)
+    conversationId: string
+  ): Promise<PiAgentSession> {
+    const {
+      createAgentSession,
+      DefaultResourceLoader,
+      SessionManager
+    } = await loadPiRuntime()
+    const modelRuntime = await this.getModelRuntime()
+    await modelRuntime.setRuntimeApiKey(DEEPSEEK_PROVIDER_ID, config.apiKey)
+    const model = modelRuntime.getModel(DEEPSEEK_PROVIDER_ID, config.modelId)
 
     if (!model) {
       throw new Error(`DeepSeek 模型不可用：${config.modelId}`)
     }
 
-    const timestamp = Date.now() - history.length
-    const historyMessages: AgentMessage[] = history.map((message, index) => {
-      if (message.role === 'user') {
-        return { role: 'user', content: message.text, timestamp: timestamp + index }
-      }
+    const conversationsDirectory = await resolvePiConversationsDirectory(projectPath, true)
+    if (!conversationsDirectory) throw new Error('无法创建 Pi 会话存储目录')
 
-      return {
-        role: 'assistant',
-        content: [{ type: 'text', text: message.text }],
-        api: model.api,
-        provider: model.provider,
-        model: model.id,
-        usage: {
-          input: 0,
-          output: 0,
-          cacheRead: 0,
-          cacheWrite: 0,
-          totalTokens: 0,
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
-        },
-        stopReason: 'stop',
-        timestamp: timestamp + index
-      }
-    })
+    const sessionPath = await findPiSessionFile(conversationsDirectory, conversationId)
+    const sessionManager = sessionPath
+      ? SessionManager.open(
+          sessionPath,
+          conversationsDirectory,
+          projectPath
+        )
+      : SessionManager.create(projectPath, conversationsDirectory, { id: conversationId })
+    if (sessionManager.getSessionId() !== conversationId) {
+      throw new Error('Pi 会话记录标识不匹配')
+    }
 
-    return new PiAgent({
-      initialState: {
-        systemPrompt: `${SYSTEM_PROMPT}\n\n当前对话所属项目目录（JSON 字符串）：${JSON.stringify(projectPath)}`,
-        model,
-        thinkingLevel: 'off',
-        tools: [],
-        messages: historyMessages
-      },
-      streamFn: models.streamSimple.bind(models),
-      getApiKey: (provider) => (provider === DEEPSEEK_PROVIDER_ID ? config.apiKey : undefined),
-      sessionId: conversationId
+    const resourceLoader = new DefaultResourceLoader({
+      cwd: projectPath,
+      agentDir: this.agentDirectory,
+      noExtensions: true,
+      noSkills: true,
+      noPromptTemplates: true,
+      noThemes: true,
+      noContextFiles: true,
+      systemPrompt: `${SYSTEM_PROMPT}\n\n当前对话所属项目目录（JSON 字符串）：${JSON.stringify(projectPath)}`
     })
+    await resourceLoader.reload()
+
+    const { session } = await createAgentSession({
+      cwd: projectPath,
+      agentDir: this.agentDirectory,
+      modelRuntime,
+      model,
+      thinkingLevel: 'off',
+      noTools: 'all',
+      resourceLoader,
+      sessionManager
+    })
+    return session
   }
 
   private async runPrompt(
-    session: AgentSession,
+    session: AgentSessionRecord,
     input: AgentPromptInput,
+    projectPath: string,
     onDelta?: (input: AgentPromptInput, delta: string) => void
   ): Promise<AgentPromptResult> {
     const config = await this.configStore.load()
@@ -209,9 +213,8 @@ export class BaseAgentService {
 
     session.agent ??= await this.createAgent(
       config,
-      input.projectPath,
-      input.conversationId,
-      input.history
+      projectPath,
+      input.conversationId
     )
     session.lastUsedAt = Date.now()
     const unsubscribe = session.agent.subscribe((event) => {
@@ -250,7 +253,20 @@ export class BaseAgentService {
     const oldest = [...this.sessions.entries()].reduce((candidate, entry) =>
       entry[1].lastUsedAt < candidate[1].lastUsedAt ? entry : candidate
     )
-    oldest[1].agent?.abort()
+    if (oldest[1].agent) {
+      void oldest[1].agent.abort().finally(() => oldest[1].agent?.dispose())
+    }
     this.sessions.delete(oldest[0])
+  }
+
+  private async getModelRuntime(): Promise<ModelRuntime> {
+    if (!this.modelRuntimePromise) {
+      this.modelRuntimePromise = loadPiRuntime().then(({ ModelRuntime }) => ModelRuntime.create({
+        authPath: join(this.agentDirectory, 'auth.json'),
+        modelsPath: null,
+        refreshOnCreate: false
+      }))
+    }
+    return this.modelRuntimePromise
   }
 }
