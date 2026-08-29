@@ -3,12 +3,15 @@ import type { AssistantMessage } from '@earendil-works/pi-ai'
 import { isAbsolute } from 'node:path'
 import {
   DEEPSEEK_PROVIDER_ID,
+  type AgentHistoryMessage,
   type AgentPromptInput,
   type AgentPromptResult
 } from '../../shared/agent'
 import type { AgentConfigStore, AgentConfiguration } from './config-store'
 
 const MAX_AGENT_SESSIONS = 50
+const MAX_HISTORY_MESSAGES = 10_000
+const MAX_HISTORY_MESSAGE_LENGTH = 2_000_000
 const SYSTEM_PROMPT = `你是 SlideMind 的基础演示创作 agent。
 你的职责是帮助用户梳理材料、建立清晰叙事、规划演示结构并打磨表达。
 信息不足时先指出缺口；不要虚构事实；输出应简洁、可执行。`
@@ -45,6 +48,17 @@ function isAssistantMessage(message: AgentMessage): message is AssistantMessage 
   return message.role === 'assistant'
 }
 
+function isAgentHistoryMessage(value: unknown): value is AgentHistoryMessage {
+  if (!value || typeof value !== 'object') return false
+
+  const candidate = value as Record<string, unknown>
+  return (
+    (candidate.role === 'assistant' || candidate.role === 'user') &&
+    typeof candidate.text === 'string' &&
+    candidate.text.length <= MAX_HISTORY_MESSAGE_LENGTH
+  )
+}
+
 export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
   if (!input || typeof input !== 'object') {
     throw new Error('Agent 请求格式无效')
@@ -57,6 +71,7 @@ export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
     : ''
   const projectPath = typeof candidate.projectPath === 'string' ? candidate.projectPath.trim() : ''
   const prompt = typeof candidate.input === 'string' ? candidate.input.trim() : ''
+  const history = candidate.history === undefined ? [] : candidate.history
 
   if (!requestId || requestId.length > 200 || !conversationId || conversationId.length > 200) {
     throw new Error('Agent 会话标识无效')
@@ -79,7 +94,15 @@ export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
     throw new Error('输入内容长度超出限制')
   }
 
-  return { requestId, conversationId, projectPath, input: prompt }
+  if (
+    !Array.isArray(history) ||
+    history.length > MAX_HISTORY_MESSAGES ||
+    !history.every(isAgentHistoryMessage)
+  ) {
+    throw new Error('Agent 历史记录无效')
+  }
+
+  return { requestId, conversationId, projectPath, input: prompt, history }
 }
 
 export class BaseAgentService {
@@ -123,7 +146,8 @@ export class BaseAgentService {
   private async createAgent(
     config: AgentConfiguration,
     projectPath: string,
-    conversationId: string
+    conversationId: string,
+    history: AgentHistoryMessage[]
   ): Promise<Agent> {
     const { Agent: PiAgent, createModels, deepseekProvider } = await loadPiRuntime()
     const models = createModels()
@@ -134,13 +158,38 @@ export class BaseAgentService {
       throw new Error(`DeepSeek 模型不可用：${config.modelId}`)
     }
 
+    const timestamp = Date.now() - history.length
+    const historyMessages: AgentMessage[] = history.map((message, index) => {
+      if (message.role === 'user') {
+        return { role: 'user', content: message.text, timestamp: timestamp + index }
+      }
+
+      return {
+        role: 'assistant',
+        content: [{ type: 'text', text: message.text }],
+        api: model.api,
+        provider: model.provider,
+        model: model.id,
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+        },
+        stopReason: 'stop',
+        timestamp: timestamp + index
+      }
+    })
+
     return new PiAgent({
       initialState: {
         systemPrompt: `${SYSTEM_PROMPT}\n\n当前对话所属项目目录（JSON 字符串）：${JSON.stringify(projectPath)}`,
         model,
         thinkingLevel: 'off',
         tools: [],
-        messages: []
+        messages: historyMessages
       },
       streamFn: models.streamSimple.bind(models),
       getApiKey: (provider) => (provider === DEEPSEEK_PROVIDER_ID ? config.apiKey : undefined),
@@ -158,7 +207,12 @@ export class BaseAgentService {
       throw new Error('请先配置 DeepSeek 模型与 API Key')
     }
 
-    session.agent ??= await this.createAgent(config, input.projectPath, input.conversationId)
+    session.agent ??= await this.createAgent(
+      config,
+      input.projectPath,
+      input.conversationId,
+      input.history
+    )
     session.lastUsedAt = Date.now()
     const unsubscribe = session.agent.subscribe((event) => {
       if (event.type === 'message_update' && event.assistantMessageEvent.type === 'text_delta') {

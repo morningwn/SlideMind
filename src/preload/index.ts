@@ -5,7 +5,7 @@ import type {
   AgentStreamEvent,
   SaveAgentConfigInput
 } from '../shared/agent'
-import type { ProjectApi } from '../shared/project'
+import type { ProjectApi, ProjectConversationState } from '../shared/project'
 
 const desktopApi = Object.freeze({
   platform: process.platform,
@@ -39,7 +39,11 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
   open: (path: string) => ipcRenderer.invoke('project:open', path),
   removeRecent: (path: string) => ipcRenderer.invoke('project:remove-recent', path),
   listDirectory: (projectPath: string, relativePath: string) =>
-    ipcRenderer.invoke('project:list-directory', projectPath, relativePath)
+    ipcRenderer.invoke('project:list-directory', projectPath, relativePath),
+  loadConversations: (projectPath: string) =>
+    ipcRenderer.invoke('project:load-conversations', projectPath),
+  saveConversations: (projectPath: string, state: ProjectConversationState) =>
+    ipcRenderer.invoke('project:save-conversations', projectPath, state)
 })
 
 contextBridge.exposeInMainWorld('projects', projectApi)

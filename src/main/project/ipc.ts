@@ -1,9 +1,13 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import type { ProjectInfo } from '../../shared/project'
+import { ProjectConversationStore } from './conversation-store'
 import { RecentProjectStore, resolveProject } from './recent-project-store'
 import { listProjectDirectory } from './project-files'
 
-export function registerProjectIpc(store: RecentProjectStore): void {
+export function registerProjectIpc(
+  store: RecentProjectStore,
+  conversationStore: ProjectConversationStore
+): void {
   ipcMain.handle('project:list-recent', () => store.list())
 
   ipcMain.handle('project:choose-folder', async (): Promise<ProjectInfo | null> => {
@@ -42,5 +46,15 @@ export function registerProjectIpc(store: RecentProjectStore): void {
     'project:list-directory',
     (_event, projectPath: unknown, relativePath: unknown) =>
       listProjectDirectory(projectPath, relativePath)
+  )
+
+  ipcMain.handle(
+    'project:load-conversations',
+    (_event, projectPath: unknown) => conversationStore.load(projectPath)
+  )
+
+  ipcMain.handle(
+    'project:save-conversations',
+    (_event, projectPath: unknown, state: unknown) => conversationStore.save(projectPath, state)
   )
 }

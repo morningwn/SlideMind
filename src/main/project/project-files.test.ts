@@ -16,6 +16,16 @@ describe('listProjectDirectory', () => {
     ])
   })
 
+  it('hides the internal SlideMind directory from the project file tree', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-files-'))
+    await mkdir(join(projectPath, '.slideMind'))
+    await writeFile(join(projectPath, 'notes.md'), 'Notes')
+
+    expect(await listProjectDirectory(projectPath, '')).toEqual([
+      { kind: 'file', name: 'notes.md', path: 'notes.md' }
+    ])
+  })
+
   it('lists a nested project directory', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-files-'))
     await mkdir(join(projectPath, 'assets'))

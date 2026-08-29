@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { BaseAgentService } from './agent/base-agent'
 import { AgentConfigStore } from './agent/config-store'
 import { registerAgentIpc } from './agent/ipc'
+import { ProjectConversationStore } from './project/conversation-store'
 import { registerProjectIpc } from './project/ipc'
 import { RecentProjectStore } from './project/recent-project-store'
 
@@ -121,9 +122,10 @@ app.whenReady().then(() => {
   const recentProjectStore = new RecentProjectStore(
     join(app.getPath('userData'), 'recent-projects.json')
   )
+  const conversationStore = new ProjectConversationStore()
 
   registerAgentIpc(configStore, agentService)
-  registerProjectIpc(recentProjectStore)
+  registerProjectIpc(recentProjectStore, conversationStore)
   installApplicationMenu()
   createWindow()
 

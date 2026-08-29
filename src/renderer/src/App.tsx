@@ -181,7 +181,7 @@ function App(): React.JSX.Element {
   return (
     <main className="app-shell">
       {activeProject ? (
-        <ProjectWorkspace project={activeProject} />
+        <ProjectWorkspace key={activeProject.path} project={activeProject} />
       ) : isSettingsOpen ? (
         <SettingsPage onBack={() => setIsSettingsOpen(false)} />
       ) : (

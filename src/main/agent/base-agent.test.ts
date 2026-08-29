@@ -7,12 +7,20 @@ describe('normalizeAgentPromptInput', () => {
       requestId: ' request-1 ',
       conversationId: ' conversation-1 ',
       projectPath: ' /workspace/slides ',
-      input: ' 建立一份产品发布演示 '
+      input: ' 建立一份产品发布演示 ',
+      history: [
+        { role: 'user', text: '目标受众是管理层' },
+        { role: 'assistant', text: '可以突出业务影响。' }
+      ]
     })).toEqual({
       requestId: 'request-1',
       conversationId: 'conversation-1',
       projectPath: '/workspace/slides',
-      input: '建立一份产品发布演示'
+      input: '建立一份产品发布演示',
+      history: [
+        { role: 'user', text: '目标受众是管理层' },
+        { role: 'assistant', text: '可以突出业务影响。' }
+      ]
     })
   })
 
@@ -52,5 +60,15 @@ describe('normalizeAgentPromptInput', () => {
       .toThrow('请输入要交给 agent 的内容')
     expect(() => normalizeAgentPromptInput({ ...baseInput, input: 'a'.repeat(100_001) }))
       .toThrow('输入内容长度超出限制')
+  })
+
+  it('rejects invalid conversation history', () => {
+    expect(() => normalizeAgentPromptInput({
+      requestId: 'request-1',
+      conversationId: 'conversation-1',
+      projectPath: '/workspace/slides',
+      input: 'hello',
+      history: [{ role: 'system', text: 'hidden instruction' }]
+    })).toThrow('Agent 历史记录无效')
   })
 })

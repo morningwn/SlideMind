@@ -3,6 +3,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path'
 import type { ProjectFileEntry } from '../../shared/project'
 
 const MAX_DIRECTORY_ENTRIES = 250
+const INTERNAL_PROJECT_DIRECTORY = '.slideMind'
 
 function validatePathInput(value: unknown, label: string, allowEmpty = false): string {
   if (
@@ -38,6 +39,7 @@ export async function listProjectDirectory(
 
   const entries = await readdir(targetPath, { withFileTypes: true })
   return entries
+    .filter((entry) => relativePath !== '' || entry.name !== INTERNAL_PROJECT_DIRECTORY)
     .sort((left, right) => {
       const kindOrder = Number(right.isDirectory()) - Number(left.isDirectory())
       return kindOrder || left.name.localeCompare(right.name, 'zh-CN')

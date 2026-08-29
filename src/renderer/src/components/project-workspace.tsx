@@ -5,13 +5,15 @@ import {
   type FormEvent,
   type KeyboardEvent
 } from 'react'
-import type { ProjectFileEntry, ProjectInfo } from '../../../shared/project'
+import type {
+  ConversationMessage,
+  ProjectConversationState,
+  ProjectFileEntry,
+  ProjectInfo
+} from '../../../shared/project'
 import { AgentModelSelect } from './agent-model-select'
 
-interface ChatMessage {
-  id: string
-  role: 'assistant' | 'user'
-  text: string
+interface ChatMessage extends ConversationMessage {
   isStreaming?: boolean
 }
 
@@ -39,6 +41,20 @@ function createConversation(): Conversation {
     id: crypto.randomUUID(),
     title: '新对话',
     messages: []
+  }
+}
+
+function toPersistedState(
+  conversations: Conversation[],
+  selectedConversationId: string
+): ProjectConversationState {
+  return {
+    selectedConversationId,
+    conversations: conversations.map((conversation) => ({
+      id: conversation.id,
+      title: conversation.title,
+      messages: conversation.messages.map(({ id, role, text }) => ({ id, role, text }))
+    }))
   }
 }
 
@@ -127,11 +143,15 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
   const [draft, setDraft] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [chatError, setChatError] = useState('')
+  const [conversationError, setConversationError] = useState('')
+  const [isConversationLoading, setIsConversationLoading] = useState(true)
+  const [canPersistConversations, setCanPersistConversations] = useState(false)
   const [entriesByDirectory, setEntriesByDirectory] = useState<Record<string, ProjectFileEntry[]>>({})
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set(['']))
   const [fileError, setFileError] = useState('')
   const messageEndRef = useRef<HTMLDivElement>(null)
+  const lastSavedConversationSnapshotRef = useRef('')
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
@@ -156,6 +176,66 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
   }, [project.path])
 
   useEffect(() => {
+    let active = true
+    setIsConversationLoading(true)
+    setCanPersistConversations(false)
+    setConversationError('')
+
+    void window.projects
+      .loadConversations(project.path)
+      .then((storedState) => {
+        if (!active) return
+
+        if (storedState) {
+          setConversations(storedState.conversations)
+          setSelectedConversationId(storedState.selectedConversationId)
+          lastSavedConversationSnapshotRef.current = JSON.stringify(storedState)
+        } else {
+          const conversation = createConversation()
+          setConversations([conversation])
+          setSelectedConversationId(conversation.id)
+          lastSavedConversationSnapshotRef.current = ''
+        }
+        setCanPersistConversations(true)
+      })
+      .catch((error: unknown) => {
+        if (!active) return
+        setConversationError(
+          `${error instanceof Error ? error.message : '无法加载项目会话'}；已停止自动保存以保护原记录`
+        )
+      })
+      .finally(() => {
+        if (active) setIsConversationLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [project.path])
+
+  useEffect(() => {
+    if (!canPersistConversations || isConversationLoading) return
+
+    const state = toPersistedState(conversations, selectedConversationId)
+    const snapshot = JSON.stringify(state)
+    if (snapshot === lastSavedConversationSnapshotRef.current) return
+
+    const timer = window.setTimeout(() => {
+      void window.projects
+        .saveConversations(project.path, state)
+        .then(() => {
+          lastSavedConversationSnapshotRef.current = snapshot
+          setConversationError('')
+        })
+        .catch((error: unknown) => {
+          setConversationError(error instanceof Error ? error.message : '无法保存项目会话')
+        })
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [canPersistConversations, conversations, isConversationLoading, project.path, selectedConversationId])
+
+  useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [selectedConversation.messages, isSending])
 
@@ -175,6 +255,7 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
   }), [])
 
   function startConversation(): void {
+    if (isConversationLoading) return
     const conversation = createConversation()
     setConversations((current) => [conversation, ...current])
     setSelectedConversationId(conversation.id)
@@ -219,7 +300,7 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
   async function sendMessage(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
     const prompt = draft.trim()
-    if (!prompt || isSending) return
+    if (!prompt || isSending || isConversationLoading) return
 
     const conversationId = selectedConversation.id
     const requestId = crypto.randomUUID()
@@ -248,7 +329,8 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
         requestId,
         conversationId,
         projectPath: project.path,
-        input: prompt
+        input: prompt,
+        history: selectedConversation.messages.map(({ role, text }) => ({ role, text }))
       })
       setConversations((current) => current.map((conversation) =>
         conversation.id === conversationId
@@ -293,7 +375,13 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
               <span>{project.name}</span>
               <h2 id="conversation-list-title">对话</h2>
             </div>
-            <button type="button" onClick={startConversation} aria-label="新建对话" title="新建对话">＋</button>
+            <button
+              type="button"
+              onClick={startConversation}
+              disabled={isConversationLoading}
+              aria-label="新建对话"
+              title="新建对话"
+            >＋</button>
           </header>
           <div className="conversation-list">
             {conversations.map((conversation) => (
@@ -371,6 +459,7 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
         </div>
 
         <form className="chat-composer" onSubmit={(event) => void sendMessage(event)}>
+          {conversationError ? <p className="composer-error" role="alert">{conversationError}</p> : null}
           {chatError ? <p className="composer-error" role="alert">{chatError}</p> : null}
           <div className="composer-box">
             <textarea
@@ -379,14 +468,14 @@ export function ProjectWorkspace({ project }: ProjectWorkspaceProps): React.JSX.
               onKeyDown={handleComposerKeyDown}
               placeholder="输入消息，和 SlideMind 一起梳理演示…"
               rows={2}
-              disabled={isSending}
+              disabled={isSending || isConversationLoading}
               aria-label="对话消息"
             />
             <div className="composer-footer">
               <span>Enter 发送 · Shift Enter 换行</span>
               <div className="composer-actions">
-                <AgentModelSelect disabled={isSending} />
-                <button className="composer-send" type="submit" disabled={!draft.trim() || isSending} aria-label="发送消息">↑</button>
+                <AgentModelSelect disabled={isSending || isConversationLoading} />
+                <button className="composer-send" type="submit" disabled={!draft.trim() || isSending || isConversationLoading} aria-label="发送消息">↑</button>
               </div>
             </div>
           </div>
