@@ -10,6 +10,8 @@ import type {
 import type {
   ProjectApi,
   ProjectConversationState,
+  ProjectExternalWatchScope,
+  ProjectFileChangedEvent,
   SaveProjectTextFileInput
 } from '../shared/project'
 import type {
@@ -67,6 +69,16 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
     ipcRenderer.invoke('project:read-preview-asset', projectHandle, documentPath, assetPath),
   saveTextFile: (projectHandle: string, input: SaveProjectTextFileInput) =>
     ipcRenderer.invoke('project:save-text-file', projectHandle, input),
+  watchExternalChanges: (projectHandle: string, scope: ProjectExternalWatchScope) =>
+    ipcRenderer.invoke('project:watch-external-changes', projectHandle, scope),
+  onFileChanged: (listener: (event: ProjectFileChangedEvent) => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      changedEvent: ProjectFileChangedEvent
+    ): void => listener(changedEvent)
+    ipcRenderer.on('project:file-changed', handler)
+    return () => ipcRenderer.removeListener('project:file-changed', handler)
+  },
   loadConversations: (projectHandle: string) =>
     ipcRenderer.invoke('project:load-conversations', projectHandle),
   loadConversationMessages: (projectHandle: string, conversationId: string) =>

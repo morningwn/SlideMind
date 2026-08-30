@@ -262,7 +262,8 @@ export function createPresentationToolsExtension(options: {
         const created = await options.presentationService.create(
           options.projectPath,
           options.projectHandle,
-          { path: params.file, title: params.title }
+          { path: params.file, title: params.title },
+          'agent'
         )
         return toolText({
           file: created.path,
@@ -315,7 +316,8 @@ export function createPresentationToolsExtension(options: {
         const result = await options.presentationService.save(
           options.projectPath,
           options.projectHandle,
-          { path: params.file, revision: params.revision, document }
+          { path: params.file, revision: params.revision, document },
+          'agent'
         )
         if (!result.ok) {
           throw new Error(`演示文稿已被修改，请重新调用 slides_read；当前修订号：${result.currentRevision}`)
@@ -341,8 +343,10 @@ export function createPresentationToolsExtension(options: {
       async execute(_toolCallId, params, signal) {
         const result = await options.presentationService.export(
           options.projectPath,
+          options.projectHandle,
           { path: params.file, outputPath: params.output },
-          signal
+          signal,
+          'agent'
         )
         return toolText({ file: params.file, output: result.outputPath })
       }

@@ -9,6 +9,8 @@ import type {
   ProjectPresentationFile,
   SaveProjectPresentationResult
 } from '../../shared/presentation'
+import type { ProjectMutationSource } from '../../shared/project'
+import type { ProjectMutationService } from '../version-control/project-mutation-service'
 import {
   defaultPresentationOutputPath,
   isPptxPath,
@@ -137,7 +139,10 @@ function runExportWorker(
 export class PresentationService {
   private readonly listeners = new Set<(event: PresentationChangedEvent) => void>()
 
-  constructor(private readonly store = new ProjectPresentationStore()) {}
+  constructor(
+    private readonly mutations?: ProjectMutationService,
+    private readonly store = new ProjectPresentationStore()
+  ) {}
 
   onChanged(listener: (event: PresentationChangedEvent) => void): () => void {
     this.listeners.add(listener)
@@ -151,9 +156,14 @@ export class PresentationService {
   async create(
     projectPath: string,
     projectHandle: string,
-    input: unknown
+    input: unknown,
+    source: ProjectMutationSource = 'presentation-editor'
   ): Promise<ProjectPresentationFile> {
-    const created = await this.store.create(projectPath, input)
+    const path = isRecord(input) && typeof input.path === 'string' ? input.path : undefined
+    const operation = () => this.store.create(projectPath, input)
+    const created = this.mutations && path
+      ? await this.mutations.run({ projectPath, projectHandle, paths: [path], source }, operation)
+      : await operation()
     this.emitChanged({ projectHandle, path: created.path })
     return created
   }
@@ -161,9 +171,18 @@ export class PresentationService {
   async save(
     projectPath: string,
     projectHandle: string,
-    input: unknown
+    input: unknown,
+    source: ProjectMutationSource = 'presentation-editor'
   ): Promise<SaveProjectPresentationResult> {
-    const result = await this.store.save(projectPath, input)
+    const path = isRecord(input) && typeof input.path === 'string' ? input.path : undefined
+    const operation = () => this.store.save(projectPath, input)
+    const result = this.mutations && path
+      ? await this.mutations.run(
+          { projectPath, projectHandle, paths: [path], source },
+          operation,
+          (candidate) => candidate.ok
+        )
+      : await operation()
     if (result.ok && isRecord(input) && typeof input.path === 'string') {
       this.emitChanged({ projectHandle, path: input.path })
     }
@@ -172,22 +191,32 @@ export class PresentationService {
 
   async export(
     projectPath: string,
+    projectHandle: string,
     inputValue: unknown,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    source: ProjectMutationSource = 'presentation-editor'
   ): Promise<ExportProjectPresentationResult> {
     const input = validateExportInput(inputValue)
     const presentation = await this.store.read(projectPath, input.path)
     const requestedOutputPath = input.outputPath ?? defaultPresentationOutputPath(presentation.path)
     const output = await resolveOutputPath(projectPath, requestedOutputPath)
     const temporaryPath = `${output.outputPath}.${process.pid}-${randomUUID()}.slidemind-tmp.pptx`
-    try {
-      await runExportWorker(presentation.document.snapshot, temporaryPath, signal)
-      await rename(temporaryPath, output.outputPath)
-    } catch (error) {
-      await unlink(temporaryPath).catch(() => undefined)
-      throw error
+    const operation = async (): Promise<ExportProjectPresentationResult> => {
+      try {
+        await runExportWorker(presentation.document.snapshot, temporaryPath, signal)
+        await rename(temporaryPath, output.outputPath)
+      } catch (error) {
+        await unlink(temporaryPath).catch(() => undefined)
+        throw error
+      }
+      return { outputPath: output.relativePath }
     }
-    return { outputPath: output.relativePath }
+    return this.mutations
+      ? this.mutations.run(
+          { projectPath, projectHandle, paths: [output.relativePath], source },
+          operation
+        )
+      : operation()
   }
 
   private emitChanged(event: PresentationChangedEvent): void {

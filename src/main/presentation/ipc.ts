@@ -40,6 +40,6 @@ export function registerPresentationIpc(
 
   ipcMain.handle('presentation:export', (_event, projectHandle: unknown, input: unknown) => {
     const project = resolveProject(projectRoots, projectHandle)
-    return service.export(project.projectPath, input)
+    return service.export(project.projectPath, project.projectHandle, input)
   })
 }

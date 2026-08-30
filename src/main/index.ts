@@ -4,11 +4,14 @@ import { BaseAgentService } from './agent/base-agent'
 import { AgentConfigStore } from './agent/config-store'
 import { registerAgentIpc } from './agent/ipc'
 import { ProjectConversationStore } from './project/conversation-store'
+import { ExternalChangeMonitor } from './project/external-change-monitor'
 import { registerProjectIpc } from './project/ipc'
 import { RecentProjectStore } from './project/recent-project-store'
 import { ProjectRootRegistry } from './project/project-root-registry'
 import { registerPresentationIpc } from './presentation/ipc'
 import { PresentationService } from './presentation/presentation-service'
+import { ProjectMutationService } from './version-control/project-mutation-service'
+import { ProjectVersionService } from './version-control/project-version-service'
 import { getTitleBarWindowOptions } from './window-options'
 
 const APP_URL_PROTOCOLS = new Set(['http:', 'https:'])
@@ -136,12 +139,16 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(() => {
   const configStore = new AgentConfigStore(join(app.getPath('userData'), 'agent-config.json'))
   const projectRoots = new ProjectRootRegistry()
-  const presentationService = new PresentationService()
+  const versionService = new ProjectVersionService()
+  const mutationService = new ProjectMutationService(versionService)
+  const externalChangeMonitor = new ExternalChangeMonitor(mutationService)
+  const presentationService = new PresentationService(mutationService)
   const agentService = new BaseAgentService(
     configStore,
     projectRoots,
     join(app.getPath('userData'), 'pi-agent'),
-    presentationService
+    presentationService,
+    mutationService
   )
   const recentProjectStore = new RecentProjectStore(
     join(app.getPath('userData'), 'recent-projects.json')
@@ -149,7 +156,13 @@ app.whenReady().then(() => {
   const conversationStore = new ProjectConversationStore()
 
   registerAgentIpc(configStore, agentService)
-  registerProjectIpc(recentProjectStore, conversationStore, projectRoots)
+  registerProjectIpc(
+    recentProjectStore,
+    conversationStore,
+    projectRoots,
+    mutationService,
+    externalChangeMonitor
+  )
   registerPresentationIpc(presentationService, projectRoots)
   installApplicationMenu()
   createWindow()
@@ -158,6 +171,11 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow()
     }
+  })
+
+  app.on('will-quit', () => {
+    void versionService.flushAll()
+    void externalChangeMonitor.closeAll()
   })
 })
 

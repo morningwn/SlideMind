@@ -12,6 +12,7 @@ import {
 } from '../../shared/agent'
 import type { ProjectRootRegistry } from '../project/project-root-registry'
 import type { PresentationService } from '../presentation/presentation-service'
+import type { ProjectMutationService } from '../version-control/project-mutation-service'
 import {
   findPiSessionFile,
   resolvePiConversationsDirectory
@@ -20,6 +21,7 @@ import type { AgentConfigStore, AgentConfiguration } from './config-store'
 import { todosFromSessionEntries, todosFromToolResult } from './agent-todo'
 import { preparePermissionSystem, type PermissionSystemSetup } from './permission-policy'
 import { createPresentationToolsExtension } from './presentation-tools'
+import { createProjectMutationToolsExtension } from './project-mutation-tools'
 
 const require = createRequire(import.meta.url)
 const MAX_AGENT_SESSIONS = 50
@@ -123,7 +125,8 @@ export class BaseAgentService {
     private readonly configStore: AgentConfigStore,
     private readonly projectRoots: ProjectRootRegistry,
     private readonly agentDirectory: string,
-    private readonly presentationService: PresentationService
+    private readonly presentationService: PresentationService,
+    private readonly mutations: ProjectMutationService
   ) {}
 
   reset(): void {
@@ -235,14 +238,24 @@ export class BaseAgentService {
       cwd: projectPath,
       agentDir: this.agentDirectory,
       additionalExtensionPaths: [permissionSystem.extensionPath, TODO_EXTENSION_PATH],
-      extensionFactories: [{
-        name: 'slidemind-presentations',
-        factory: createPresentationToolsExtension({
-          presentationService: this.presentationService,
-          projectHandle,
-          projectPath
-        })
-      }],
+      extensionFactories: [
+        {
+          name: 'slidemind-presentations',
+          factory: createPresentationToolsExtension({
+            presentationService: this.presentationService,
+            projectHandle,
+            projectPath
+          })
+        },
+        {
+          name: 'slidemind-project-mutations',
+          factory: createProjectMutationToolsExtension({
+            mutations: this.mutations,
+            projectHandle,
+            projectPath
+          })
+        }
+      ],
       noExtensions: true,
       noSkills: true,
       noPromptTemplates: true,
@@ -252,7 +265,7 @@ export class BaseAgentService {
     })
     await resourceLoader.reload()
     const extensions = resourceLoader.getExtensions()
-    if (extensions.errors.length > 0 || extensions.extensions.length !== 3) {
+    if (extensions.errors.length > 0 || extensions.extensions.length !== 4) {
       const details = extensions.errors.map((entry) => entry.error).join('; ')
       throw new Error(`Agent 扩展加载失败${details ? `：${details}` : ''}`)
     }

@@ -32,6 +32,34 @@ export interface SaveProjectTextFileInput {
   hasBom: boolean
 }
 
+export type ProjectMutationSource =
+  | 'agent'
+  | 'import'
+  | 'presentation-editor'
+  | 'restore'
+  | 'text-editor'
+
+export type ProjectFileChangeSource = ProjectMutationSource | 'external'
+
+export type ProjectFileChangeKind =
+  | 'add'
+  | 'add-directory'
+  | 'change'
+  | 'remove'
+  | 'remove-directory'
+
+export interface ProjectFileChangedEvent {
+  projectHandle: string
+  path: string
+  kind: ProjectFileChangeKind
+  source: ProjectFileChangeSource
+}
+
+export interface ProjectExternalWatchScope {
+  files: string[]
+  directories: string[]
+}
+
 export type SaveProjectTextFileResult =
   | { ok: true; revision: string }
   | { ok: false; reason: 'conflict'; currentRevision: string }
@@ -68,6 +96,11 @@ export interface ProjectApi {
     projectHandle: string,
     input: SaveProjectTextFileInput
   ): Promise<SaveProjectTextFileResult>
+  watchExternalChanges(
+    projectHandle: string,
+    scope: ProjectExternalWatchScope
+  ): Promise<void>
+  onFileChanged(listener: (event: ProjectFileChangedEvent) => void): () => void
   loadConversations(projectHandle: string): Promise<ProjectConversationState | null>
   loadConversationMessages(
     projectHandle: string,

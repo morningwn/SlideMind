@@ -1,17 +1,32 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron'
-import type { OpenedProject, ProjectInfo } from '../../shared/project'
+import type {
+  OpenedProject,
+  ProjectFileChangedEvent,
+  ProjectInfo
+} from '../../shared/project'
 import { ProjectConversationStore } from './conversation-store'
 import { RecentProjectStore, resolveProject } from './recent-project-store'
 import { listProjectDirectory } from './project-files'
 import { ProjectRootRegistry } from './project-root-registry'
 import { ProjectTextFileStore } from './project-text-files'
+import type { ProjectMutationService } from '../version-control/project-mutation-service'
+import type { ExternalChangeMonitor } from './external-change-monitor'
 
 export function registerProjectIpc(
   store: RecentProjectStore,
   conversationStore: ProjectConversationStore,
-  projectRoots: ProjectRootRegistry
+  projectRoots: ProjectRootRegistry,
+  mutations: ProjectMutationService,
+  externalChanges: ExternalChangeMonitor
 ): void {
   const textFileStore = new ProjectTextFileStore()
+  const emitChanged = (event: ProjectFileChangedEvent): void => {
+    for (const window of BrowserWindow.getAllWindows()) {
+      window.webContents.send('project:file-changed', event)
+    }
+  }
+  mutations.onChanged(emitChanged)
+  externalChanges.onChanged(emitChanged)
   ipcMain.handle('project:list-recent', () => store.list())
 
   ipcMain.handle('project:choose-folder', async (): Promise<OpenedProject | null> => {
@@ -67,8 +82,36 @@ export function registerProjectIpc(
 
   ipcMain.handle(
     'project:save-text-file',
-    (_event, projectHandle: unknown, input: unknown) =>
-      textFileStore.save(projectRoots.resolve(projectHandle), input)
+    (_event, projectHandle: unknown, input: unknown) => {
+      if (typeof projectHandle !== 'string') throw new Error('项目授权无效')
+      const projectPath = projectRoots.resolve(projectHandle)
+      const path = input && typeof input === 'object'
+        ? (input as { path?: unknown }).path
+        : undefined
+      if (typeof path !== 'string') return textFileStore.save(projectPath, input)
+      return mutations.run(
+        {
+          projectPath,
+          projectHandle,
+          paths: [path],
+          source: 'text-editor'
+        },
+        () => textFileStore.save(projectPath, input),
+        (result) => result.ok
+      )
+    }
+  )
+
+  ipcMain.handle(
+    'project:watch-external-changes',
+    (_event, projectHandle: unknown, scope: unknown) => {
+      if (typeof projectHandle !== 'string') throw new Error('项目授权无效')
+      return externalChanges.setScope(
+        projectRoots.resolve(projectHandle),
+        projectHandle,
+        scope
+      )
+    }
   )
 
   ipcMain.handle(

@@ -13,6 +13,7 @@ import type {
   ConversationMessage,
   OpenedProject,
   ProjectConversationState,
+  ProjectFileChangedEvent,
   ProjectFileEntry
 } from '../../../shared/project'
 import { AgentModelSelect } from './agent-model-select'
@@ -75,6 +76,11 @@ function toPersistedState(
       title: conversation.title
     }))
   }
+}
+
+function parentDirectory(path: string): string {
+  const separatorIndex = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  return separatorIndex < 0 ? '' : path.slice(0, separatorIndex)
 }
 
 function ConversationIcon(): React.JSX.Element {
@@ -248,6 +254,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     toPersistedState(conversations, selectedConversationId)
   )
   const canFlushConversationsRef = useRef(false)
+  const openDocumentsRef = useRef<OpenTextDocument[]>([])
+  const openPresentationsRef = useRef<OpenPresentationDocument[]>([])
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
@@ -264,6 +272,19 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   )
   latestConversationStateRef.current = toPersistedState(conversations, selectedConversationId)
   canFlushConversationsRef.current = canPersistConversations && !isConversationLoading
+  openDocumentsRef.current = openDocuments
+  openPresentationsRef.current = openPresentations
+  const externalWatchScope = {
+    files: [
+      ...openDocuments.map((document) => document.path),
+      ...openPresentations.map((presentation) => presentation.path)
+    ],
+    directories: ['', ...expandedPaths]
+  }
+  const externalWatchScopeKey = JSON.stringify({
+    files: [...externalWatchScope.files].sort(),
+    directories: [...externalWatchScope.directories].sort()
+  })
 
   useEffect(() => {
     onDirtyChange(hasDirtyDocuments)
@@ -331,6 +352,46 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       }))
     }).catch(() => undefined)
   }), [project.handle])
+
+  useEffect(() => {
+    void window.projects
+      .watchExternalChanges(project.handle, externalWatchScope)
+      .catch((error: unknown) => {
+        setFileError(error instanceof Error ? error.message : '无法监听外部文件修改')
+      })
+  }, [externalWatchScopeKey, project.handle])
+
+  useEffect(() => () => {
+    void window.projects.watchExternalChanges(project.handle, {
+      files: [],
+      directories: []
+    }).catch(() => undefined)
+  }, [project.handle])
+
+  useEffect(() => window.projects.onFileChanged((event) => {
+    if (event.projectHandle !== project.handle) return
+    void handleProjectFileChanged(event)
+  }), [project.handle])
+
+  useEffect(() => {
+    function refreshVisibleProjectFiles(): void {
+      for (const directory of ['', ...expandedPaths]) void refreshDirectory(directory)
+      for (const path of [
+        ...openDocumentsRef.current.map((document) => document.path),
+        ...openPresentationsRef.current.map((presentation) => presentation.path)
+      ]) {
+        void handleProjectFileChanged({
+          projectHandle: project.handle,
+          path,
+          kind: 'change',
+          source: 'external'
+        })
+      }
+    }
+
+    window.addEventListener('focus', refreshVisibleProjectFiles)
+    return () => window.removeEventListener('focus', refreshVisibleProjectFiles)
+  }, [expandedPaths, project.handle])
 
   useEffect(() => {
     let active = true
@@ -527,6 +588,127 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         next.delete(conversationId)
         return next
       })
+    }
+  }
+
+  async function refreshDirectory(directory: string): Promise<void> {
+    try {
+      const entries = await window.projects.listDirectory(project.handle, directory)
+      setEntriesByDirectory((current) => ({ ...current, [directory]: entries }))
+    } catch (error) {
+      if (directory === '' || expandedPaths.has(directory)) {
+        setFileError(error instanceof Error ? error.message : '无法刷新项目文件')
+      }
+    }
+  }
+
+  async function handleProjectFileChanged(event: ProjectFileChangedEvent): Promise<void> {
+    if (event.source === 'text-editor' || event.source === 'presentation-editor') return
+    await refreshDirectory(parentDirectory(event.path))
+
+    const textDocument = openDocumentsRef.current.find(
+      (document) => document.path === event.path
+    )
+    const presentation = openPresentationsRef.current.find(
+      (candidate) => candidate.path === event.path
+    )
+    if (!textDocument && !presentation) return
+
+    if (event.kind === 'remove' || event.kind === 'remove-directory') {
+      if (textDocument) {
+        setOpenDocuments((current) => current.map((document) =>
+          document.path === event.path
+            ? {
+                ...document,
+                conflict: true,
+                error: '文件已被外部程序删除。当前编辑内容仍保留在 SlideMind 中。'
+              }
+            : document
+        ))
+      }
+      if (presentation) {
+        setOpenPresentations((current) => current.map((candidate) =>
+          candidate.path === event.path
+            ? {
+                ...candidate,
+                conflict: true,
+                error: '演示文稿已被外部程序删除。当前编辑内容仍保留在 SlideMind 中。'
+              }
+            : candidate
+        ))
+      }
+      return
+    }
+
+    if (textDocument) {
+      try {
+        const file = await window.projects.readTextFile(project.handle, event.path)
+        setOpenDocuments((current) => current.map((document) => {
+          if (document.path !== event.path || document.revision === file.revision) return document
+          if (document.content !== document.savedContent) {
+            return {
+              ...document,
+              conflict: true,
+              error: '文件已在 SlideMind 外部修改。重新载入会放弃当前未保存内容。'
+            }
+          }
+          return {
+            ...document,
+            ...file,
+            savedContent: file.content,
+            isSaving: false,
+            conflict: false,
+            error: ''
+          }
+        }))
+      } catch (error) {
+        setOpenDocuments((current) => current.map((document) =>
+          document.path === event.path
+            ? {
+                ...document,
+                conflict: true,
+                error: error instanceof Error ? error.message : '无法读取外部修改后的文件'
+              }
+            : document
+        ))
+      }
+      return
+    }
+
+    try {
+      const file = await window.presentations.read(project.handle, event.path)
+      const serializedDocument = JSON.stringify(file.document)
+      setOpenPresentations((current) => current.map((candidate) => {
+        if (candidate.path !== event.path || candidate.revision === file.revision) return candidate
+        if (candidate.serializedDocument !== candidate.savedSerializedDocument) {
+          return {
+            ...candidate,
+            conflict: true,
+            error: '演示文稿已在 SlideMind 外部修改。重新载入会放弃当前未保存内容。'
+          }
+        }
+        return {
+          ...candidate,
+          document: file.document,
+          serializedDocument,
+          savedSerializedDocument: serializedDocument,
+          revision: file.revision,
+          reloadKey: crypto.randomUUID(),
+          isSaving: false,
+          conflict: false,
+          error: ''
+        }
+      }))
+    } catch (error) {
+      setOpenPresentations((current) => current.map((candidate) =>
+        candidate.path === event.path
+          ? {
+              ...candidate,
+              conflict: true,
+              error: error instanceof Error ? error.message : '无法读取外部修改后的演示文稿'
+            }
+          : candidate
+      ))
     }
   }
 
