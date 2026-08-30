@@ -5,11 +5,7 @@ import {
   readFile,
   writeFile
 } from 'node:fs/promises'
-import {
-  createEditTool,
-  createWriteTool,
-  type ExtensionFactory
-} from '@earendil-works/pi-coding-agent'
+import type { ExtensionFactory } from '@earendil-works/pi-coding-agent'
 import type { ProjectMutationService } from '../version-control/project-mutation-service'
 
 export function createProjectMutationToolsExtension(options: {
@@ -18,6 +14,9 @@ export function createProjectMutationToolsExtension(options: {
   projectPath: string
 }): ExtensionFactory {
   return async (pi) => {
+    const { createEditTool, createWriteTool } = await import(
+      '@earendil-works/pi-coding-agent'
+    )
     const write = async (absolutePath: string, content: string): Promise<void> => {
       await options.mutations.run(
         {
