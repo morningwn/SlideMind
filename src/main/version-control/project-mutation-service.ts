@@ -5,6 +5,10 @@ import type {
   ProjectFileChangedEvent,
   ProjectMutationSource
 } from '../../shared/project'
+import type {
+  RestoreProjectVersionInput,
+  RestoreProjectVersionResult
+} from '../../shared/project-version'
 import {
   isVersionedProjectPath,
   normalizeVersionedPath,
@@ -32,6 +36,24 @@ export class ProjectMutationService {
   onChanged(listener: (event: ProjectFileChangedEvent) => void): () => void {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
+  }
+
+  restoreVersion(
+    projectPath: string,
+    projectHandle: string,
+    input: RestoreProjectVersionInput
+  ): Promise<RestoreProjectVersionResult> {
+    const paths = input.files.map((file) => file.path)
+    return this.run(
+      {
+        projectPath,
+        projectHandle,
+        paths,
+        source: 'restore'
+      },
+      () => this.versions.restoreFiles(projectPath, input),
+      (result) => result.ok && result.restoredPaths.length > 0
+    )
   }
 
   async run<T>(
@@ -74,10 +96,12 @@ export class ProjectMutationService {
       return result
     }
 
+    const existsAfter = new Map<string, boolean>()
     await Promise.all(paths.map(async (path) => {
       try {
         const revision = await this.fileRevision(resolve(input.projectPath, path))
         this.internalEchoes.set(this.echoKey(input.projectPath, path), { expiresAt, revision })
+        existsAfter.set(path, revision !== 'missing')
       } catch (error) {
         this.internalEchoes.delete(this.echoKey(input.projectPath, path))
         console.warn('Unable to identify an internal file-write echo:', error)
@@ -86,10 +110,16 @@ export class ProjectMutationService {
 
     this.versions.record(input.projectPath, paths, input.source)
     for (const path of paths) {
+      const existedBefore = existed.get(path) ?? false
+      const existsNow = existsAfter.get(path) ?? false
       this.emit({
         projectHandle: input.projectHandle,
         path,
-        kind: existed.get(path) ? 'change' : 'add',
+        kind: existedBefore && !existsNow
+          ? 'remove'
+          : !existedBefore && existsNow
+            ? 'add'
+            : 'change',
         source: input.source
       })
     }

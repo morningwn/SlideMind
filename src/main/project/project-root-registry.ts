@@ -28,4 +28,8 @@ export class ProjectRootRegistry {
     if (!projectPath) throw new Error('项目授权已失效，请重新打开项目')
     return projectPath
   }
+
+  handleForPath(projectPath: string): string | null {
+    return this.handlesByPath.get(projectPath) ?? null
+  }
 }

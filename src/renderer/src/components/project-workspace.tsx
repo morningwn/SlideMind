@@ -23,6 +23,7 @@ import {
   type OpenTextDocument
 } from './document-editor'
 import type { OpenPresentationDocument } from './presentation-editor'
+import { ProjectHistoryPanel } from './project-history-panel'
 
 const PresentationEditor = lazy(async () => {
   const module = await import('./presentation-editor')
@@ -104,6 +105,16 @@ function FileIcon(): React.JSX.Element {
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M6 3.5h8l4 4v13H6z" />
       <path d="M14 3.5v4h4" />
+    </svg>
+  )
+}
+
+function HistoryIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 6.5V3.8M4 3.8h2.8" />
+      <path d="M4.6 4.4A8.5 8.5 0 1 1 3.5 13" />
+      <path d="M12 7.5V12l3.2 2" />
     </svg>
   )
 }
@@ -246,6 +257,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [openDocuments, setOpenDocuments] = useState<OpenTextDocument[]>([])
   const [openPresentations, setOpenPresentations] = useState<OpenPresentationDocument[]>([])
   const [activeDocumentPath, setActiveDocumentPath] = useState<string | null>(null)
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false)
+  const [isHistoryActive, setIsHistoryActive] = useState(false)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [openingFilePaths, setOpeningFilePaths] = useState<Set<string>>(new Set())
   const messageEndRef = useRef<HTMLDivElement>(null)
@@ -256,6 +269,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const canFlushConversationsRef = useRef(false)
   const openDocumentsRef = useRef<OpenTextDocument[]>([])
   const openPresentationsRef = useRef<OpenPresentationDocument[]>([])
+  const confirmedRestorePathsRef = useRef<Set<string>>(new Set())
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
@@ -300,6 +314,19 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     window.addEventListener('beforeunload', protectUnsavedDocuments)
     return () => window.removeEventListener('beforeunload', protectUnsavedDocuments)
   }, [hasDirtyDocuments])
+
+  useEffect(() => {
+    function openHistoryShortcut(event: globalThis.KeyboardEvent): void {
+      const shortcutModifier = window.desktop.platform === 'darwin' ? event.metaKey : event.ctrlKey
+      if (!shortcutModifier || !event.shiftKey || event.key.toLocaleLowerCase() !== 'h') return
+      event.preventDefault()
+      setIsHistoryOpen(true)
+      setIsHistoryActive(true)
+    }
+
+    window.addEventListener('keydown', openHistoryShortcut)
+    return () => window.removeEventListener('keydown', openHistoryShortcut)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -605,6 +632,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   async function handleProjectFileChanged(event: ProjectFileChangedEvent): Promise<void> {
     if (event.source === 'text-editor' || event.source === 'presentation-editor') return
     await refreshDirectory(parentDirectory(event.path))
+    const confirmedRestore = event.source === 'restore' && confirmedRestorePathsRef.current.delete(
+      event.path
+    )
 
     const textDocument = openDocumentsRef.current.find(
       (document) => document.path === event.path
@@ -615,6 +645,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     if (!textDocument && !presentation) return
 
     if (event.kind === 'remove' || event.kind === 'remove-directory') {
+      if (confirmedRestore) {
+        setOpenDocuments((current) => current.filter((document) => document.path !== event.path))
+        setOpenPresentations((current) => current.filter((candidate) => candidate.path !== event.path))
+        setActiveDocumentPath((current) => current === event.path ? null : current)
+        return
+      }
       if (textDocument) {
         setOpenDocuments((current) => current.map((document) =>
           document.path === event.path
@@ -645,7 +681,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         const file = await window.projects.readTextFile(project.handle, event.path)
         setOpenDocuments((current) => current.map((document) => {
           if (document.path !== event.path || document.revision === file.revision) return document
-          if (document.content !== document.savedContent) {
+          if (!confirmedRestore && document.content !== document.savedContent) {
             return {
               ...document,
               conflict: true,
@@ -680,7 +716,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       const serializedDocument = JSON.stringify(file.document)
       setOpenPresentations((current) => current.map((candidate) => {
         if (candidate.path !== event.path || candidate.revision === file.revision) return candidate
-        if (candidate.serializedDocument !== candidate.savedSerializedDocument) {
+        if (!confirmedRestore && candidate.serializedDocument !== candidate.savedSerializedDocument) {
           return {
             ...candidate,
             conflict: true,
@@ -749,6 +785,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   async function openFile(entry: ProjectFileEntry): Promise<void> {
     const existingDocument = openDocuments.find((document) => document.path === entry.path)
     if (existingDocument) {
+      setIsHistoryActive(false)
       setActiveDocumentPath(existingDocument.path)
       setSelectedFilePath(existingDocument.path)
       return
@@ -757,6 +794,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       (presentation) => presentation.path === entry.path
     )
     if (existingPresentation) {
+      setIsHistoryActive(false)
       setActiveDocumentPath(existingPresentation.path)
       setSelectedFilePath(existingPresentation.path)
       return
@@ -786,6 +824,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             ? current
             : [...current, presentation]
         )
+        setIsHistoryActive(false)
         setActiveDocumentPath(file.path)
         return
       }
@@ -804,6 +843,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           ? current
           : [...current, document]
       )
+      setIsHistoryActive(false)
       setActiveDocumentPath(file.path)
     } catch (error) {
       setFileError(error instanceof Error ? error.message : '无法打开文件')
@@ -844,6 +884,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         error: ''
       }
       setOpenPresentations((current) => [...current, presentation])
+      setIsHistoryActive(false)
       setActiveDocumentPath(file.path)
       setSelectedFilePath(file.path)
     } catch (error) {
@@ -1181,6 +1222,35 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }
 
+  function openHistory(): void {
+    setIsHistoryOpen(true)
+    setIsHistoryActive(true)
+  }
+
+  function confirmVersionRestore(paths: string[]): boolean {
+    const dirtyPaths = paths.filter((path) => {
+      const document = openDocumentsRef.current.find((candidate) => candidate.path === path)
+      if (document && document.content !== document.savedContent) return true
+      const presentation = openPresentationsRef.current.find((candidate) => candidate.path === path)
+      return Boolean(
+        presentation &&
+        presentation.serializedDocument !== presentation.savedSerializedDocument
+      )
+    })
+    const message = dirtyPaths.length > 0
+      ? `以下文件有未保存内容，恢复会放弃这些修改：\n\n${dirtyPaths.join('\n')}\n\n继续恢复吗？`
+      : `将 ${paths.length} 个文件恢复为所选版本状态。恢复后的文件状态会纳入自动版本记录，是否继续？`
+    if (!window.confirm(message)) return false
+    for (const path of paths) confirmedRestorePathsRef.current.add(path)
+    return true
+  }
+
+  function settleVersionRestore(paths: string[]): void {
+    window.setTimeout(() => {
+      for (const path of paths) confirmedRestorePathsRef.current.delete(path)
+    }, 3_000)
+  }
+
   return (
     <section className="project-workspace" aria-label={`${project.name} 项目工作区`}>
       <aside className="project-sidebar">
@@ -1252,18 +1322,21 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         <header className="workspace-bar">
           <nav className="workspace-tabs" aria-label="打开的内容" role="tablist">
             <button
-              className={`workspace-tab workspace-chat-tab${activeFile ? '' : ' workspace-tab-active'}`}
+              className={`workspace-tab workspace-chat-tab${activeFile || isHistoryActive ? '' : ' workspace-tab-active'}`}
               type="button"
               role="tab"
-              aria-selected={!activeFile}
-              onClick={() => setActiveDocumentPath(null)}
+              aria-selected={!activeFile && !isHistoryActive}
+              onClick={() => {
+                setIsHistoryActive(false)
+                setActiveDocumentPath(null)
+              }}
             >
               <ConversationIcon />
               <span>{selectedConversation.title}</span>
             </button>
             {openDocuments.map((document) => {
               const isDirty = document.content !== document.savedContent
-              const isActive = document.path === activeDocument?.path
+              const isActive = !isHistoryActive && document.path === activeDocument?.path
               const status = document.conflict
                 ? '保存冲突'
                 : document.isSaving
@@ -1285,6 +1358,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     aria-selected={isActive}
                     title={document.path}
                     onClick={() => {
+                      setIsHistoryActive(false)
                       setActiveDocumentPath(document.path)
                       setSelectedFilePath(document.path)
                     }}
@@ -1309,7 +1383,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             })}
             {openPresentations.map((presentation) => {
               const isDirty = presentation.serializedDocument !== presentation.savedSerializedDocument
-              const isActive = presentation.path === activePresentation?.path
+              const isActive = !isHistoryActive && presentation.path === activePresentation?.path
               const status = presentation.conflict
                 ? '保存冲突'
                 : presentation.isSaving
@@ -1331,6 +1405,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     aria-selected={isActive}
                     title={presentation.path}
                     onClick={() => {
+                      setIsHistoryActive(false)
                       setActiveDocumentPath(presentation.path)
                       setSelectedFilePath(presentation.path)
                     }}
@@ -1353,11 +1428,48 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 </div>
               )
             })}
+            {isHistoryOpen ? (
+              <div
+                className={`workspace-document-tab${isHistoryActive ? ' workspace-tab-active' : ''}`}
+                role="presentation"
+              >
+                <button
+                  className="workspace-document-tab-main workspace-history-tab-main"
+                  type="button"
+                  role="tab"
+                  aria-selected={isHistoryActive}
+                  onClick={() => setIsHistoryActive(true)}
+                >
+                  <HistoryIcon />
+                  <span>版本历史</span>
+                </button>
+                <button
+                  className="workspace-tab-close"
+                  type="button"
+                  aria-label="关闭版本历史"
+                  onClick={() => {
+                    setIsHistoryOpen(false)
+                    setIsHistoryActive(false)
+                  }}
+                >×</button>
+              </div>
+            ) : null}
           </nav>
 
-          {activeDocument ? (
-            <div className="workspace-document-actions">
-              {activeDocument.kind === 'markdown' ? (
+          <div className="workspace-document-actions">
+            <button
+              className={`workspace-history-button${isHistoryActive ? ' workspace-history-button-active' : ''}`}
+              type="button"
+              title="版本历史 (Ctrl/⌘ Shift H)"
+              aria-pressed={isHistoryActive}
+              onClick={openHistory}
+            >
+              <HistoryIcon />
+              <span>版本历史</span>
+            </button>
+            {!isHistoryActive && activeDocument ? (
+              <>
+                {activeDocument.kind === 'markdown' ? (
                 <div className="workspace-view-switch" aria-label="Markdown 查看方式">
                   {(['edit', 'split', 'preview'] as const).map((mode) => (
                     <button
@@ -1371,40 +1483,47 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     </button>
                   ))}
                 </div>
-              ) : null}
-              <button
-                className="workspace-save-button"
-                type="button"
-                title="保存 (Ctrl/⌘S)"
-                aria-label={`保存 ${activeDocument.name}`}
-                onClick={() => void saveDocument(activeDocument.path)}
-                disabled={
-                  activeDocument.content === activeDocument.savedContent ||
-                  activeDocument.isSaving ||
-                  activeDocument.conflict
-                }
-              >保存</button>
-            </div>
-          ) : activePresentation ? (
-            <div className="workspace-document-actions">
-              <span className="workspace-file-kind">SLIDES</span>
-              <button
-                className="workspace-save-button"
-                type="button"
-                title="保存 (Ctrl/⌘S)"
-                aria-label={`保存 ${activePresentation.name}`}
-                onClick={() => void savePresentation(activePresentation.path)}
-                disabled={
-                  activePresentation.serializedDocument === activePresentation.savedSerializedDocument ||
-                  activePresentation.isSaving ||
-                  activePresentation.conflict
-                }
-              >保存</button>
-            </div>
-          ) : null}
+                ) : null}
+                <button
+                  className="workspace-save-button"
+                  type="button"
+                  title="保存 (Ctrl/⌘S)"
+                  aria-label={`保存 ${activeDocument.name}`}
+                  onClick={() => void saveDocument(activeDocument.path)}
+                  disabled={
+                    activeDocument.content === activeDocument.savedContent ||
+                    activeDocument.isSaving ||
+                    activeDocument.conflict
+                  }
+                >保存</button>
+              </>
+            ) : !isHistoryActive && activePresentation ? (
+              <>
+                <span className="workspace-file-kind">SLIDES</span>
+                <button
+                  className="workspace-save-button"
+                  type="button"
+                  title="保存 (Ctrl/⌘S)"
+                  aria-label={`保存 ${activePresentation.name}`}
+                  onClick={() => void savePresentation(activePresentation.path)}
+                  disabled={
+                    activePresentation.serializedDocument === activePresentation.savedSerializedDocument ||
+                    activePresentation.isSaving ||
+                    activePresentation.conflict
+                  }
+                >保存</button>
+              </>
+            ) : null}
+          </div>
         </header>
 
-        {activeDocument ? (
+        {isHistoryActive ? (
+          <ProjectHistoryPanel
+            projectHandle={project.handle}
+            onConfirmRestore={confirmVersionRestore}
+            onRestoreSettled={settleVersionRestore}
+          />
+        ) : activeDocument ? (
           <DocumentEditor
             key={activeDocument.path}
             document={activeDocument}

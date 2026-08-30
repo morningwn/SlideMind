@@ -21,6 +21,12 @@ import type {
   PresentationChangedEvent,
   SaveProjectPresentationInput
 } from '../shared/presentation'
+import type {
+  CompareProjectVersionFileInput,
+  ProjectVersionApi,
+  ProjectVersionCreatedEvent,
+  RestoreProjectVersionInput
+} from '../shared/project-version'
 
 const desktopApi = Object.freeze({
   platform: process.platform,
@@ -88,6 +94,25 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
 })
 
 contextBridge.exposeInMainWorld('projects', projectApi)
+
+const projectVersionApi: Readonly<ProjectVersionApi> = Object.freeze({
+  list: (projectHandle: string, cursor?: string) =>
+    ipcRenderer.invoke('project-version:list', projectHandle, cursor),
+  compareFile: (projectHandle: string, input: CompareProjectVersionFileInput) =>
+    ipcRenderer.invoke('project-version:compare-file', projectHandle, input),
+  restore: (projectHandle: string, input: RestoreProjectVersionInput) =>
+    ipcRenderer.invoke('project-version:restore', projectHandle, input),
+  onCreated: (listener: (event: ProjectVersionCreatedEvent) => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      createdEvent: ProjectVersionCreatedEvent
+    ): void => listener(createdEvent)
+    ipcRenderer.on('project-version:created', handler)
+    return () => ipcRenderer.removeListener('project-version:created', handler)
+  }
+})
+
+contextBridge.exposeInMainWorld('projectVersions', projectVersionApi)
 
 const presentationApi: Readonly<PresentationApi> = Object.freeze({
   create: (projectHandle: string, input: CreateProjectPresentationInput) =>

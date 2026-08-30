@@ -10,6 +10,7 @@ import { RecentProjectStore } from './project/recent-project-store'
 import { ProjectRootRegistry } from './project/project-root-registry'
 import { registerPresentationIpc } from './presentation/ipc'
 import { PresentationService } from './presentation/presentation-service'
+import { registerProjectVersionIpc } from './version-control/ipc'
 import { ProjectMutationService } from './version-control/project-mutation-service'
 import { ProjectVersionService } from './version-control/project-version-service'
 import { getTitleBarWindowOptions } from './window-options'
@@ -164,6 +165,7 @@ app.whenReady().then(() => {
     externalChangeMonitor
   )
   registerPresentationIpc(presentationService, projectRoots)
+  registerProjectVersionIpc(projectRoots, versionService, mutationService)
   installApplicationMenu()
   createWindow()
 
