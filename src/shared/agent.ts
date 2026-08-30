@@ -45,15 +45,38 @@ export interface AgentPromptInput {
   input: string
 }
 
+export interface AgentConversationInput {
+  conversationId: string
+  projectHandle: string
+}
+
+export type AgentTodoStatus = 'pending' | 'in_progress' | 'completed'
+
+export interface AgentTodo {
+  id: number
+  subject: string
+  activeForm?: string
+  status: AgentTodoStatus
+  blockedBy?: number[]
+}
+
 export interface AgentStreamEvent {
   requestId: string
   conversationId: string
   delta: string
 }
 
+export interface AgentTodosEvent {
+  requestId: string
+  conversationId: string
+  todos: AgentTodo[]
+}
+
 export interface AgentApi {
   getConfig(): Promise<AgentConfigStatus>
   saveConfig(input: SaveAgentConfigInput): Promise<AgentConfigStatus>
+  getTodos(input: AgentConversationInput): Promise<AgentTodo[]>
   prompt(input: AgentPromptInput): Promise<AgentPromptResult>
   onStream(listener: (event: AgentStreamEvent) => void): () => void
+  onTodos(listener: (event: AgentTodosEvent) => void): () => void
 }

@@ -1,11 +1,14 @@
 import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import type { AssistantMessage } from '@earendil-works/pi-ai'
 import type { AgentSession as PiAgentSession, ModelRuntime } from '@earendil-works/pi-coding-agent'
-import { join } from 'node:path'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
 import {
   DEEPSEEK_PROVIDER_ID,
+  type AgentConversationInput,
   type AgentPromptInput,
-  type AgentPromptResult
+  type AgentPromptResult,
+  type AgentTodo
 } from '../../shared/agent'
 import type { ProjectRootRegistry } from '../project/project-root-registry'
 import {
@@ -13,10 +16,16 @@ import {
   resolvePiConversationsDirectory
 } from '../project/project-storage'
 import type { AgentConfigStore, AgentConfiguration } from './config-store'
+import { todosFromSessionEntries, todosFromToolResult } from './agent-todo'
 import { preparePermissionSystem, type PermissionSystemSetup } from './permission-policy'
 
+const require = createRequire(import.meta.url)
 const MAX_AGENT_SESSIONS = 50
 const SESSION_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/
+const TODO_EXTENSION_PATH = join(
+  dirname(require.resolve('@juicesharp/rpiv-todo/package.json')),
+  'index.ts'
+)
 const SYSTEM_PROMPT = `你是 SlideMind 的基础演示创作 agent。
 你的职责是帮助用户梳理材料、建立清晰叙事、规划演示结构并打磨表达。
 信息不足时先指出缺口；不要虚构事实；输出应简洁、可执行。`
@@ -25,6 +34,7 @@ interface AgentSessionRecord {
   agent?: PiAgentSession
   lastUsedAt: number
   queue: Promise<void>
+  todos?: AgentTodo[]
 }
 
 interface PiRuntime {
@@ -51,6 +61,32 @@ function isAssistantMessage(message: AgentMessage): message is AssistantMessage 
   return message.role === 'assistant'
 }
 
+export function normalizeAgentConversationInput(input: unknown): AgentConversationInput {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Agent 会话请求格式无效')
+  }
+
+  const candidate = input as Record<string, unknown>
+  const conversationId = typeof candidate.conversationId === 'string'
+    ? candidate.conversationId.trim()
+    : ''
+  const projectHandle = typeof candidate.projectHandle === 'string'
+    ? candidate.projectHandle.trim()
+    : ''
+
+  if (
+    !conversationId ||
+    conversationId.length > 200 ||
+    !SESSION_ID_PATTERN.test(conversationId)
+  ) {
+    throw new Error('Agent 会话标识无效')
+  }
+  if (!projectHandle || projectHandle.length > 200 || projectHandle.includes('\0')) {
+    throw new Error('项目授权无效')
+  }
+  return { conversationId, projectHandle }
+}
+
 export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
   if (!input || typeof input !== 'object') {
     throw new Error('Agent 请求格式无效')
@@ -58,26 +94,11 @@ export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
 
   const candidate = input as Record<string, unknown>
   const requestId = typeof candidate.requestId === 'string' ? candidate.requestId.trim() : ''
-  const conversationId = typeof candidate.conversationId === 'string'
-    ? candidate.conversationId.trim()
-    : ''
-  const projectHandle = typeof candidate.projectHandle === 'string'
-    ? candidate.projectHandle.trim()
-    : ''
+  const { conversationId, projectHandle } = normalizeAgentConversationInput(candidate)
   const prompt = typeof candidate.input === 'string' ? candidate.input.trim() : ''
 
-  if (
-    !requestId ||
-    requestId.length > 200 ||
-    !conversationId ||
-    conversationId.length > 200 ||
-    !SESSION_ID_PATTERN.test(conversationId)
-  ) {
+  if (!requestId || requestId.length > 200) {
     throw new Error('Agent 会话标识无效')
-  }
-
-  if (!projectHandle || projectHandle.length > 200 || projectHandle.includes('\0')) {
-    throw new Error('项目授权无效')
   }
 
   if (!prompt) {
@@ -109,9 +130,30 @@ export class BaseAgentService {
     this.sessions.clear()
   }
 
+  async getTodos(input: unknown): Promise<AgentTodo[]> {
+    const conversation = normalizeAgentConversationInput(input)
+    const projectPath = this.projectRoots.resolve(conversation.projectHandle)
+    const sessionKey = this.sessionKey(conversation)
+    const activeTodos = this.sessions.get(sessionKey)?.todos
+    if (activeTodos) return structuredClone(activeTodos)
+
+    const conversationsDirectory = await resolvePiConversationsDirectory(projectPath, false)
+    if (!conversationsDirectory) return []
+
+    const { SessionManager } = await loadPiRuntime()
+    const sessionPath = await findPiSessionFile(conversationsDirectory, conversation.conversationId)
+    if (!sessionPath) return []
+    const sessionManager = SessionManager.open(sessionPath, conversationsDirectory, projectPath)
+    if (sessionManager.getSessionId() !== conversation.conversationId) {
+      throw new Error('Pi 会话记录标识不匹配')
+    }
+    return todosFromSessionEntries(sessionManager.getBranch())
+  }
+
   prompt(
     input: unknown,
-    onDelta?: (input: AgentPromptInput, delta: string) => void
+    onDelta?: (input: AgentPromptInput, delta: string) => void,
+    onTodos?: (input: AgentPromptInput, todos: AgentTodo[]) => void
   ): Promise<AgentPromptResult> {
     let prompt: AgentPromptInput
     try {
@@ -127,7 +169,7 @@ export class BaseAgentService {
       return Promise.reject(error)
     }
 
-    const sessionKey = `${prompt.projectHandle}\0${prompt.conversationId}`
+    const sessionKey = this.sessionKey(prompt)
     let session = this.sessions.get(sessionKey)
     if (!session) {
       this.evictOldestSession()
@@ -135,7 +177,13 @@ export class BaseAgentService {
       this.sessions.set(sessionKey, session)
     }
 
-    const run = session.queue.then(() => this.runPrompt(session, prompt, projectPath, onDelta))
+    const run = session.queue.then(() => this.runPrompt(
+      session,
+      prompt,
+      projectPath,
+      onDelta,
+      onTodos
+    ))
     const queue = run.then(
       () => undefined,
       () => undefined
@@ -148,7 +196,7 @@ export class BaseAgentService {
     config: AgentConfiguration,
     projectPath: string,
     conversationId: string
-  ): Promise<PiAgentSession> {
+  ): Promise<{ agent: PiAgentSession; todos: AgentTodo[] }> {
     const {
       createAgentSession,
       DefaultResourceLoader,
@@ -177,11 +225,12 @@ export class BaseAgentService {
     if (sessionManager.getSessionId() !== conversationId) {
       throw new Error('Pi 会话记录标识不匹配')
     }
+    const todos = todosFromSessionEntries(sessionManager.getBranch())
 
     const resourceLoader = new DefaultResourceLoader({
       cwd: projectPath,
       agentDir: this.agentDirectory,
-      additionalExtensionPaths: [permissionSystem.extensionPath],
+      additionalExtensionPaths: [permissionSystem.extensionPath, TODO_EXTENSION_PATH],
       noExtensions: true,
       noSkills: true,
       noPromptTemplates: true,
@@ -191,9 +240,9 @@ export class BaseAgentService {
     })
     await resourceLoader.reload()
     const extensions = resourceLoader.getExtensions()
-    if (extensions.errors.length > 0 || extensions.extensions.length !== 1) {
+    if (extensions.errors.length > 0 || extensions.extensions.length !== 2) {
       const details = extensions.errors.map((entry) => entry.error).join('; ')
-      throw new Error(`权限系统加载失败${details ? `：${details}` : ''}`)
+      throw new Error(`Agent 扩展加载失败${details ? `：${details}` : ''}`)
     }
 
     const { session } = await createAgentSession({
@@ -202,33 +251,41 @@ export class BaseAgentService {
       modelRuntime,
       model,
       thinkingLevel: 'off',
-      tools: ['read', 'write', 'edit', 'grep', 'find', 'ls'],
+      tools: ['read', 'write', 'edit', 'grep', 'find', 'ls', 'todo'],
       resourceLoader,
       sessionManager
     })
-    return session
+    return { agent: session, todos }
   }
 
   private async runPrompt(
     session: AgentSessionRecord,
     input: AgentPromptInput,
     projectPath: string,
-    onDelta?: (input: AgentPromptInput, delta: string) => void
+    onDelta?: (input: AgentPromptInput, delta: string) => void,
+    onTodos?: (input: AgentPromptInput, todos: AgentTodo[]) => void
   ): Promise<AgentPromptResult> {
     const config = await this.configStore.load()
     if (!config) {
       throw new Error('请先配置 DeepSeek 模型与 API Key')
     }
 
-    session.agent ??= await this.createAgent(
-      config,
-      projectPath,
-      input.conversationId
-    )
+    if (!session.agent) {
+      const created = await this.createAgent(config, projectPath, input.conversationId)
+      session.agent = created.agent
+      session.todos = created.todos
+      onTodos?.(input, structuredClone(created.todos))
+    }
     session.lastUsedAt = Date.now()
     const unsubscribe = session.agent.subscribe((event) => {
       if (event.type === 'message_update' && event.assistantMessageEvent.type === 'text_delta') {
         onDelta?.(input, event.assistantMessageEvent.delta)
+      }
+      if (event.type === 'tool_execution_end' && event.toolName === 'todo' && !event.isError) {
+        const todos = todosFromToolResult(event.result)
+        if (!todos) return
+        session.todos = todos
+        onTodos?.(input, structuredClone(todos))
       }
     })
 
@@ -266,6 +323,10 @@ export class BaseAgentService {
       void oldest[1].agent.abort().finally(() => oldest[1].agent?.dispose())
     }
     this.sessions.delete(oldest[0])
+  }
+
+  private sessionKey(input: AgentConversationInput): string {
+    return `${input.projectHandle}\0${input.conversationId}`
   }
 
   private async getModelRuntime(): Promise<ModelRuntime> {

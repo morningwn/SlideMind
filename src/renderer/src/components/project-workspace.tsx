@@ -5,6 +5,7 @@ import {
   type FormEvent,
   type KeyboardEvent
 } from 'react'
+import type { AgentTodo } from '../../../shared/agent'
 import type {
   ConversationMessage,
   OpenedProject,
@@ -92,6 +93,56 @@ function FileIcon(): React.JSX.Element {
   )
 }
 
+function TodoProgress({ todos }: { todos: AgentTodo[] }): React.JSX.Element | null {
+  if (todos.length === 0) return null
+
+  const completedCount = todos.filter((todo) => todo.status === 'completed').length
+  const progress = Math.round((completedCount / todos.length) * 100)
+
+  return (
+    <section className="agent-todos" aria-label="Agent 工作清单" aria-live="polite">
+      <header className="agent-todos-heading">
+        <div>
+          <span>工作清单</span>
+          <strong>{completedCount}/{todos.length} 已完成</strong>
+        </div>
+        <div
+          className="agent-todos-progress"
+          role="progressbar"
+          aria-label="任务完成进度"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progress}
+        >
+          <i style={{ width: `${progress}%` }} />
+        </div>
+      </header>
+      <ol className="agent-todo-list">
+        {todos.map((todo) => (
+          <li className={`agent-todo agent-todo-${todo.status}`} key={todo.id}>
+            <span className="agent-todo-marker" aria-hidden="true">
+              {todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '●' : ''}
+            </span>
+            <div>
+              <span>{todo.subject}</span>
+              {todo.status === 'in_progress' && todo.activeForm ? (
+                <small>{todo.activeForm}</small>
+              ) : null}
+            </div>
+            <small>
+              {todo.status === 'completed'
+                ? '完成'
+                : todo.status === 'in_progress'
+                  ? '进行中'
+                  : '待处理'}
+            </small>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
 function FileTreeLevel({
   directoryPath,
   depth,
@@ -172,6 +223,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [canPersistConversations, setCanPersistConversations] = useState(false)
   const [loadedConversationIds, setLoadedConversationIds] = useState<Set<string>>(new Set())
   const [loadingConversationIds, setLoadingConversationIds] = useState<Set<string>>(new Set())
+  const [todosByConversation, setTodosByConversation] = useState<Record<string, AgentTodo[]>>({})
   const [entriesByDirectory, setEntriesByDirectory] = useState<Record<string, ProjectFileEntry[]>>({})
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set(['']))
@@ -190,6 +242,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
   const activeDocument = openDocuments.find((document) => document.path === activeDocumentPath)
+  const selectedTodos = todosByConversation[selectedConversation.id] ?? []
   const hasDirtyDocuments = openDocuments.some(
     (document) => document.content !== document.savedContent
   )
@@ -238,6 +291,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
     setLoadedConversationIds(new Set())
     setLoadingConversationIds(new Set())
+    setTodosByConversation({})
 
     void (async () => {
       try {
@@ -344,6 +398,40 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         : conversation
     ))
   }), [])
+
+  useEffect(() => window.agent.onTodos((event) => {
+    setTodosByConversation((current) => ({
+      ...current,
+      [event.conversationId]: event.todos
+    }))
+  }), [])
+
+  useEffect(() => {
+    if (
+      isConversationLoading ||
+      Object.prototype.hasOwnProperty.call(todosByConversation, selectedConversation.id)
+    ) return
+
+    let active = true
+    const conversationId = selectedConversation.id
+    void window.agent.getTodos({
+      projectHandle: project.handle,
+      conversationId
+    }).then((todos) => {
+      if (!active) return
+      setTodosByConversation((current) => (
+        Object.prototype.hasOwnProperty.call(current, conversationId)
+          ? current
+          : { ...current, [conversationId]: todos }
+      ))
+    }).catch((error: unknown) => {
+      console.warn('Unable to load agent todos:', error)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [isConversationLoading, project.handle, selectedConversation.id, todosByConversation])
 
   function startConversation(): void {
     if (isConversationLoading) return
@@ -852,6 +940,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             </div>
 
             <form className="chat-composer" onSubmit={(event) => void sendMessage(event)}>
+              <TodoProgress todos={selectedTodos} />
               {conversationError ? <p className="composer-error" role="alert">{conversationError}</p> : null}
               {chatError ? <p className="composer-error" role="alert">{chatError}</p> : null}
               <div className="composer-box">

@@ -36,6 +36,7 @@ export function createManagedPermissionPolicy(agentDirectory: string): Record<st
       grep: 'allow',
       find: 'allow',
       ls: 'allow',
+      todo: 'allow',
       [`write:${skillsDirectory}`]: 'deny',
       [`write:${skillsDirectory}/*`]: 'deny',
       [`edit:${skillsDirectory}`]: 'deny',

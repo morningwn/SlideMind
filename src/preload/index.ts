@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AgentApi,
+  AgentConversationInput,
   AgentPromptInput,
   AgentStreamEvent,
+  AgentTodosEvent,
   SaveAgentConfigInput
 } from '../shared/agent'
 import type {
@@ -25,6 +27,7 @@ contextBridge.exposeInMainWorld('desktop', desktopApi)
 const agentApi: Readonly<AgentApi> = Object.freeze({
   getConfig: () => ipcRenderer.invoke('agent:get-config'),
   saveConfig: (input: SaveAgentConfigInput) => ipcRenderer.invoke('agent:save-config', input),
+  getTodos: (input: AgentConversationInput) => ipcRenderer.invoke('agent:get-todos', input),
   prompt: (input: AgentPromptInput) => ipcRenderer.invoke('agent:prompt', input),
   onStream: (listener: (event: AgentStreamEvent) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, streamEvent: AgentStreamEvent): void => {
@@ -32,6 +35,13 @@ const agentApi: Readonly<AgentApi> = Object.freeze({
     }
     ipcRenderer.on('agent:stream', handler)
     return () => ipcRenderer.removeListener('agent:stream', handler)
+  },
+  onTodos: (listener: (event: AgentTodosEvent) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, todosEvent: AgentTodosEvent): void => {
+      listener(todosEvent)
+    }
+    ipcRenderer.on('agent:todos', handler)
+    return () => ipcRenderer.removeListener('agent:todos', handler)
   }
 })
 

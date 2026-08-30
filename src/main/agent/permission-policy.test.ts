@@ -1,10 +1,18 @@
 import { mkdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { todosFromToolResult } from './agent-todo'
 import {
   createManagedPermissionPolicy,
   preparePermissionSystem
 } from './permission-policy'
+
+const require = createRequire(import.meta.url)
+const todoExtensionPath = join(
+  dirname(require.resolve('@juicesharp/rpiv-todo/package.json')),
+  'index.ts'
+)
 
 describe('createManagedPermissionPolicy', () => {
   it('allows project file tools while denying unknown tools and bash', () => {
@@ -22,7 +30,8 @@ describe('createManagedPermissionPolicy', () => {
       edit: 'allow',
       grep: 'allow',
       find: 'allow',
-      ls: 'allow'
+      ls: 'allow',
+      todo: 'allow'
     })
     expect(policy.bash['*']).toBe('deny')
   })
@@ -97,7 +106,7 @@ describe('preparePermissionSystem', () => {
     const resourceLoader = new DefaultResourceLoader({
       cwd: projectDirectory,
       agentDir: agentDirectory,
-      additionalExtensionPaths: [setup.extensionPath],
+      additionalExtensionPaths: [setup.extensionPath, todoExtensionPath],
       noExtensions: true,
       noSkills: true,
       noPromptTemplates: true,
@@ -105,17 +114,36 @@ describe('preparePermissionSystem', () => {
       noContextFiles: true
     })
     await resourceLoader.reload()
+    expect(resourceLoader.getExtensions()).toMatchObject({
+      errors: [],
+      extensions: [{}, {}]
+    })
     const { session } = await createAgentSession({
       cwd: projectDirectory,
       agentDir: agentDirectory,
       modelRuntime,
       model,
-      tools: ['read', 'write', 'edit', 'grep', 'find', 'ls'],
+      tools: ['read', 'write', 'edit', 'grep', 'find', 'ls', 'todo'],
       resourceLoader,
       sessionManager: SessionManager.inMemory(projectDirectory)
     })
 
     try {
+      expect(session.getActiveToolNames()).toContain('todo')
+      expect(session.systemPrompt).toContain('Use `todo` for complex work with 3+ steps')
+      const todoTool = session.getToolDefinition('todo')
+      expect(todoTool).toBeDefined()
+      const todoResult = await todoTool!.execute(
+        'create-todo',
+        { action: 'create', subject: '梳理演示结构' },
+        undefined,
+        undefined,
+        session.extensionRunner.createContext()
+      )
+      expect(todosFromToolResult(todoResult)).toEqual([
+        { id: 1, subject: '梳理演示结构', status: 'pending' }
+      ])
+
       const insideRead = await session.extensionRunner.emitToolCall({
         type: 'tool_call',
         toolCallId: 'inside-read',

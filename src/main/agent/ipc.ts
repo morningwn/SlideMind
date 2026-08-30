@@ -21,15 +21,31 @@ export function registerAgentIpc(configStore: AgentConfigStore, agentService: Ba
     return status
   })
 
+  ipcMain.handle('agent:get-todos', (event, input: unknown) => {
+    assertTrustedRenderer(event)
+    return agentService.getTodos(input)
+  })
+
   ipcMain.handle('agent:prompt', (event, input: unknown) => {
     assertTrustedRenderer(event)
-    return agentService.prompt(input, (prompt, delta) => {
-      if (event.sender.isDestroyed()) return
-      event.sender.send('agent:stream', {
-        requestId: prompt.requestId,
-        conversationId: prompt.conversationId,
-        delta
-      })
-    })
+    return agentService.prompt(
+      input,
+      (prompt, delta) => {
+        if (event.sender.isDestroyed()) return
+        event.sender.send('agent:stream', {
+          requestId: prompt.requestId,
+          conversationId: prompt.conversationId,
+          delta
+        })
+      },
+      (prompt, todos) => {
+        if (event.sender.isDestroyed()) return
+        event.sender.send('agent:todos', {
+          requestId: prompt.requestId,
+          conversationId: prompt.conversationId,
+          todos
+        })
+      }
+    )
   })
 }

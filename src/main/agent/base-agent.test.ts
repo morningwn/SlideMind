@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeAgentPromptInput } from './base-agent'
+import { normalizeAgentConversationInput, normalizeAgentPromptInput } from './base-agent'
+
+describe('normalizeAgentConversationInput', () => {
+  it('normalizes a project conversation reference', () => {
+    expect(normalizeAgentConversationInput({
+      conversationId: ' conversation-1 ',
+      projectHandle: ' project-handle-1 '
+    })).toEqual({
+      conversationId: 'conversation-1',
+      projectHandle: 'project-handle-1'
+    })
+  })
+
+  it('rejects invalid conversation references', () => {
+    expect(() => normalizeAgentConversationInput({
+      conversationId: '../conversation-1',
+      projectHandle: 'project-handle-1'
+    })).toThrow('Agent 会话标识无效')
+  })
+})
 
 describe('normalizeAgentPromptInput', () => {
   it('normalizes a project conversation prompt', () => {
