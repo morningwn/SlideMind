@@ -11,6 +11,7 @@ import {
   type AgentTodo
 } from '../../shared/agent'
 import type { ProjectRootRegistry } from '../project/project-root-registry'
+import type { PresentationService } from '../presentation/presentation-service'
 import {
   findPiSessionFile,
   resolvePiConversationsDirectory
@@ -18,6 +19,7 @@ import {
 import type { AgentConfigStore, AgentConfiguration } from './config-store'
 import { todosFromSessionEntries, todosFromToolResult } from './agent-todo'
 import { preparePermissionSystem, type PermissionSystemSetup } from './permission-policy'
+import { createPresentationToolsExtension } from './presentation-tools'
 
 const require = createRequire(import.meta.url)
 const MAX_AGENT_SESSIONS = 50
@@ -120,7 +122,8 @@ export class BaseAgentService {
   constructor(
     private readonly configStore: AgentConfigStore,
     private readonly projectRoots: ProjectRootRegistry,
-    private readonly agentDirectory: string
+    private readonly agentDirectory: string,
+    private readonly presentationService: PresentationService
   ) {}
 
   reset(): void {
@@ -195,6 +198,7 @@ export class BaseAgentService {
   private async createAgent(
     config: AgentConfiguration,
     projectPath: string,
+    projectHandle: string,
     conversationId: string
   ): Promise<{ agent: PiAgentSession; todos: AgentTodo[] }> {
     const {
@@ -231,6 +235,14 @@ export class BaseAgentService {
       cwd: projectPath,
       agentDir: this.agentDirectory,
       additionalExtensionPaths: [permissionSystem.extensionPath, TODO_EXTENSION_PATH],
+      extensionFactories: [{
+        name: 'slidemind-presentations',
+        factory: createPresentationToolsExtension({
+          presentationService: this.presentationService,
+          projectHandle,
+          projectPath
+        })
+      }],
       noExtensions: true,
       noSkills: true,
       noPromptTemplates: true,
@@ -240,7 +252,7 @@ export class BaseAgentService {
     })
     await resourceLoader.reload()
     const extensions = resourceLoader.getExtensions()
-    if (extensions.errors.length > 0 || extensions.extensions.length !== 2) {
+    if (extensions.errors.length > 0 || extensions.extensions.length !== 3) {
       const details = extensions.errors.map((entry) => entry.error).join('; ')
       throw new Error(`Agent 扩展加载失败${details ? `：${details}` : ''}`)
     }
@@ -251,7 +263,19 @@ export class BaseAgentService {
       modelRuntime,
       model,
       thinkingLevel: 'off',
-      tools: ['read', 'write', 'edit', 'grep', 'find', 'ls', 'todo'],
+      tools: [
+        'read',
+        'write',
+        'edit',
+        'grep',
+        'find',
+        'ls',
+        'todo',
+        'slides_create',
+        'slides_read',
+        'slides_write',
+        'slides_export'
+      ],
       resourceLoader,
       sessionManager
     })
@@ -271,7 +295,12 @@ export class BaseAgentService {
     }
 
     if (!session.agent) {
-      const created = await this.createAgent(config, projectPath, input.conversationId)
+      const created = await this.createAgent(
+        config,
+        projectPath,
+        input.projectHandle,
+        input.conversationId
+      )
       session.agent = created.agent
       session.todos = created.todos
       onTodos?.(input, structuredClone(created.todos))

@@ -5,3 +5,6 @@ allowBuilds:
   esbuild: true
   pi-permission-system: false
   protobufjs: false
+minimumReleaseAgeExclude:
+  - '@juicesharp/rpiv-config@2.8.0'
+  - '@juicesharp/rpiv-todo@2.8.0'

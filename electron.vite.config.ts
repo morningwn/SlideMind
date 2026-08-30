@@ -4,7 +4,17 @@ import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()]
+    plugins: [externalizeDepsPlugin({ exclude: ['pptxgenjs'] })],
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/main/index.ts'),
+          'presentation-export-worker': resolve(
+            'src/main/presentation/presentation-export-worker.ts'
+          )
+        }
+      }
+    }
   },
   preload: {
     plugins: [externalizeDepsPlugin()]

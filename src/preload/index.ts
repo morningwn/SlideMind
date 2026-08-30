@@ -12,6 +12,13 @@ import type {
   ProjectConversationState,
   SaveProjectTextFileInput
 } from '../shared/project'
+import type {
+  CreateProjectPresentationInput,
+  ExportProjectPresentationInput,
+  PresentationApi,
+  PresentationChangedEvent,
+  SaveProjectPresentationInput
+} from '../shared/presentation'
 
 const desktopApi = Object.freeze({
   platform: process.platform,
@@ -69,3 +76,24 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
 })
 
 contextBridge.exposeInMainWorld('projects', projectApi)
+
+const presentationApi: Readonly<PresentationApi> = Object.freeze({
+  create: (projectHandle: string, input: CreateProjectPresentationInput) =>
+    ipcRenderer.invoke('presentation:create', projectHandle, input),
+  read: (projectHandle: string, relativePath: string) =>
+    ipcRenderer.invoke('presentation:read', projectHandle, relativePath),
+  save: (projectHandle: string, input: SaveProjectPresentationInput) =>
+    ipcRenderer.invoke('presentation:save', projectHandle, input),
+  export: (projectHandle: string, input: ExportProjectPresentationInput) =>
+    ipcRenderer.invoke('presentation:export', projectHandle, input),
+  onChanged: (listener: (event: PresentationChangedEvent) => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      changedEvent: PresentationChangedEvent
+    ): void => listener(changedEvent)
+    ipcRenderer.on('presentation:changed', handler)
+    return () => ipcRenderer.removeListener('presentation:changed', handler)
+  }
+})
+
+contextBridge.exposeInMainWorld('presentations', presentationApi)

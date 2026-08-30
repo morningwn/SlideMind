@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useRef,
   useState,
@@ -6,6 +8,7 @@ import {
   type KeyboardEvent
 } from 'react'
 import type { AgentTodo } from '../../../shared/agent'
+import { isPresentationPath, PRESENTATION_FILE_SUFFIX } from '../../../shared/presentation'
 import type {
   ConversationMessage,
   OpenedProject,
@@ -18,6 +21,12 @@ import {
   type MarkdownViewMode,
   type OpenTextDocument
 } from './document-editor'
+import type { OpenPresentationDocument } from './presentation-editor'
+
+const PresentationEditor = lazy(async () => {
+  const module = await import('./presentation-editor')
+  return { default: module.PresentationEditor }
+})
 
 interface ChatMessage extends ConversationMessage {
   isStreaming?: boolean
@@ -229,6 +238,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set(['']))
   const [fileError, setFileError] = useState('')
   const [openDocuments, setOpenDocuments] = useState<OpenTextDocument[]>([])
+  const [openPresentations, setOpenPresentations] = useState<OpenPresentationDocument[]>([])
   const [activeDocumentPath, setActiveDocumentPath] = useState<string | null>(null)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [openingFilePaths, setOpeningFilePaths] = useState<Set<string>>(new Set())
@@ -242,9 +252,15 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
   const activeDocument = openDocuments.find((document) => document.path === activeDocumentPath)
+  const activePresentation = openPresentations.find(
+    (presentation) => presentation.path === activeDocumentPath
+  )
+  const activeFile = activeDocument ?? activePresentation
   const selectedTodos = todosByConversation[selectedConversation.id] ?? []
   const hasDirtyDocuments = openDocuments.some(
     (document) => document.content !== document.savedContent
+  ) || openPresentations.some(
+    (presentation) => presentation.serializedDocument !== presentation.savedSerializedDocument
   )
   latestConversationStateRef.current = toPersistedState(conversations, selectedConversationId)
   canFlushConversationsRef.current = canPersistConversations && !isConversationLoading
@@ -282,6 +298,39 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       active = false
     }
   }, [project.handle])
+
+  useEffect(() => window.presentations.onChanged((event) => {
+    if (event.projectHandle !== project.handle) return
+    void window.projects.listDirectory(project.handle, '').then((entries) => {
+      setEntriesByDirectory((current) => ({ ...current, '': entries }))
+    }).catch((error: unknown) => {
+      setFileError(error instanceof Error ? error.message : '无法刷新项目文件')
+    })
+
+    void window.presentations.read(project.handle, event.path).then((file) => {
+      setOpenPresentations((current) => current.map((presentation) => {
+        if (presentation.path !== event.path || presentation.isSaving) return presentation
+        if (presentation.serializedDocument !== presentation.savedSerializedDocument) {
+          return {
+            ...presentation,
+            conflict: true,
+            error: '演示文稿已被 Agent 或其他进程修改。重新载入会放弃当前未保存内容。'
+          }
+        }
+        const serializedDocument = JSON.stringify(file.document)
+        return {
+          ...presentation,
+          document: file.document,
+          serializedDocument,
+          savedSerializedDocument: serializedDocument,
+          revision: file.revision,
+          reloadKey: crypto.randomUUID(),
+          conflict: false,
+          error: ''
+        }
+      }))
+    }).catch(() => undefined)
+  }), [project.handle])
 
   useEffect(() => {
     let active = true
@@ -522,12 +571,42 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       setSelectedFilePath(existingDocument.path)
       return
     }
+    const existingPresentation = openPresentations.find(
+      (presentation) => presentation.path === entry.path
+    )
+    if (existingPresentation) {
+      setActiveDocumentPath(existingPresentation.path)
+      setSelectedFilePath(existingPresentation.path)
+      return
+    }
     if (openingFilePaths.has(entry.path)) return
 
     setOpeningFilePaths((current) => new Set(current).add(entry.path))
     setSelectedFilePath(entry.path)
     setFileError('')
     try {
+      if (isPresentationPath(entry.path)) {
+        const file = await window.presentations.read(project.handle, entry.path)
+        const serializedDocument = JSON.stringify(file.document)
+        const presentation: OpenPresentationDocument = {
+          ...file,
+          name: entry.name,
+          serializedDocument,
+          savedSerializedDocument: serializedDocument,
+          reloadKey: crypto.randomUUID(),
+          isSaving: false,
+          isExporting: false,
+          conflict: false,
+          error: ''
+        }
+        setOpenPresentations((current) =>
+          current.some((candidate) => candidate.path === file.path)
+            ? current
+            : [...current, presentation]
+        )
+        setActiveDocumentPath(file.path)
+        return
+      }
       const file = await window.projects.readTextFile(project.handle, entry.path)
       const document: OpenTextDocument = {
         ...file,
@@ -552,6 +631,186 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         next.delete(entry.path)
         return next
       })
+    }
+  }
+
+  async function createPresentation(): Promise<void> {
+    const existingNames = new Set(
+      (entriesByDirectory[''] ?? []).map((entry) => entry.name.toLocaleLowerCase())
+    )
+    let suffix = 1
+    let fileName = `presentation${PRESENTATION_FILE_SUFFIX}`
+    while (existingNames.has(fileName.toLocaleLowerCase())) {
+      suffix += 1
+      fileName = `presentation-${suffix}${PRESENTATION_FILE_SUFFIX}`
+    }
+    const path = fileName
+    const title = '未命名演示文稿'
+    setFileError('')
+    try {
+      const file = await window.presentations.create(project.handle, { path, title })
+      const serializedDocument = JSON.stringify(file.document)
+      const presentation: OpenPresentationDocument = {
+        ...file,
+        name: fileName,
+        serializedDocument,
+        savedSerializedDocument: serializedDocument,
+        reloadKey: crypto.randomUUID(),
+        isSaving: false,
+        isExporting: false,
+        conflict: false,
+        error: ''
+      }
+      setOpenPresentations((current) => [...current, presentation])
+      setActiveDocumentPath(file.path)
+      setSelectedFilePath(file.path)
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : '无法新建演示文稿')
+    }
+  }
+
+  function updatePresentation(path: string, document: OpenPresentationDocument['document']): void {
+    const serializedDocument = JSON.stringify(document)
+    setOpenPresentations((current) => current.map((presentation) =>
+      presentation.path === path
+        ? { ...presentation, document, serializedDocument, error: '', lastExportPath: undefined }
+        : presentation
+    ))
+  }
+
+  async function savePresentation(path: string): Promise<boolean> {
+    const presentation = openPresentations.find((candidate) => candidate.path === path)
+    if (!presentation || presentation.isSaving || presentation.conflict) return false
+    if (presentation.serializedDocument === presentation.savedSerializedDocument) return true
+
+    const document = presentation.document
+    const serializedDocument = presentation.serializedDocument
+    setOpenPresentations((current) => current.map((candidate) =>
+      candidate.path === path ? { ...candidate, isSaving: true, error: '' } : candidate
+    ))
+    try {
+      const result = await window.presentations.save(project.handle, {
+        path,
+        revision: presentation.revision,
+        document
+      })
+      if (!result.ok) {
+        setOpenPresentations((current) => current.map((candidate) =>
+          candidate.path === path
+            ? {
+                ...candidate,
+                isSaving: false,
+                conflict: true,
+                error: '演示文稿已被其他程序修改。重新载入会放弃当前未保存内容。'
+              }
+            : candidate
+        ))
+        return false
+      }
+      setOpenPresentations((current) => current.map((candidate) =>
+        candidate.path === path
+          ? {
+              ...candidate,
+              isSaving: false,
+              revision: result.revision,
+              savedSerializedDocument: serializedDocument,
+              conflict: false,
+              error: ''
+            }
+          : candidate
+      ))
+      return true
+    } catch (error) {
+      setOpenPresentations((current) => current.map((candidate) =>
+        candidate.path === path
+          ? {
+              ...candidate,
+              isSaving: false,
+              error: error instanceof Error ? error.message : '无法保存演示文稿'
+            }
+          : candidate
+      ))
+      return false
+    }
+  }
+
+  async function reloadPresentation(path: string): Promise<void> {
+    const presentation = openPresentations.find((candidate) => candidate.path === path)
+    if (!presentation) return
+    if (
+      presentation.serializedDocument !== presentation.savedSerializedDocument &&
+      !window.confirm(`重新载入 ${presentation.name}？当前未保存内容将丢失。`)
+    ) return
+
+    try {
+      const file = await window.presentations.read(project.handle, path)
+      const serializedDocument = JSON.stringify(file.document)
+      setOpenPresentations((current) => current.map((candidate) =>
+        candidate.path === path
+          ? {
+              ...candidate,
+              document: file.document,
+              serializedDocument,
+              savedSerializedDocument: serializedDocument,
+              revision: file.revision,
+              reloadKey: crypto.randomUUID(),
+              isSaving: false,
+              conflict: false,
+              error: ''
+            }
+          : candidate
+      ))
+    } catch (error) {
+      setOpenPresentations((current) => current.map((candidate) =>
+        candidate.path === path
+          ? { ...candidate, error: error instanceof Error ? error.message : '无法重新载入演示文稿' }
+          : candidate
+      ))
+    }
+  }
+
+  function closePresentation(path: string): void {
+    const presentationIndex = openPresentations.findIndex((presentation) => presentation.path === path)
+    const presentation = openPresentations[presentationIndex]
+    if (!presentation) return
+    if (
+      presentation.serializedDocument !== presentation.savedSerializedDocument &&
+      !window.confirm(`关闭 ${presentation.name}？当前未保存内容将丢失。`)
+    ) return
+
+    const remaining = openPresentations.filter((candidate) => candidate.path !== path)
+    setOpenPresentations(remaining)
+    if (activeDocumentPath === path) {
+      const nextPresentation = remaining[Math.min(presentationIndex, remaining.length - 1)]
+      setActiveDocumentPath(nextPresentation?.path ?? openDocuments.at(-1)?.path ?? null)
+    }
+  }
+
+  async function exportPresentation(path: string): Promise<void> {
+    const saved = await savePresentation(path)
+    if (!saved) return
+    setOpenPresentations((current) => current.map((candidate) =>
+      candidate.path === path
+        ? { ...candidate, isExporting: true, error: '', lastExportPath: undefined }
+        : candidate
+    ))
+    try {
+      const result = await window.presentations.export(project.handle, { path })
+      setOpenPresentations((current) => current.map((candidate) =>
+        candidate.path === path
+          ? { ...candidate, isExporting: false, lastExportPath: result.outputPath }
+          : candidate
+      ))
+    } catch (error) {
+      setOpenPresentations((current) => current.map((candidate) =>
+        candidate.path === path
+          ? {
+              ...candidate,
+              isExporting: false,
+              error: error instanceof Error ? error.message : '无法导出 PowerPoint'
+            }
+          : candidate
+      ))
     }
   }
 
@@ -663,7 +922,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setOpenDocuments(remaining)
     if (activeDocumentPath === path) {
       const nextDocument = remaining[Math.min(documentIndex, remaining.length - 1)]
-      setActiveDocumentPath(nextDocument?.path ?? null)
+      setActiveDocumentPath(nextDocument?.path ?? openPresentations.at(-1)?.path ?? null)
     }
   }
 
@@ -778,6 +1037,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               <span>项目内容</span>
               <h2 id="project-files-title">文件</h2>
             </div>
+            <button
+              type="button"
+              onClick={() => void createPresentation()}
+              aria-label="新建演示文稿"
+              title="新建演示文稿"
+            >＋</button>
           </header>
           <div className="file-tree-scroll">
             {fileError ? <p className="sidebar-error" role="alert">{fileError}</p> : null}
@@ -805,10 +1070,10 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         <header className="workspace-bar">
           <nav className="workspace-tabs" aria-label="打开的内容" role="tablist">
             <button
-              className={`workspace-tab workspace-chat-tab${activeDocument ? '' : ' workspace-tab-active'}`}
+              className={`workspace-tab workspace-chat-tab${activeFile ? '' : ' workspace-tab-active'}`}
               type="button"
               role="tab"
-              aria-selected={!activeDocument}
+              aria-selected={!activeFile}
               onClick={() => setActiveDocumentPath(null)}
             >
               <ConversationIcon />
@@ -860,6 +1125,52 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 </div>
               )
             })}
+            {openPresentations.map((presentation) => {
+              const isDirty = presentation.serializedDocument !== presentation.savedSerializedDocument
+              const isActive = presentation.path === activePresentation?.path
+              const status = presentation.conflict
+                ? '保存冲突'
+                : presentation.isSaving
+                  ? '正在保存'
+                  : isDirty
+                    ? '未保存'
+                    : '已保存'
+              return (
+                <div
+                  className={`workspace-document-tab${isActive ? ' workspace-tab-active' : ''}`}
+                  key={presentation.path}
+                  role="presentation"
+                >
+                  <button
+                    className="workspace-document-tab-main"
+                    type="button"
+                    role="tab"
+                    aria-label={`${presentation.name}，${status}`}
+                    aria-selected={isActive}
+                    title={presentation.path}
+                    onClick={() => {
+                      setActiveDocumentPath(presentation.path)
+                      setSelectedFilePath(presentation.path)
+                    }}
+                  >
+                    <FileIcon />
+                    <span>{presentation.name}</span>
+                    {isDirty ? (
+                      <i
+                        className={`${presentation.isSaving ? 'document-status-saving' : ''}${presentation.conflict ? ' document-status-conflict' : ''}`}
+                        aria-hidden="true"
+                      />
+                    ) : null}
+                  </button>
+                  <button
+                    className="workspace-tab-close"
+                    type="button"
+                    aria-label={`关闭 ${presentation.name}`}
+                    onClick={() => closePresentation(presentation.path)}
+                  >×</button>
+                </div>
+              )
+            })}
           </nav>
 
           {activeDocument ? (
@@ -892,6 +1203,22 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 }
               >保存</button>
             </div>
+          ) : activePresentation ? (
+            <div className="workspace-document-actions">
+              <span className="workspace-file-kind">SLIDES</span>
+              <button
+                className="workspace-save-button"
+                type="button"
+                title="保存 (Ctrl/⌘S)"
+                aria-label={`保存 ${activePresentation.name}`}
+                onClick={() => void savePresentation(activePresentation.path)}
+                disabled={
+                  activePresentation.serializedDocument === activePresentation.savedSerializedDocument ||
+                  activePresentation.isSaving ||
+                  activePresentation.conflict
+                }
+              >保存</button>
+            </div>
           ) : null}
         </header>
 
@@ -904,6 +1231,17 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             onSave={() => void saveDocument(activeDocument.path)}
             projectHandle={project.handle}
           />
+        ) : activePresentation ? (
+          <Suspense fallback={<p className="sidebar-loading">正在加载演示编辑器…</p>}>
+            <PresentationEditor
+              key={`${activePresentation.path}:${activePresentation.reloadKey}`}
+              document={activePresentation}
+              onChange={(document) => updatePresentation(activePresentation.path, document)}
+              onReload={() => void reloadPresentation(activePresentation.path)}
+              onSave={() => void savePresentation(activePresentation.path)}
+              onExport={() => void exportPresentation(activePresentation.path)}
+            />
+          </Suspense>
         ) : (
           <section className="chat-panel" aria-labelledby="active-conversation-title">
             <h1 id="active-conversation-title" className="sr-only">
