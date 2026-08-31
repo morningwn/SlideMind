@@ -5,6 +5,7 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import {
   DEEPSEEK_PROVIDER_ID,
+  type AgentActivityEvent,
   type AgentConversationInput,
   type AgentPromptReference,
   type AgentPromptInput,
@@ -22,6 +23,7 @@ import {
   resolvePiConversationsDirectory
 } from '../project/project-storage'
 import type { AgentConfigStore, AgentConfiguration } from './config-store'
+import { createToolActivity, toolErrorDetail } from './agent-activity'
 import { todosFromSessionEntries, todosFromToolResult } from './agent-todo'
 import { preparePermissionSystem, type PermissionSystemSetup } from './permission-policy'
 import {
@@ -227,7 +229,8 @@ export class BaseAgentService {
   prompt(
     input: unknown,
     onDelta?: (input: AgentPromptInput, delta: string) => void,
-    onTodos?: (input: AgentPromptInput, todos: AgentTodo[]) => void
+    onTodos?: (input: AgentPromptInput, todos: AgentTodo[]) => void,
+    onActivity?: (event: AgentActivityEvent) => void
   ): Promise<AgentPromptResult> {
     let prompt: AgentPromptInput
     try {
@@ -264,7 +267,8 @@ export class BaseAgentService {
           prompt,
           projectPath,
           onDelta,
-          onTodos
+          onTodos,
+          onActivity
         )
         logger.info('agent.request_completed', {
           operationId,
@@ -378,7 +382,7 @@ export class BaseAgentService {
       agentDir: this.agentDirectory,
       modelRuntime,
       model,
-      thinkingLevel: 'off',
+      thinkingLevel: 'high',
       tools: [
         'read',
         'write',
@@ -404,7 +408,8 @@ export class BaseAgentService {
     input: AgentPromptInput,
     projectPath: string,
     onDelta?: (input: AgentPromptInput, delta: string) => void,
-    onTodos?: (input: AgentPromptInput, todos: AgentTodo[]) => void
+    onTodos?: (input: AgentPromptInput, todos: AgentTodo[]) => void,
+    onActivity?: (event: AgentActivityEvent) => void
   ): Promise<AgentPromptResult> {
     const config = await this.configStore.load()
     if (!config) {
@@ -423,15 +428,87 @@ export class BaseAgentService {
       onTodos?.(input, structuredClone(created.todos))
     }
     session.lastUsedAt = Date.now()
+    let thinkingSequence = 0
+    let activeThinkingId: string | undefined
     const unsubscribe = session.agent.subscribe((event) => {
-      if (event.type === 'message_update' && event.assistantMessageEvent.type === 'text_delta') {
-        onDelta?.(input, event.assistantMessageEvent.delta)
+      if (event.type === 'message_update') {
+        const messageEvent = event.assistantMessageEvent
+        if (messageEvent.type === 'text_delta') {
+          onDelta?.(input, messageEvent.delta)
+        }
+        if (messageEvent.type === 'thinking_start') {
+          activeThinkingId = `${input.requestId}:thinking:${thinkingSequence++}`
+          onActivity?.({
+            requestId: input.requestId,
+            conversationId: input.conversationId,
+            type: 'start',
+            activity: {
+              id: activeThinkingId,
+              kind: 'thinking',
+              name: '模型思考',
+              status: 'running',
+              content: ''
+            }
+          })
+        }
+        if (messageEvent.type === 'thinking_delta') {
+          if (!activeThinkingId) {
+            activeThinkingId = `${input.requestId}:thinking:${thinkingSequence++}`
+            onActivity?.({
+              requestId: input.requestId,
+              conversationId: input.conversationId,
+              type: 'start',
+              activity: {
+                id: activeThinkingId,
+                kind: 'thinking',
+                name: '模型思考',
+                status: 'running',
+                content: ''
+              }
+            })
+          }
+          onActivity?.({
+            requestId: input.requestId,
+            conversationId: input.conversationId,
+            type: 'append',
+            activityId: activeThinkingId,
+            delta: messageEvent.delta
+          })
+        }
+        if (messageEvent.type === 'thinking_end' && activeThinkingId) {
+          onActivity?.({
+            requestId: input.requestId,
+            conversationId: input.conversationId,
+            type: 'finish',
+            activityId: activeThinkingId,
+            status: 'completed'
+          })
+          activeThinkingId = undefined
+        }
       }
-      if (event.type === 'tool_execution_end' && event.toolName === 'todo' && !event.isError) {
-        const todos = todosFromToolResult(event.result)
-        if (!todos) return
-        session.todos = todos
-        onTodos?.(input, structuredClone(todos))
+      if (event.type === 'tool_execution_start') {
+        onActivity?.({
+          requestId: input.requestId,
+          conversationId: input.conversationId,
+          type: 'start',
+          activity: createToolActivity(event.toolCallId, event.toolName, event.args)
+        })
+      }
+      if (event.type === 'tool_execution_end') {
+        onActivity?.({
+          requestId: input.requestId,
+          conversationId: input.conversationId,
+          type: 'finish',
+          activityId: event.toolCallId,
+          status: event.isError ? 'error' : 'completed',
+          detail: event.isError ? toolErrorDetail(event.result) : undefined
+        })
+        if (event.toolName === 'todo' && !event.isError) {
+          const todos = todosFromToolResult(event.result)
+          if (!todos) return
+          session.todos = todos
+          onTodos?.(input, structuredClone(todos))
+        }
       }
     })
 

@@ -8,6 +8,8 @@ import type {
   ProjectConversation,
   ProjectConversationState
 } from '../../shared/project'
+import type { AgentActivity } from '../../shared/agent'
+import { createToolActivity, toolErrorDetail } from '../agent/agent-activity'
 import { resolveProject } from './recent-project-store'
 import {
   findPiSessionFile,
@@ -100,6 +102,27 @@ function extractText(message: AgentMessage): string | null {
     .join('')
 }
 
+function extractActivities(message: AgentMessage, entryId: string): AgentActivity[] {
+  if (message.role !== 'assistant' || !Array.isArray(message.content)) return []
+
+  const activities: AgentActivity[] = []
+  for (const [index, block] of message.content.entries()) {
+    if (block.type === 'thinking' && !block.redacted && block.thinking.trim()) {
+      activities.push({
+        id: `${entryId}:thinking:${index}`,
+        kind: 'thinking',
+        name: '模型思考',
+        status: 'completed',
+        content: block.thinking
+      })
+    }
+    if (block.type === 'toolCall') {
+      activities.push(createToolActivity(block.id, block.name, block.arguments))
+    }
+  }
+  return activities
+}
+
 export function visibleUserPrompt(text: string): string {
   const startMarker = '\n\n<slidemind-injected-context version="1">'
   const endMarker = '\n</slidemind-injected-context>'
@@ -110,8 +133,23 @@ export function visibleUserPrompt(text: string): string {
 
 function projectMessages(sessionManager: PiSessionManager): ConversationMessage[] {
   const messages: ConversationMessage[] = []
+  const activitiesByToolCall = new Map<string, AgentActivity>()
   for (const entry of sessionManager.getBranch()) {
     if (entry.type !== 'message') continue
+
+    if (entry.message.role === 'toolResult') {
+      const activity = activitiesByToolCall.get(entry.message.toolCallId)
+      if (activity) {
+        activity.status = entry.message.isError ? 'error' : 'completed'
+        if (entry.message.isError) {
+          const errorDetail = toolErrorDetail(entry.message)
+          if (errorDetail) {
+            activity.detail = [activity.detail, `错误：${errorDetail}`].filter(Boolean).join('\n\n')
+          }
+        }
+      }
+      continue
+    }
 
     const text = extractText(entry.message)
     if (text === null || (entry.message.role !== 'assistant' && entry.message.role !== 'user')) {
@@ -120,10 +158,24 @@ function projectMessages(sessionManager: PiSessionManager): ConversationMessage[
     if (text.length > MAX_MESSAGE_LENGTH || messages.length >= MAX_MESSAGES_PER_CONVERSATION) {
       throw new Error('Pi 会话记录超出显示限制')
     }
+    const activities = extractActivities(entry.message, entry.id)
+    for (const activity of activities) {
+      if (activity.kind !== 'thinking') activitiesByToolCall.set(activity.id, activity)
+    }
+    const visibleText = entry.message.role === 'user' ? visibleUserPrompt(text) : text
+    const previousMessage = messages.at(-1)
+    if (entry.message.role === 'assistant' && previousMessage?.role === 'assistant') {
+      previousMessage.text = [previousMessage.text, visibleText].filter(Boolean).join('\n\n')
+      if (activities.length > 0) {
+        previousMessage.activities = [...(previousMessage.activities ?? []), ...activities]
+      }
+      continue
+    }
     messages.push({
       id: entry.id,
       role: entry.message.role,
-      text: entry.message.role === 'user' ? visibleUserPrompt(text) : text
+      text: visibleText,
+      ...(activities.length > 0 ? { activities } : {})
     })
   }
   return messages

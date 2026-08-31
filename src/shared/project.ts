@@ -84,6 +84,7 @@ export interface ConversationMessage {
   id: string
   role: 'assistant' | 'user'
   text: string
+  activities?: import('./agent').AgentActivity[]
 }
 
 export interface ProjectConversation {

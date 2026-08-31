@@ -50,6 +50,10 @@ export function registerAgentIpc(configStore: AgentConfigStore, agentService: Ba
           conversationId: prompt.conversationId,
           todos
         })
+      },
+      (activityEvent) => {
+        if (event.sender.isDestroyed()) return
+        event.sender.send('agent:activity', activityEvent)
       }
     )
   })

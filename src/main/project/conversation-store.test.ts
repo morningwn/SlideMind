@@ -88,6 +88,76 @@ describe('ProjectConversationStore', () => {
     ])
   })
 
+  it('restores thinking, skills and tool results with the assistant response', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    const conversationsDirectory = join(projectPath, '.slideMind', 'convs')
+    const session = SessionManager.create(projectPath, conversationsDirectory, {
+      id: 'conversation-1'
+    })
+    session.appendMessage({
+      role: 'user',
+      content: [{ type: 'text', text: '生成一份演示文稿' }],
+      timestamp: 1
+    })
+    session.appendMessage({
+      role: 'assistant',
+      content: [
+        { type: 'thinking', thinking: '先读取文案工作流。' },
+        {
+          type: 'toolCall',
+          id: 'skill-call-1',
+          name: 'read',
+          arguments: { path: '/project/skills/slide-copywriting/SKILL.md' }
+        }
+      ],
+      api: 'deepseek-messages',
+      provider: 'deepseek',
+      model: 'deepseek-v4-flash',
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+      },
+      stopReason: 'toolUse',
+      timestamp: 2
+    })
+    session.appendMessage({
+      role: 'toolResult',
+      toolCallId: 'skill-call-1',
+      toolName: 'read',
+      content: [{ type: 'text', text: 'skill instructions' }],
+      isError: false,
+      timestamp: 3
+    })
+    appendExchange(session, '继续', '演示文稿已经生成。')
+
+    const messages = await new ProjectConversationStore().loadMessages(
+      projectPath,
+      'conversation-1'
+    )
+
+    expect(messages[1]).toMatchObject({
+      role: 'assistant',
+      text: '',
+      activities: [
+        {
+          kind: 'thinking',
+          status: 'completed',
+          content: '先读取文案工作流。'
+        },
+        {
+          id: 'skill-call-1',
+          kind: 'skill',
+          name: 'slide-copywriting',
+          status: 'completed'
+        }
+      ]
+    })
+  })
+
   it('serializes writes for the same project', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
     const store = new ProjectConversationStore()

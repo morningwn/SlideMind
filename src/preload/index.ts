@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
+  AgentActivityEvent,
   AgentApi,
   AgentConversationInput,
   AgentPromptInput,
@@ -76,6 +77,13 @@ const agentApi: Readonly<AgentApi> = Object.freeze({
     }
     ipcRenderer.on('agent:todos', handler)
     return () => ipcRenderer.removeListener('agent:todos', handler)
+  },
+  onActivity: (listener: (event: AgentActivityEvent) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, activityEvent: AgentActivityEvent): void => {
+      listener(activityEvent)
+    }
+    ipcRenderer.on('agent:activity', handler)
+    return () => ipcRenderer.removeListener('agent:activity', handler)
   }
 })
 

@@ -23,6 +23,8 @@ import type {
 } from '../../../shared/project'
 import { AgentModelSelect } from './agent-model-select'
 import { AgentMarkdown } from './agent-markdown'
+import { AgentActivityPanel } from './agent-activity-panel'
+import { applyAgentActivityEvent } from '../lib/agent-activity'
 import {
   isOpenableProjectFile,
   projectFileDisplayKind,
@@ -853,6 +855,24 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             messages: conversation.messages.map((message) =>
               message.id === event.requestId
                 ? { ...message, text: `${message.text}${event.delta}` }
+                : message
+            )
+          }
+        : conversation
+    ))
+  }), [])
+
+  useEffect(() => window.agent.onActivity((event) => {
+    setConversations((current) => current.map((conversation) =>
+      conversation.id === event.conversationId
+        ? {
+            ...conversation,
+            messages: conversation.messages.map((message) =>
+              message.id === event.requestId
+                ? {
+                    ...message,
+                    activities: applyAgentActivityEvent(message.activities ?? [], event)
+                  }
                 : message
             )
           }
@@ -1865,7 +1885,19 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         conversation.id === conversationId
           ? {
               ...conversation,
-              messages: conversation.messages.filter((message) => message.id !== requestId)
+              messages: conversation.messages.flatMap((message) => {
+                if (message.id !== requestId) return [message]
+                if (!message.text && !message.activities?.length) return []
+                return [{
+                  ...message,
+                  isStreaming: false,
+                  activities: message.activities?.map((activity) => (
+                    activity.status === 'running'
+                      ? { ...activity, status: 'error' as const }
+                      : activity
+                  ))
+                }]
+              })
             }
           : conversation
       ))
@@ -2340,14 +2372,24 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 <div className="message-list">
                   {selectedConversation.messages.map((message) => (
                     <article
-                      className={`chat-message chat-message-${message.role}${message.isStreaming && !message.text ? ' chat-message-loading' : ''}${message.isStreaming && message.text ? ' chat-message-streaming' : ''}`}
+                      className={`chat-message chat-message-${message.role}${message.isStreaming && !message.text && !message.activities?.length ? ' chat-message-loading' : ''}${message.isStreaming && message.text ? ' chat-message-streaming' : ''}`}
                       key={message.id}
                     >
                       <span>{message.role === 'user' ? '你' : 'SM'}</span>
-                      {message.isStreaming && !message.text ? (
+                      {message.role === 'assistant' ? (
+                        <div className="chat-assistant-response">
+                          <AgentActivityPanel
+                            activities={message.activities ?? []}
+                            isStreaming={Boolean(message.isStreaming)}
+                          />
+                          {message.isStreaming && !message.text && !message.activities?.length ? (
+                            <p className="chat-message-placeholder"><i /><i /><i /></p>
+                          ) : message.text ? (
+                            <AgentMarkdown source={message.text} />
+                          ) : null}
+                        </div>
+                      ) : message.isStreaming && !message.text ? (
                         <p><i /><i /><i /></p>
-                      ) : message.role === 'assistant' ? (
-                        <AgentMarkdown source={message.text} />
                       ) : (
                         <p>{message.text}</p>
                       )}

@@ -90,6 +90,27 @@ export interface AgentTodosEvent {
   todos: AgentTodo[]
 }
 
+export type AgentActivityKind = 'thinking' | 'skill' | 'tool'
+export type AgentActivityStatus = 'running' | 'completed' | 'error'
+
+export interface AgentActivity {
+  id: string
+  kind: AgentActivityKind
+  name: string
+  status: AgentActivityStatus
+  content?: string
+  detail?: string
+}
+
+export type AgentActivityEvent = {
+  requestId: string
+  conversationId: string
+} & (
+  | { type: 'start'; activity: AgentActivity }
+  | { type: 'append'; activityId: string; delta: string }
+  | { type: 'finish'; activityId: string; status: Exclude<AgentActivityStatus, 'running'>; detail?: string }
+)
+
 export interface AgentApi {
   getConfig(): Promise<AgentConfigStatus>
   saveConfig(input: SaveAgentConfigInput): Promise<AgentConfigStatus>
@@ -98,4 +119,5 @@ export interface AgentApi {
   prompt(input: AgentPromptInput): Promise<AgentPromptResult>
   onStream(listener: (event: AgentStreamEvent) => void): () => void
   onTodos(listener: (event: AgentTodosEvent) => void): () => void
+  onActivity(listener: (event: AgentActivityEvent) => void): () => void
 }
