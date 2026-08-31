@@ -11,6 +11,7 @@ import type {
 } from '../../shared/presentation'
 import type { ProjectMutationSource } from '../../shared/project'
 import type { ProjectMutationService } from '../version-control/project-mutation-service'
+import { getLogger, registerSensitivePath } from '../logging/logger'
 import {
   defaultPresentationOutputPath,
   isPptxPath,
@@ -19,6 +20,7 @@ import {
 
 const EXPORT_TIMEOUT_MS = 120_000
 const INTERNAL_PROJECT_DIRECTORY = '.slidemind'
+const logger = getLogger('presentation')
 
 interface PresentationExportWorkerResult {
   error?: string
@@ -248,31 +250,58 @@ export class PresentationService {
     source: ProjectMutationSource,
     allowExternalOutput: boolean
   ): Promise<ExportProjectPresentationResult> {
-    const input = validateExportInput(inputValue)
-    const presentation = await this.store.read(projectPath, input.path)
-    const requestedOutputPath = input.outputPath ?? defaultPresentationOutputPath(presentation.path)
-    const output = await resolvePresentationOutputPath(
-      projectPath,
-      requestedOutputPath,
-      allowExternalOutput
-    )
-    const temporaryPath = `${output.outputPath}.${process.pid}-${randomUUID()}.slidemind-tmp.pptx`
-    const operation = async (): Promise<ExportProjectPresentationResult> => {
-      try {
-        await runExportWorker(presentation.document.presentation, temporaryPath, signal)
-        await rename(temporaryPath, output.outputPath)
-      } catch (error) {
-        await unlink(temporaryPath).catch(() => undefined)
-        throw error
+    const operationId = randomUUID()
+    const startedAt = Date.now()
+    logger.info('presentation.export_started', {
+      operationId,
+      context: { allowExternalOutput }
+    })
+    try {
+      const input = validateExportInput(inputValue)
+      if (input.outputPath && isAbsolute(input.outputPath)) {
+        registerSensitivePath(dirname(input.outputPath))
       }
-      return { outputPath: output.resultPath }
+      const presentation = await this.store.read(projectPath, input.path)
+      const requestedOutputPath = input.outputPath ?? defaultPresentationOutputPath(presentation.path)
+      const output = await resolvePresentationOutputPath(
+        projectPath,
+        requestedOutputPath,
+        allowExternalOutput
+      )
+      const temporaryPath = `${output.outputPath}.${process.pid}-${randomUUID()}.slidemind-tmp.pptx`
+      const operation = async (): Promise<ExportProjectPresentationResult> => {
+        try {
+          await runExportWorker(presentation.document.presentation, temporaryPath, signal)
+          await rename(temporaryPath, output.outputPath)
+        } catch (error) {
+          await unlink(temporaryPath).catch(() => undefined)
+          throw error
+        }
+        return { outputPath: output.resultPath }
+      }
+      const result = await (this.mutations && output.projectRelativePath !== undefined
+        ? this.mutations.run(
+            { projectPath, projectHandle, paths: [output.projectRelativePath], source },
+            operation
+          )
+        : operation())
+      logger.info('presentation.export_completed', {
+        operationId,
+        durationMs: Date.now() - startedAt,
+        context: {
+          externalOutput: output.projectRelativePath === undefined,
+          slideCount: presentation.document.presentation.slides.length
+        }
+      })
+      return result
+    } catch (error) {
+      logger.error('presentation.export_failed', {
+        operationId,
+        durationMs: Date.now() - startedAt,
+        error
+      })
+      throw error
     }
-    return this.mutations && output.projectRelativePath !== undefined
-      ? this.mutations.run(
-          { projectPath, projectHandle, paths: [output.projectRelativePath], source },
-          operation
-        )
-      : operation()
   }
 
   private emitChanged(event: PresentationChangedEvent): void {

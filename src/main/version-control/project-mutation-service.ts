@@ -14,8 +14,10 @@ import {
   normalizeVersionedPath,
   type ProjectVersionService
 } from './project-version-service'
+import { getLogger } from '../logging/logger'
 
 const INTERNAL_ECHO_TTL_MS = 3_000
+const logger = getLogger('project-mutation')
 
 interface ProjectMutationInput {
   projectPath: string
@@ -75,7 +77,10 @@ export class ProjectMutationService {
     try {
       await this.versions.ensureBaseline(input.projectPath, paths)
     } catch (error) {
-      console.warn('Unable to create SlideMind version baseline:', error)
+      logger.warn('version.baseline_failed', {
+        error,
+        context: { fileCount: paths.length, source: input.source }
+      })
     }
 
     const expiresAt = Date.now() + INTERNAL_ECHO_TTL_MS
@@ -104,7 +109,7 @@ export class ProjectMutationService {
         existsAfter.set(path, revision !== 'missing')
       } catch (error) {
         this.internalEchoes.delete(this.echoKey(input.projectPath, path))
-        console.warn('Unable to identify an internal file-write echo:', error)
+        logger.warn('version.internal_echo_failed', { error })
       }
     }))
 

@@ -3,6 +3,7 @@ import type {
   PptistPresentation,
   PresentationDocument
 } from '../../../shared/presentation'
+import { reportDiagnosticEvent } from '../lib/logger'
 
 export interface OpenPresentationDocument {
   path: string
@@ -83,11 +84,11 @@ export function PresentationEditor({
         return
       }
       if (event.data.type === 'slidemind:pptist:error') {
-        setSetupError(
-          typeof event.data.message === 'string'
-            ? event.data.message
-            : 'PPTist 编辑器运行失败'
-        )
+        const message = typeof event.data.message === 'string'
+          ? event.data.message
+          : 'PPTist 编辑器运行失败'
+        reportDiagnosticEvent('error', 'presentation.editor_failed', message)
+        setSetupError(message)
         return
       }
       if (

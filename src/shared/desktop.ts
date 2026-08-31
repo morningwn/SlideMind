@@ -1,3 +1,5 @@
+import type { RendererDiagnosticEvent } from './logging'
+
 export type DesktopCloseResponse = 'keep-window-open' | 'exit-application'
 
 export interface DesktopApi {
@@ -7,6 +9,7 @@ export interface DesktopApi {
     chrome: string
     node: string
   }>
+  reportDiagnosticEvent(event: RendererDiagnosticEvent): void
   onCloseRequested(listener: () => void): () => void
   resolveCloseRequest(response: DesktopCloseResponse): Promise<boolean>
 }

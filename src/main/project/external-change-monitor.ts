@@ -7,9 +7,11 @@ import type {
 } from '../../shared/project'
 import { isVersionedProjectPath } from '../version-control/project-version-service'
 import type { ProjectMutationService } from '../version-control/project-mutation-service'
+import { getLogger } from '../logging/logger'
 
 const MAX_WATCHED_FILES = 100
 const MAX_WATCHED_DIRECTORIES = 100
+const logger = getLogger('external-change-monitor')
 
 interface ProjectWatcher {
   directories: Set<string>
@@ -146,7 +148,7 @@ export class ExternalChangeMonitor {
       void this.handleEvent(projectHandle, registered, event, absolutePath)
     })
     watcher.on('error', (error) => {
-      console.warn('Unable to monitor external project changes:', error)
+      logger.warn('project.external_watch_failed', { error })
     })
     try {
       await new Promise<void>((resolveReady, rejectReady) => {

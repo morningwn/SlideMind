@@ -25,6 +25,7 @@ import type {
   RestoreProjectVersionInput,
   RestoreProjectVersionResult
 } from '../../shared/project-version'
+import { getLogger } from '../logging/logger'
 
 const VERSION_DIRECTORY = join('.slideMind', 'history.git')
 const VERSION_DELAY_MS = 800
@@ -32,6 +33,7 @@ const VERSION_PAGE_SIZE = 30
 const VERSION_ID_PATTERN = /^[a-f0-9]{40}$/
 const MAX_PREVIEW_BYTES = 1024 * 1024
 const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf])
+const logger = getLogger('project-version')
 const EXCLUDED_SEGMENTS = new Set([
   '.git',
   '.slidemind',
@@ -299,7 +301,7 @@ export class ProjectVersionService {
   private createTimer(projectPath: string): NodeJS.Timeout {
     return setTimeout(() => {
       void this.flush(projectPath).catch((error: unknown) => {
-        console.warn('Unable to create SlideMind project version:', error)
+        logger.warn('version.create_failed', { error })
       })
     }, VERSION_DELAY_MS)
   }

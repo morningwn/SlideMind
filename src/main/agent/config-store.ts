@@ -8,6 +8,7 @@ import {
   type AgentConfigStatus
 } from '../../shared/agent'
 import { normalizeConfigInput } from './config-validation'
+import { getLogger } from '../logging/logger'
 
 interface StoredAgentConfig {
   version: 1
@@ -22,6 +23,7 @@ export interface AgentConfiguration {
 }
 
 const allowedModelIds: readonly string[] = DEEPSEEK_MODEL_OPTIONS.map((model) => model.id)
+const logger = getLogger('agent-config')
 
 function isStoredAgentConfig(value: unknown): value is StoredAgentConfig {
   if (!value || typeof value !== 'object') return false
@@ -56,7 +58,7 @@ export class AgentConfigStore {
     } catch (error) {
       const code = error instanceof Error && 'code' in error ? error.code : undefined
       if (code !== 'ENOENT') {
-        console.warn('Unable to read the agent configuration:', error)
+        logger.warn('agent.config_read_failed', { error })
       }
       return undefined
     }

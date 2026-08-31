@@ -16,6 +16,7 @@ import type { ProjectRootRegistry } from '../project/project-root-registry'
 import { resolveRegularProjectFile } from '../project/project-files'
 import type { PresentationService } from '../presentation/presentation-service'
 import type { ProjectMutationService } from '../version-control/project-mutation-service'
+import { diagnosticId, getLogger } from '../logging/logger'
 import {
   findPiSessionFile,
   resolvePiConversationsDirectory
@@ -43,6 +44,7 @@ const TODO_EXTENSION_PATH = join(
 const SYSTEM_PROMPT = `你是 SlideMind 的基础演示创作 agent。
 你的职责是帮助用户梳理材料、建立清晰叙事、规划演示结构并打磨表达。
 信息不足时先指出缺口；不要虚构事实；输出应简洁、可执行。`
+const logger = getLogger('agent')
 
 interface AgentSessionRecord {
   agent?: PiAgentSession
@@ -249,13 +251,38 @@ export class BaseAgentService {
       this.sessions.set(sessionKey, session)
     }
 
-    const run = session.queue.then(() => this.runPrompt(
-      session,
-      prompt,
-      projectPath,
-      onDelta,
-      onTodos
-    ))
+    const operationId = diagnosticId(prompt.requestId)
+    const run = session.queue.then(async () => {
+      const startedAt = Date.now()
+      logger.info('agent.request_started', {
+        operationId,
+        context: { referenceCount: prompt.references.length }
+      })
+      try {
+        const result = await this.runPrompt(
+          session,
+          prompt,
+          projectPath,
+          onDelta,
+          onTodos
+        )
+        logger.info('agent.request_completed', {
+          operationId,
+          durationMs: Date.now() - startedAt,
+          context: { modelId: result.modelId }
+        })
+        return result
+      } catch (error) {
+        logger.error('agent.request_failed', {
+          operationId,
+          durationMs: Date.now() - startedAt,
+          context: {
+            errorName: error instanceof Error ? error.name : 'NonError'
+          }
+        })
+        throw error
+      }
+    })
     const queue = run.then(
       () => undefined,
       () => undefined

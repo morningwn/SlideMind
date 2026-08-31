@@ -3404,3 +3404,35 @@ button.file-tree-item:not(.file-tree-directory) {
     animation-iteration-count: 1 !important;
   }
 }
+
+.fatal-error-page {
+  display: grid;
+  min-height: 100vh;
+  padding: 32px;
+  place-items: center;
+  background: #f3f6fb;
+  color: #273149;
+}
+
+.fatal-error-page section {
+  width: min(520px, 100%);
+  padding: 36px;
+  border: 1px solid #dce2ee;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgb(55 68 97 / 12%);
+}
+
+.fatal-error-page h1 {
+  margin: 8px 0 12px;
+}
+
+.fatal-error-page button {
+  margin-top: 18px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #5667e8;
+  color: #fff;
+  cursor: pointer;
+}

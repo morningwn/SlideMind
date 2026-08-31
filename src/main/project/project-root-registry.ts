@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import type { OpenedProject, ProjectInfo } from '../../shared/project'
+import { registerSensitivePath } from '../logging/logger'
 
 const MAX_PROJECT_HANDLE_LENGTH = 200
 
@@ -8,6 +9,7 @@ export class ProjectRootRegistry {
   private readonly handlesByPath = new Map<string, string>()
 
   grant(project: ProjectInfo): OpenedProject {
+    registerSensitivePath(project.path)
     let handle = this.handlesByPath.get(project.path)
     if (!handle) {
       handle = randomUUID()

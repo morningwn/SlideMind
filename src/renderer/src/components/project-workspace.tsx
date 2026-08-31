@@ -42,6 +42,7 @@ import {
   removeComposerReferenceTrigger,
   type ComposerReferenceTrigger
 } from '../lib/composer-references'
+import { reportDiagnosticEvent } from '../lib/logger'
 
 const PresentationEditor = lazy(async () => {
   const module = await import('./presentation-editor')
@@ -817,7 +818,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     if (snapshot === lastSavedConversationSnapshotRef.current) return
 
     void window.projects.saveConversations(project.handle, state).catch((error: unknown) => {
-      console.warn('Unable to flush project conversations:', error)
+      reportDiagnosticEvent('warn', 'conversation.flush_failed', error)
     })
   }, [project.handle])
 
@@ -866,7 +867,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           : { ...current, [conversationId]: todos }
       ))
     }).catch((error: unknown) => {
-      console.warn('Unable to load agent todos:', error)
+      reportDiagnosticEvent('warn', 'agent.todos_load_failed', error)
     })
 
     return () => {

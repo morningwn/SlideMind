@@ -30,6 +30,7 @@ import type {
   RestoreProjectVersionInput
 } from '../shared/project-version'
 import type { DesktopApi, DesktopCloseResponse } from '../shared/desktop'
+import type { RendererDiagnosticEvent } from '../shared/logging'
 
 const desktopApi: Readonly<DesktopApi> = Object.freeze({
   platform: process.platform,
@@ -38,6 +39,9 @@ const desktopApi: Readonly<DesktopApi> = Object.freeze({
     chrome: process.versions.chrome,
     node: process.versions.node
   }),
+  reportDiagnosticEvent: (event: RendererDiagnosticEvent) => {
+    ipcRenderer.send('logging:renderer-event', event)
+  },
   onCloseRequested: (listener: () => void) => {
     const handler = (): void => listener()
     ipcRenderer.on('desktop:close-requested', handler)

@@ -1,6 +1,7 @@
 import { mkdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import type { ProjectInfo } from '../../shared/project'
+import { getLogger } from '../logging/logger'
 
 interface StoredRecentProjects {
   version: 1
@@ -8,6 +9,7 @@ interface StoredRecentProjects {
 }
 
 const MAX_RECENT_PROJECTS = 20
+const logger = getLogger('recent-projects')
 
 function isProjectInfo(value: unknown): value is ProjectInfo {
   if (!value || typeof value !== 'object') return false
@@ -73,7 +75,7 @@ export class RecentProjectStore {
     } catch (error) {
       const code = error instanceof Error && 'code' in error ? error.code : undefined
       if (code !== 'ENOENT') {
-        console.warn('Unable to read recent projects:', error)
+        logger.warn('project.recent_read_failed', { error })
       }
       return []
     }

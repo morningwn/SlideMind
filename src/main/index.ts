@@ -16,10 +16,26 @@ import { ProjectMutationService } from './version-control/project-mutation-servi
 import { ProjectVersionService } from './version-control/project-version-service'
 import { getTitleBarWindowOptions } from './window-options'
 import type { DesktopCloseResponse } from '../shared/desktop'
+import { registerLoggingIpc } from './logging/ipc'
+import {
+  installApplicationLifecycleLogging,
+  installProcessErrorLogging,
+  installWindowLifecycleLogging
+} from './logging/lifecycle'
+import { getLogger, initializeApplicationLogging } from './logging/logger'
 
 const APP_URL_PROTOCOLS = new Set(['http:', 'https:'])
+const applicationStartedAt = Date.now()
 const pendingWindowCloseRequests = new Set<number>()
 let isApplicationQuitting = false
+
+initializeApplicationLogging({
+  isPackaged: app.isPackaged,
+  logsDirectory: app.getPath('logs')
+})
+installProcessErrorLogging()
+installApplicationLifecycleLogging(app)
+const logger = getLogger('application')
 
 function isSafeExternalUrl(rawUrl: string): boolean {
   try {
@@ -136,6 +152,7 @@ function createWindow(): BrowserWindow {
       sandbox: true
     }
   })
+  installWindowLifecycleLogging(mainWindow)
 
   mainWindow.once('ready-to-show', () => mainWindow.show())
 
@@ -197,6 +214,15 @@ function createWindow(): BrowserWindow {
 }
 
 app.whenReady().then(() => {
+  logger.info('app.started', {
+    durationMs: Date.now() - applicationStartedAt,
+    context: {
+      appVersion: app.getVersion(),
+      arch: process.arch,
+      electronVersion: process.versions.electron,
+      platform: process.platform
+    }
+  })
   const configStore = new AgentConfigStore(join(app.getPath('userData'), 'agent-config.json'))
   const projectRoots = new ProjectRootRegistry()
   const versionService = new ProjectVersionService()
@@ -222,6 +248,7 @@ app.whenReady().then(() => {
 
   registerAgentIpc(configStore, agentService)
   registerDesktopIpc()
+  registerLoggingIpc()
   registerProjectIpc(
     recentProjectStore,
     conversationStore,
@@ -248,6 +275,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isApplicationQuitting = true
+  logger.info('app.shutdown_requested')
 })
 
 app.on('window-all-closed', () => {
