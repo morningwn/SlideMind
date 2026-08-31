@@ -4,6 +4,8 @@ import type { AgentSession as PiAgentSession, ModelRuntime } from '@earendil-wor
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import {
+  DEFAULT_AGENT_THINKING_LEVEL,
+  DEEPSEEK_MODEL_OPTIONS,
   DEEPSEEK_PROVIDER_ID,
   type AgentActivityEvent,
   type AgentConversationInput,
@@ -11,7 +13,9 @@ import {
   type AgentPromptInput,
   type AgentPromptResult,
   type AgentSkillOption,
-  type AgentTodo
+  type AgentThinkingLevel,
+  type AgentTodo,
+  isAgentThinkingLevel
 } from '../../shared/agent'
 import type { ProjectRootRegistry } from '../project/project-root-registry'
 import { resolveRegularProjectFile } from '../project/project-files'
@@ -118,6 +122,9 @@ export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
   const { conversationId, projectHandle } = normalizeAgentConversationInput(candidate)
   const prompt = typeof candidate.input === 'string' ? candidate.input.trim() : ''
   const references = normalizePromptReferences(candidate.references)
+  const thinkingLevel = candidate.thinkingLevel === undefined
+    ? DEFAULT_AGENT_THINKING_LEVEL
+    : candidate.thinkingLevel
 
   if (!requestId || requestId.length > 200) {
     throw new Error('Agent 会话标识无效')
@@ -131,7 +138,11 @@ export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
     throw new Error('输入内容长度超出限制')
   }
 
-  return { requestId, conversationId, projectHandle, input: prompt, references }
+  if (!isAgentThinkingLevel(thinkingLevel)) {
+    throw new Error('Agent 思考深度无效')
+  }
+
+  return { requestId, conversationId, projectHandle, input: prompt, references, thinkingLevel }
 }
 
 function normalizePromptReferences(value: unknown): AgentPromptReference[] {
@@ -260,7 +271,10 @@ export class BaseAgentService {
       const startedAt = Date.now()
       logger.info('agent.request_started', {
         operationId,
-        context: { referenceCount: prompt.references.length }
+        context: {
+          referenceCount: prompt.references.length,
+          thinkingLevel: prompt.thinkingLevel
+        }
       })
       try {
         const result = await this.runPrompt(
@@ -300,7 +314,8 @@ export class BaseAgentService {
     config: AgentConfiguration,
     projectPath: string,
     projectHandle: string,
-    conversationId: string
+    conversationId: string,
+    thinkingLevel: AgentThinkingLevel
   ): Promise<{ agent: PiAgentSession; todos: AgentTodo[] }> {
     const {
       createAgentSession,
@@ -389,7 +404,7 @@ export class BaseAgentService {
       agentDir: this.agentDirectory,
       modelRuntime,
       model,
-      thinkingLevel: 'high',
+      thinkingLevel,
       tools: [
         'read',
         'write',
@@ -423,18 +438,24 @@ export class BaseAgentService {
     if (!config) {
       throw new Error('请先配置 DeepSeek 模型与 API Key')
     }
+    const modelOption = DEEPSEEK_MODEL_OPTIONS.find((model) => model.id === config.modelId)
+    if (!modelOption?.thinkingLevels.some((level) => level === input.thinkingLevel)) {
+      throw new Error('当前模型不支持所选思考深度')
+    }
 
     if (!session.agent) {
       const created = await this.createAgent(
         config,
         projectPath,
         input.projectHandle,
-        input.conversationId
+        input.conversationId,
+        input.thinkingLevel
       )
       session.agent = created.agent
       session.todos = created.todos
       onTodos?.(input, structuredClone(created.todos))
     }
+    session.agent.setThinkingLevel(input.thinkingLevel)
     session.lastUsedAt = Date.now()
     let thinkingSequence = 0
     let activeThinkingId: string | undefined

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { DEEPSEEK_MODEL_OPTIONS } from '../../shared/agent'
 import { normalizeConfigInput } from './config-validation'
 
 const models = ['deepseek-v4-flash', 'deepseek-v4-pro']
@@ -33,9 +34,17 @@ describe('normalizeConfigInput', () => {
   })
 
   it('keeps configured model ids aligned with the bundled Pi provider', async () => {
+    const { getSupportedThinkingLevels } = await import('@earendil-works/pi-ai')
     const { deepseekProvider } = await import('@earendil-works/pi-ai/providers/deepseek')
-    const bundledIds = deepseekProvider().getModels().map((model) => model.id)
+    const bundledModels = deepseekProvider().getModels()
+    const bundledIds = bundledModels.map((model) => model.id)
 
     expect(bundledIds).toEqual(expect.arrayContaining(models))
+    for (const option of DEEPSEEK_MODEL_OPTIONS) {
+      const bundledModel = bundledModels.find((model) => model.id === option.id)
+      expect(bundledModel).toBeDefined()
+      if (!bundledModel) continue
+      expect(getSupportedThinkingLevels(bundledModel)).toEqual(option.thinkingLevels)
+    }
   })
 })

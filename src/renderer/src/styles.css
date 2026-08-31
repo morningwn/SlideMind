@@ -3813,6 +3813,94 @@ button.file-tree-item:not(.file-tree-directory) {
   stroke-width: 1.5;
 }
 
+.composer-thinking-select {
+  position: relative;
+  display: flex;
+  width: 104px;
+  height: 30px;
+  align-items: center;
+  border: 1px solid #dbe3ef;
+  border-radius: 9px;
+  background: #f7f9fc;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.composer-thinking-select:hover {
+  border-color: #c4d0e3;
+  background: #f2f5fa;
+}
+
+.composer-thinking-select:focus-within {
+  border-color: #8ea9e9;
+  box-shadow: 0 0 0 3px rgb(47 97 233 / 8%);
+}
+
+.composer-thinking-select > i {
+  position: absolute;
+  left: 8px;
+  z-index: 1;
+  display: flex;
+  height: 12px;
+  gap: 2px;
+  align-items: end;
+  pointer-events: none;
+}
+
+.composer-thinking-select > i > b {
+  width: 2px;
+  border-radius: 2px;
+  background: #c8d1df;
+}
+
+.composer-thinking-select > i > b:nth-child(1) { height: 4px; }
+.composer-thinking-select > i > b:nth-child(2) { height: 8px; }
+.composer-thinking-select > i > b:nth-child(3) { height: 12px; }
+
+.composer-thinking-low > i > b:nth-child(1),
+.composer-thinking-high > i > b:nth-child(-n+2),
+.composer-thinking-max > i > b {
+  background: #5c78cf;
+}
+
+.composer-thinking-select select {
+  width: 100%;
+  height: 100%;
+  padding: 0 24px 0 19px;
+  appearance: none;
+  overflow: hidden;
+  border: 0;
+  outline: 0;
+  color: #536178;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-thinking-select select:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.composer-thinking-select > svg {
+  position: absolute;
+  right: 7px;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
+.composer-thinking-select > svg path {
+  fill: none;
+  stroke: #7d899a;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
 @media (max-width: 700px) {
   .app-shell {
     --page-gutter: 20px;

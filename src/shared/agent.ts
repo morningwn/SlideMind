@@ -1,15 +1,48 @@
 export const DEEPSEEK_PROVIDER_ID = 'deepseek' as const
 
+export const AGENT_THINKING_LEVEL_OPTIONS = [
+  {
+    id: 'off',
+    name: '关闭',
+    description: '不启用额外推理，响应最快'
+  },
+  {
+    id: 'low',
+    name: '轻量',
+    description: '少量推理，适合简单问题'
+  },
+  {
+    id: 'high',
+    name: '深入',
+    description: '充分推理，适合大多数创作任务'
+  },
+  {
+    id: 'max',
+    name: '极致',
+    description: '使用最大推理深度，适合复杂任务'
+  }
+] as const
+
+export type AgentThinkingLevel = typeof AGENT_THINKING_LEVEL_OPTIONS[number]['id']
+
+export const DEFAULT_AGENT_THINKING_LEVEL: AgentThinkingLevel = 'high'
+
+export function isAgentThinkingLevel(value: unknown): value is AgentThinkingLevel {
+  return AGENT_THINKING_LEVEL_OPTIONS.some((option) => option.id === value)
+}
+
 export const DEEPSEEK_MODEL_OPTIONS = [
   {
     id: 'deepseek-v4-flash',
     name: 'DeepSeek V4 Flash',
-    description: '响应更快，适合日常构思与大纲整理'
+    description: '响应更快，适合日常构思与大纲整理',
+    thinkingLevels: ['off', 'low', 'high', 'max'] satisfies AgentThinkingLevel[]
   },
   {
     id: 'deepseek-v4-pro',
     name: 'DeepSeek V4 Pro',
-    description: '推理能力更强，适合复杂叙事与内容打磨'
+    description: '推理能力更强，适合复杂叙事与内容打磨',
+    thinkingLevels: ['off', 'high', 'max'] satisfies AgentThinkingLevel[]
   }
 ] as const
 
@@ -25,6 +58,7 @@ export interface AgentConfigStatus {
     id: string
     name: string
     description: string
+    thinkingLevels: ReadonlyArray<AgentThinkingLevel>
   }>
 }
 
@@ -61,6 +95,7 @@ export interface AgentPromptInput {
   projectHandle: string
   input: string
   references: AgentPromptReference[]
+  thinkingLevel: AgentThinkingLevel
 }
 
 export interface AgentConversationInput {

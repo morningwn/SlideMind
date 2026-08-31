@@ -27,6 +27,7 @@ describe('normalizeAgentPromptInput', () => {
       conversationId: ' conversation-1 ',
       projectHandle: ' project-handle-1 ',
       input: ' 建立一份产品发布演示 ',
+      thinkingLevel: 'max',
       references: [
         { type: 'file', path: ' docs/brief.md ' },
         { type: 'skill', name: 'presentation-design' },
@@ -37,11 +38,25 @@ describe('normalizeAgentPromptInput', () => {
       conversationId: 'conversation-1',
       projectHandle: 'project-handle-1',
       input: '建立一份产品发布演示',
+      thinkingLevel: 'max',
       references: [
         { type: 'file', path: 'docs/brief.md' },
         { type: 'skill', name: 'presentation-design' }
       ]
     })
+  })
+
+  it('defaults and validates the thinking level', () => {
+    const baseInput = {
+      requestId: 'request-1',
+      conversationId: 'conversation-1',
+      projectHandle: 'project-handle-1',
+      input: 'hello'
+    }
+
+    expect(normalizeAgentPromptInput(baseInput).thinkingLevel).toBe('high')
+    expect(() => normalizeAgentPromptInput({ ...baseInput, thinkingLevel: 'ultra' }))
+      .toThrow('Agent 思考深度无效')
   })
 
   it('rejects missing session identifiers', () => {

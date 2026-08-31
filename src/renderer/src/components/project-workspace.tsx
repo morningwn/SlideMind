@@ -8,10 +8,13 @@ import {
   type KeyboardEvent
 } from 'react'
 import { createPortal } from 'react-dom'
-import type {
-  AgentPromptReference,
-  AgentSkillOption,
-  AgentTodo
+import {
+  DEFAULT_AGENT_THINKING_LEVEL,
+  isAgentThinkingLevel,
+  type AgentPromptReference,
+  type AgentSkillOption,
+  type AgentThinkingLevel,
+  type AgentTodo
 } from '../../../shared/agent'
 import { isPresentationPath, PRESENTATION_FILE_SUFFIX } from '../../../shared/presentation'
 import type {
@@ -51,6 +54,17 @@ const PresentationEditor = lazy(async () => {
   const module = await import('./presentation-editor')
   return { default: module.PresentationEditor }
 })
+
+const THINKING_LEVEL_STORAGE_KEY = 'slidemind:agent-thinking-level'
+
+function loadThinkingLevel(): AgentThinkingLevel {
+  try {
+    const stored = window.localStorage.getItem(THINKING_LEVEL_STORAGE_KEY)
+    return isAgentThinkingLevel(stored) ? stored : DEFAULT_AGENT_THINKING_LEVEL
+  } catch {
+    return DEFAULT_AGENT_THINKING_LEVEL
+  }
+}
 
 interface ChatMessage extends ConversationMessage {
   isStreaming?: boolean
@@ -500,6 +514,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [conversations, setConversations] = useState<Conversation[]>(() => [createConversation()])
   const [selectedConversationId, setSelectedConversationId] = useState(() => conversations[0].id)
   const [draft, setDraft] = useState('')
+  const [thinkingLevel, setThinkingLevel] = useState<AgentThinkingLevel>(loadThinkingLevel)
   const [promptReferences, setPromptReferences] = useState<AgentPromptReference[]>([])
   const [referenceFiles, setReferenceFiles] = useState<ProjectFileEntry[]>([])
   const [skillOptions, setSkillOptions] = useState<AgentSkillOption[]>([])
@@ -583,6 +598,14 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   useEffect(() => {
     onDirtyChange(hasDirtyDocuments)
   }, [hasDirtyDocuments, onDirtyChange])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(THINKING_LEVEL_STORAGE_KEY, thinkingLevel)
+    } catch {
+      // The selected level still applies to the current app session when storage is unavailable.
+    }
+  }, [thinkingLevel])
 
   useEffect(() => {
     function protectUnsavedDocuments(event: BeforeUnloadEvent): void {
@@ -1866,7 +1889,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         conversationId,
         projectHandle: project.handle,
         input: prompt,
-        references: promptReferences
+        references: promptReferences,
+        thinkingLevel
       })
       setConversations((current) => current.map((conversation) =>
         conversation.id === conversationId
@@ -2505,7 +2529,11 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                   <div className="composer-footer">
                     <span>@ 文件 · / Skill · Enter 发送</span>
                     <div className="composer-actions">
-                      <AgentModelSelect disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} />
+                      <AgentModelSelect
+                        disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
+                        thinkingLevel={thinkingLevel}
+                        onThinkingLevelChange={setThinkingLevel}
+                      />
                       <button className="composer-send" type="submit" disabled={(!draft.trim() && promptReferences.length === 0) || isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} aria-label="发送消息">↑</button>
                     </div>
                   </div>
