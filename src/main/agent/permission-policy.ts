@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
+import { PI_AGENT_TOOL_NAMES } from './pi-extensions'
 
 const require = createRequire(import.meta.url)
 
@@ -55,6 +56,7 @@ export function createManagedPermissionPolicy(
       slides_read: 'allow',
       slides_write: 'allow',
       slides_export: 'allow',
+      ...Object.fromEntries(PI_AGENT_TOOL_NAMES.map((name) => [name, 'allow'])),
       ...fileToolRules
     },
     bash: {

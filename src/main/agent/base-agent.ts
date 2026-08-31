@@ -23,6 +23,12 @@ import {
 import type { AgentConfigStore, AgentConfiguration } from './config-store'
 import { todosFromSessionEntries, todosFromToolResult } from './agent-todo'
 import { preparePermissionSystem, type PermissionSystemSetup } from './permission-policy'
+import {
+  PI_AGENT_TOOL_NAMES,
+  PI_EXTENSION_PATHS,
+  createWebAccessGuardExtension,
+  preparePiExtensions
+} from './pi-extensions'
 import { createPresentationToolsExtension } from './presentation-tools'
 import { createProjectMutationToolsExtension } from './project-mutation-tools'
 
@@ -271,6 +277,7 @@ export class BaseAgentService {
     } = await loadPiRuntime()
     const modelRuntime = await this.getModelRuntime()
     const permissionSystem = await this.getPermissionSystem()
+    await preparePiExtensions(this.agentDirectory)
     await modelRuntime.setRuntimeApiKey(DEEPSEEK_PROVIDER_ID, config.apiKey)
     const model = modelRuntime.getModel(DEEPSEEK_PROVIDER_ID, config.modelId)
 
@@ -297,9 +304,17 @@ export class BaseAgentService {
     const resourceLoader = new DefaultResourceLoader({
       cwd: projectPath,
       agentDir: this.agentDirectory,
-      additionalExtensionPaths: [permissionSystem.extensionPath, TODO_EXTENSION_PATH],
+      additionalExtensionPaths: [
+        permissionSystem.extensionPath,
+        TODO_EXTENSION_PATH,
+        ...PI_EXTENSION_PATHS
+      ],
       additionalSkillPaths: [this.bundledSkillsDirectory],
       extensionFactories: [
+        {
+          name: 'slidemind-web-access-guard',
+          factory: createWebAccessGuardExtension
+        },
         {
           name: 'slidemind-presentations',
           factory: createPresentationToolsExtension({
@@ -326,7 +341,7 @@ export class BaseAgentService {
     })
     await resourceLoader.reload()
     const extensions = resourceLoader.getExtensions()
-    if (extensions.errors.length > 0 || extensions.extensions.length !== 4) {
+    if (extensions.errors.length > 0 || extensions.extensions.length !== 9) {
       const details = extensions.errors.map((entry) => entry.error).join('; ')
       throw new Error(`Agent 扩展加载失败${details ? `：${details}` : ''}`)
     }
@@ -348,7 +363,8 @@ export class BaseAgentService {
         'slides_create',
         'slides_read',
         'slides_write',
-        'slides_export'
+        'slides_export',
+        ...PI_AGENT_TOOL_NAMES
       ],
       resourceLoader,
       sessionManager

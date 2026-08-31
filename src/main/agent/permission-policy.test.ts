@@ -31,7 +31,11 @@ describe('createManagedPermissionPolicy', () => {
       grep: 'allow',
       find: 'allow',
       ls: 'allow',
-      todo: 'allow'
+      todo: 'allow',
+      web_search: 'allow',
+      source_check: 'allow',
+      fetch_content: 'allow',
+      get_search_content: 'allow'
     })
     expect(policy.bash['*']).toBe('deny')
   })
