@@ -40,6 +40,19 @@ type SlideInput = {
       color?: string
     }
     | {
+      type: 'line'
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+      color?: string
+      lineWidth?: number
+      style?: 'solid' | 'dashed' | 'dotted'
+      routing?: 'straight' | 'orthogonal'
+      startMarker?: 'none' | 'arrow' | 'dot'
+      endMarker?: 'none' | 'arrow' | 'dot'
+    }
+    | {
       type: 'image'
       x: number
       y: number
@@ -80,6 +93,40 @@ function textHtml(value: string, options?: {
 }
 
 function createElement(element: SlideInput['elements'][number]): PptistElement {
+  if (element.type === 'line') {
+    if (element.x1 === element.x2 && element.y1 === element.y2) {
+      throw new Error('线条起点和终点不能重合')
+    }
+    const left = Math.min(element.x1, element.x2)
+    const top = Math.min(element.y1, element.y2)
+    const start: [number, number] = [element.x1 - left, element.y1 - top]
+    const end: [number, number] = [element.x2 - left, element.y2 - top]
+    const marker = (value: typeof element.startMarker): '' | 'arrow' | 'dot' =>
+      value === 'arrow' || value === 'dot' ? value : ''
+    const routing = element.routing ?? 'straight'
+    const deltaX = Math.abs(element.x2 - element.x1)
+    const deltaY = Math.abs(element.y2 - element.y1)
+
+    return {
+      id: randomUUID(),
+      type: 'line',
+      left,
+      top,
+      start,
+      end,
+      points: [marker(element.startMarker), marker(element.endMarker)],
+      color: element.color ?? '#8EA4CC',
+      style: element.style ?? 'solid',
+      width: element.lineWidth ?? 2,
+      ...(routing === 'orthogonal' && deltaX > 0 && deltaY > 0
+        ? {
+            broken2: [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2],
+            broken2Direction: deltaX >= deltaY ? 'horizontal' : 'vertical'
+          }
+        : {})
+    }
+  }
+
   const base = {
     id: randomUUID(),
     left: element.x,
@@ -174,22 +221,43 @@ function presentationSummary(document: PresentationDocument): Record<string, unk
       id: slide.id,
       title: typeof slide.name === 'string' ? slide.name : `第 ${index + 1} 页`,
       background: typeof slide.background === 'object' ? slide.background : undefined,
-      elements: slide.elements.map((element) => ({
-        id: element.id,
-        type: element.type,
-        x: element.left,
-        y: element.top,
-        width: element.width,
-        height: element.height,
-        rotation: element.rotate ?? 0,
-        text: plainText(element.content) || (
-          typeof element.text === 'object' && element.text !== null
-            ? plainText((element.text as Record<string, unknown>).content)
-            : ''
-        ),
-        fill: element.fill,
-        image: element.type === 'image' ? '[embedded image]' : undefined
-      }))
+      elements: slide.elements.map((element) => {
+        if (element.type === 'line') {
+          const start = Array.isArray(element.start) ? element.start : [0, 0]
+          const end = Array.isArray(element.end) ? element.end : [0, 0]
+          return {
+            id: element.id,
+            type: element.type,
+            x1: element.left + Number(start[0]),
+            y1: element.top + Number(start[1]),
+            x2: element.left + Number(end[0]),
+            y2: element.top + Number(end[1]),
+            color: element.color,
+            lineWidth: element.width,
+            style: element.style,
+            markers: element.points,
+            routing: element.broken2
+              ? 'orthogonal'
+              : element.broken || element.curve || element.cubic ? 'unsupported' : 'straight'
+          }
+        }
+        return {
+          id: element.id,
+          type: element.type,
+          x: element.left,
+          y: element.top,
+          width: element.width,
+          height: element.height,
+          rotation: element.rotate ?? 0,
+          text: plainText(element.content) || (
+            typeof element.text === 'object' && element.text !== null
+              ? plainText((element.text as Record<string, unknown>).content)
+              : ''
+          ),
+          fill: element.fill,
+          image: element.type === 'image' ? '[embedded image]' : undefined
+        }
+      })
     }))
   }
 }
@@ -236,6 +304,31 @@ export function createPresentationToolsExtension(options: {
       fontSize: Type.Optional(Type.Number({ minimum: 1, maximum: 400 })),
       color: Type.Optional(Type.String({ maxLength: 100 }))
     }, { additionalProperties: false })
+    const lineMarkerSchema = Type.Union([
+      Type.Literal('none'),
+      Type.Literal('arrow'),
+      Type.Literal('dot')
+    ])
+    const lineElementSchema = Type.Object({
+      type: Type.Literal('line'),
+      x1: Type.Number({ minimum: 0, maximum: 100_000 }),
+      y1: Type.Number({ minimum: 0, maximum: 100_000 }),
+      x2: Type.Number({ minimum: 0, maximum: 100_000 }),
+      y2: Type.Number({ minimum: 0, maximum: 100_000 }),
+      color: Type.Optional(Type.String({ maxLength: 100 })),
+      lineWidth: Type.Optional(Type.Number({ minimum: 0.5, maximum: 100 })),
+      style: Type.Optional(Type.Union([
+        Type.Literal('solid'),
+        Type.Literal('dashed'),
+        Type.Literal('dotted')
+      ])),
+      routing: Type.Optional(Type.Union([
+        Type.Literal('straight'),
+        Type.Literal('orthogonal')
+      ])),
+      startMarker: Type.Optional(lineMarkerSchema),
+      endMarker: Type.Optional(lineMarkerSchema)
+    }, { additionalProperties: false })
     const imageElementSchema = Type.Object({
       type: Type.Literal('image'),
       ...elementBase,
@@ -246,7 +339,12 @@ export function createPresentationToolsExtension(options: {
       title: Type.String({ minLength: 1, maxLength: 10_000 }),
       background: Type.Optional(Type.String({ maxLength: 100 })),
       elements: Type.Array(
-        Type.Union([textElementSchema, shapeElementSchema, imageElementSchema]),
+        Type.Union([
+          textElementSchema,
+          shapeElementSchema,
+          lineElementSchema,
+          imageElementSchema
+        ]),
         { maxItems: 5_000 }
       )
     }, { additionalProperties: false })
@@ -297,7 +395,7 @@ export function createPresentationToolsExtension(options: {
       name: 'slides_write',
       label: '写入演示文稿',
       description: '使用结构化页面替换 PPTist 演示文稿内容。revision 必须来自最近一次 slides_read。',
-      promptSnippet: 'Write structured PPTist slides with text, shapes, and embedded images.',
+      promptSnippet: 'Write structured PPTist slides with text, shapes, lines, and embedded images.',
       promptGuidelines: [
         'Use a 1000×562.5 coordinate system unless slides_read reports another canvas size.',
         'Call slides_read immediately before slides_write and pass its revision.'

@@ -9,7 +9,7 @@ import {
 } from './presentation-exporter'
 
 describe('exportPresentationToPptx', () => {
-  it('writes an OOXML PowerPoint from PPTist text and shapes', async () => {
+  it('writes an OOXML PowerPoint from PPTist text, shapes and routed lines', async () => {
     const outputDirectory = await mkdtemp(join(tmpdir(), 'slidemind-pptx-'))
     const outputPath = join(outputDirectory, 'deck.pptx')
     const document = createBlankPresentationDocument('导出演示文稿')
@@ -44,6 +44,20 @@ describe('exportPresentationToPptx', () => {
           defaultColor: '#333333',
           align: 'middle'
         }
+      },
+      {
+        id: 'connector',
+        type: 'line',
+        left: 340,
+        top: 240,
+        width: 3,
+        start: [0, 0],
+        end: [360, 120],
+        broken2: [180, 60],
+        broken2Direction: 'horizontal',
+        points: ['dot', 'arrow'],
+        color: '#24488E',
+        style: 'dashed'
       }
     ]
 

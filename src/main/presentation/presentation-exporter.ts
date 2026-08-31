@@ -143,13 +143,62 @@ function addLineElement(
   element: PptistElement,
   scale: number
 ): void {
-  slide.addShape(pptx.ShapeType.line, {
-    ...elementPosition(element, scale),
-    line: {
-      color: normalizeColor(element.color, DEFAULT_LINE_COLOR),
-      width: 1
+  const point = (value: unknown): [number, number] | undefined =>
+    Array.isArray(value) && value.length === 2 && value.every((entry) =>
+      typeof entry === 'number' && Number.isFinite(entry)
+    ) ? [value[0], value[1]] : undefined
+  const start = point(element.start)
+  const end = point(element.end)
+  if (!start || !end) return
+
+  const broken = point(element.broken)
+  const broken2 = point(element.broken2)
+  const linePoints: Array<[number, number]> = [start]
+  if (broken) linePoints.push(broken)
+  else if (broken2) {
+    if (element.broken2Direction === 'vertical') {
+      linePoints.push([start[0], broken2[1]], [end[0], broken2[1]])
     }
-  })
+    else {
+      linePoints.push([broken2[0], start[1]], [broken2[0], end[1]])
+    }
+  }
+  linePoints.push(end)
+  const segments = linePoints
+    .slice(0, -1)
+    .map((from, index) => ({ from, to: linePoints[index + 1] }))
+    .filter(({ from, to }) => from[0] !== to[0] || from[1] !== to[1])
+
+  const markers = Array.isArray(element.points) ? element.points : ['', '']
+  const markerType = (value: unknown): 'none' | 'triangle' | 'oval' =>
+    value === 'arrow' ? 'triangle' : value === 'dot' ? 'oval' : 'none'
+  const dashType = element.style === 'dotted'
+    ? 'sysDot' as const
+    : element.style === 'dashed' ? 'dash' as const : 'solid' as const
+
+  for (let index = 0; index < segments.length; index += 1) {
+    const { from, to } = segments[index]
+    const deltaX = to[0] - from[0]
+    const deltaY = to[1] - from[1]
+    const forward = deltaX !== 0 ? deltaX > 0 : deltaY >= 0
+    const beginMarker = index === 0 ? markerType(markers[0]) : 'none'
+    const endMarker = index === segments.length - 1 ? markerType(markers[1]) : 'none'
+
+    slide.addShape(pptx.ShapeType.line, {
+      x: (element.left + Math.min(from[0], to[0])) / scale,
+      y: (element.top + Math.min(from[1], to[1])) / scale,
+      w: Math.abs(deltaX) / scale,
+      h: Math.abs(deltaY) / scale,
+      flipV: deltaX * deltaY < 0,
+      line: {
+        color: normalizeColor(element.color, DEFAULT_LINE_COLOR),
+        width: Math.max(0.5, numberOr(element.width, 2)),
+        dashType,
+        beginArrowType: forward ? beginMarker : endMarker,
+        endArrowType: forward ? endMarker : beginMarker
+      }
+    })
+  }
 }
 
 function addPage(

@@ -12,6 +12,7 @@ const EXPECTED_SKILLS = [
   'deck-strategy',
   'pptist-template-library',
   'slide-copywriting',
+  'slide-flowchart',
   'slide-visual-design'
 ]
 
