@@ -41,6 +41,16 @@ function ExportIcon(): React.JSX.Element {
   )
 }
 
+function CrashReportIcon(): React.JSX.Element {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 3.5h8l4 4v13H6z" />
+      <path d="M14 3.5v4h4" />
+      <path d="m8.5 14 2-2 2.2 4 2.8-4" />
+    </svg>
+  )
+}
+
 function ClearIcon(): React.JSX.Element {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -52,7 +62,7 @@ function ClearIcon(): React.JSX.Element {
   )
 }
 
-type DiagnosticAction = 'clear' | 'export' | 'open' | null
+type DiagnosticAction = 'clear' | 'crashes' | 'export' | 'open' | null
 
 function actionError(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
@@ -104,6 +114,20 @@ export function SettingsPage({ onBack }: SettingsPageProps): React.JSX.Element {
       if (!result.canceled) setDiagnosticMessage('诊断包已导出到所选位置。')
     } catch (error) {
       setDiagnosticError(actionError(error, '无法导出诊断包'))
+    } finally {
+      setDiagnosticAction(null)
+    }
+  }
+
+  async function openCrashReportDirectory(): Promise<void> {
+    setDiagnosticAction('crashes')
+    setDiagnosticError('')
+    setDiagnosticMessage('')
+    try {
+      await window.desktop.openCrashReportDirectory()
+      setDiagnosticMessage('崩溃报告目录已打开。')
+    } catch (error) {
+      setDiagnosticError(actionError(error, '无法打开崩溃报告目录'))
     } finally {
       setDiagnosticAction(null)
     }
@@ -222,7 +246,7 @@ export function SettingsPage({ onBack }: SettingsPageProps): React.JSX.Element {
               <span className="diagnostic-local-status"><i aria-hidden="true" />仅存本机</span>
             </header>
 
-            <div className="diagnostic-recorder" aria-label="日志覆盖主进程、界面和导出任务">
+            <div className="diagnostic-recorder" aria-label="日志和崩溃报告覆盖主进程、界面和导出任务">
               <span><i aria-hidden="true" />MAIN</span>
               <span><i aria-hidden="true" />UI</span>
               <span><i aria-hidden="true" />WORKER</span>
@@ -230,7 +254,7 @@ export function SettingsPage({ onBack }: SettingsPageProps): React.JSX.Element {
             </div>
 
             <p className="diagnostic-description">
-              日志经过脱敏并保存在当前设备。诊断包只包含应用版本、运行环境和本地日志。
+              日志经过脱敏并保存在当前设备。原生崩溃报告单独存放，不会自动上传或加入诊断包。
             </p>
 
             <div className="diagnostic-actions">
@@ -241,6 +265,14 @@ export function SettingsPage({ onBack }: SettingsPageProps): React.JSX.Element {
               >
                 <FolderIcon />
                 <span><strong>打开日志目录</strong><small>查看应用生成的滚动日志</small></span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void openCrashReportDirectory()}
+                disabled={diagnosticAction !== null}
+              >
+                <CrashReportIcon />
+                <span><strong>崩溃报告目录</strong><small>查看本机生成的 minidump</small></span>
               </button>
               <button
                 type="button"

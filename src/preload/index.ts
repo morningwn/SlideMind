@@ -41,6 +41,7 @@ const desktopApi: Readonly<DesktopApi> = Object.freeze({
   }),
   clearLogs: () => ipcRenderer.invoke('logging:clear'),
   exportDiagnosticBundle: () => ipcRenderer.invoke('logging:export-diagnostics'),
+  openCrashReportDirectory: () => ipcRenderer.invoke('logging:open-crash-directory'),
   openLogDirectory: () => ipcRenderer.invoke('logging:open-directory'),
   reportDiagnosticEvent: (event: RendererDiagnosticEvent) => {
     ipcRenderer.send('logging:renderer-event', event)

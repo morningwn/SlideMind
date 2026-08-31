@@ -18,6 +18,10 @@ import { getTitleBarWindowOptions } from './window-options'
 import type { DesktopCloseResponse } from '../shared/desktop'
 import { registerLoggingIpc } from './logging/ipc'
 import {
+  initializeLocalCrashReporting,
+  reportExistingCrashReports
+} from './logging/crash-reporter'
+import {
   installApplicationLifecycleLogging,
   installProcessErrorLogging,
   installWindowLifecycleLogging
@@ -33,6 +37,7 @@ initializeApplicationLogging({
   isPackaged: app.isPackaged,
   logsDirectory: app.getPath('logs')
 })
+initializeLocalCrashReporting(app.getName())
 installProcessErrorLogging()
 installApplicationLifecycleLogging(app)
 const logger = getLogger('application')
@@ -223,6 +228,7 @@ app.whenReady().then(() => {
       platform: process.platform
     }
   })
+  void reportExistingCrashReports(app.getPath('crashDumps'))
   const configStore = new AgentConfigStore(join(app.getPath('userData'), 'agent-config.json'))
   const projectRoots = new ProjectRootRegistry()
   const versionService = new ProjectVersionService()
@@ -249,6 +255,7 @@ app.whenReady().then(() => {
   registerAgentIpc(configStore, agentService)
   registerDesktopIpc()
   registerLoggingIpc({
+    crashDumpsDirectory: app.getPath('crashDumps'),
     downloadsDirectory: app.getPath('downloads'),
     logsDirectory: app.getPath('logs'),
     environment: {

@@ -16,6 +16,7 @@ export interface DesktopApi {
   }>
   clearLogs(): Promise<boolean>
   exportDiagnosticBundle(): Promise<DiagnosticExportResult>
+  openCrashReportDirectory(): Promise<void>
   openLogDirectory(): Promise<void>
   reportDiagnosticEvent(event: RendererDiagnosticEvent): void
   onCloseRequested(listener: () => void): () => void

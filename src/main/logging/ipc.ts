@@ -30,6 +30,7 @@ interface RateState {
 const rateStates = new Map<number, RateState>()
 
 export interface LoggingIpcOptions {
+  crashDumpsDirectory: string
   downloadsDirectory: string
   environment: DiagnosticEnvironment
   logsDirectory: string
@@ -79,13 +80,26 @@ export function registerLoggingIpc(options: LoggingIpcOptions): void {
   ipcMain.handle('logging:open-directory', async (event): Promise<void> => {
     trustedWindow(event)
     try {
-      await mkdir(options.logsDirectory, { recursive: true })
+      await mkdir(options.logsDirectory, { recursive: true, mode: 0o700 })
       const errorMessage = await shell.openPath(options.logsDirectory)
       if (errorMessage) throw new Error(errorMessage)
       logger.info('logs.directory_opened')
     } catch (error) {
       logger.error('logs.directory_open_failed', { error })
       throw new Error('无法打开日志目录')
+    }
+  })
+
+  ipcMain.handle('logging:open-crash-directory', async (event): Promise<void> => {
+    trustedWindow(event)
+    try {
+      await mkdir(options.crashDumpsDirectory, { recursive: true, mode: 0o700 })
+      const errorMessage = await shell.openPath(options.crashDumpsDirectory)
+      if (errorMessage) throw new Error(errorMessage)
+      logger.info('crash_reports.directory_opened')
+    } catch (error) {
+      logger.error('crash_reports.directory_open_failed', { error })
+      throw new Error('无法打开崩溃报告目录')
     }
   })
 
