@@ -1,6 +1,6 @@
 import { createApp, nextTick, watch } from 'vue'
 import { createPinia } from 'pinia'
-import Editor from '@/views/Editor/index.vue'
+import Editor from './pptist-editor.vue'
 import Directive from '@/directive'
 import { useSlidesStore, useSnapshotStore } from '@/store'
 
