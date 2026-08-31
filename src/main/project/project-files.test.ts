@@ -8,6 +8,7 @@ import {
   deleteProjectDirectory,
   deleteProjectFile,
   listProjectDirectory,
+  listProjectFiles,
   projectDirectoryDeletePaths,
   projectDirectoryRenamePaths,
   renameProjectDirectory,
@@ -44,6 +45,22 @@ describe('listProjectDirectory', () => {
 
     expect(await listProjectDirectory(projectPath, 'assets')).toEqual([
       { kind: 'file', name: 'cover.png', path: join('assets', 'cover.png') }
+    ])
+  })
+
+  it('lists recursively referenceable files while excluding generated and internal paths', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-files-'))
+    await mkdir(join(projectPath, 'docs', 'nested'), { recursive: true })
+    await mkdir(join(projectPath, 'node_modules', 'dependency'), { recursive: true })
+    await mkdir(join(projectPath, '.slideMind'))
+    await writeFile(join(projectPath, 'README.md'), 'Readme')
+    await writeFile(join(projectPath, 'docs', 'nested', 'brief.md'), 'Brief')
+    await writeFile(join(projectPath, 'node_modules', 'dependency', 'index.js'), 'module')
+    await writeFile(join(projectPath, '.slideMind', 'private.json'), '{}')
+
+    expect(await listProjectFiles(projectPath)).toEqual([
+      { kind: 'file', name: 'brief.md', path: join('docs', 'nested', 'brief.md') },
+      { kind: 'file', name: 'README.md', path: 'README.md' }
     ])
   })
 

@@ -38,11 +38,29 @@ export interface AgentPromptResult {
   modelId: string
 }
 
+export interface AgentFileReference {
+  type: 'file'
+  path: string
+}
+
+export interface AgentSkillReference {
+  type: 'skill'
+  name: string
+}
+
+export type AgentPromptReference = AgentFileReference | AgentSkillReference
+
+export interface AgentSkillOption {
+  name: string
+  description: string
+}
+
 export interface AgentPromptInput {
   requestId: string
   conversationId: string
   projectHandle: string
   input: string
+  references: AgentPromptReference[]
 }
 
 export interface AgentConversationInput {
@@ -75,6 +93,7 @@ export interface AgentTodosEvent {
 export interface AgentApi {
   getConfig(): Promise<AgentConfigStatus>
   saveConfig(input: SaveAgentConfigInput): Promise<AgentConfigStatus>
+  listSkills(projectHandle: string): Promise<AgentSkillOption[]>
   getTodos(input: AgentConversationInput): Promise<AgentTodo[]>
   prompt(input: AgentPromptInput): Promise<AgentPromptResult>
   onStream(listener: (event: AgentStreamEvent) => void): () => void

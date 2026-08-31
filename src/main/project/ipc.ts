@@ -12,6 +12,7 @@ import {
   deleteProjectDirectory,
   deleteProjectFile,
   listProjectDirectory,
+  listProjectFiles,
   projectDirectoryDeletePaths,
   projectDirectoryRenamePaths,
   projectFileRenamePaths,
@@ -83,6 +84,11 @@ export function registerProjectIpc(
     'project:list-directory',
     (_event, projectHandle: unknown, relativePath: unknown) =>
       listProjectDirectory(projectRoots.resolve(projectHandle), relativePath)
+  )
+
+  ipcMain.handle(
+    'project:list-files',
+    (_event, projectHandle: unknown) => listProjectFiles(projectRoots.resolve(projectHandle))
   )
 
   ipcMain.handle('project:create-directory', async (

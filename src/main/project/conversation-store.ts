@@ -100,6 +100,14 @@ function extractText(message: AgentMessage): string | null {
     .join('')
 }
 
+export function visibleUserPrompt(text: string): string {
+  const startMarker = '\n\n<slidemind-injected-context version="1">'
+  const endMarker = '\n</slidemind-injected-context>'
+  if (!text.endsWith(endMarker)) return text
+  const contextStart = text.lastIndexOf(startMarker)
+  return contextStart < 0 ? text : text.slice(0, contextStart)
+}
+
 function projectMessages(sessionManager: PiSessionManager): ConversationMessage[] {
   const messages: ConversationMessage[] = []
   for (const entry of sessionManager.getBranch()) {
@@ -112,7 +120,11 @@ function projectMessages(sessionManager: PiSessionManager): ConversationMessage[
     if (text.length > MAX_MESSAGE_LENGTH || messages.length >= MAX_MESSAGES_PER_CONVERSATION) {
       throw new Error('Pi 会话记录超出显示限制')
     }
-    messages.push({ id: entry.id, role: entry.message.role, text })
+    messages.push({
+      id: entry.id,
+      role: entry.message.role,
+      text: entry.message.role === 'user' ? visibleUserPrompt(text) : text
+    })
   }
   return messages
 }

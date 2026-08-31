@@ -21,6 +21,11 @@ export function registerAgentIpc(configStore: AgentConfigStore, agentService: Ba
     return status
   })
 
+  ipcMain.handle('agent:list-skills', (event, projectHandle: unknown) => {
+    assertTrustedRenderer(event)
+    return agentService.listSkills(projectHandle)
+  })
+
   ipcMain.handle('agent:get-todos', (event, input: unknown) => {
     assertTrustedRenderer(event)
     return agentService.getTodos(input)

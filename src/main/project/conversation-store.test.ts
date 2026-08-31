@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { ProjectConversationState } from '../../shared/project'
-import { ProjectConversationStore } from './conversation-store'
+import { ProjectConversationStore, visibleUserPrompt } from './conversation-store'
 
 const conversationState: ProjectConversationState = {
   selectedConversationId: 'conversation-1',
@@ -42,6 +42,13 @@ function appendExchange(session: SessionManager, userText: string, assistantText
 }
 
 describe('ProjectConversationStore', () => {
+  it('hides injected reference instructions from visible user messages', () => {
+    expect(visibleUserPrompt(
+      '整理这份材料\n\n<slidemind-injected-context version="1">\n- internal\n</slidemind-injected-context>'
+    )).toBe('整理这份材料')
+    expect(visibleUserPrompt('普通消息')).toBe('普通消息')
+  })
+
   it('returns null when a project has no conversation record', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
 

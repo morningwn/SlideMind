@@ -26,12 +26,21 @@ describe('normalizeAgentPromptInput', () => {
       requestId: ' request-1 ',
       conversationId: ' conversation-1 ',
       projectHandle: ' project-handle-1 ',
-      input: ' 建立一份产品发布演示 '
+      input: ' 建立一份产品发布演示 ',
+      references: [
+        { type: 'file', path: ' docs/brief.md ' },
+        { type: 'skill', name: 'presentation-design' },
+        { type: 'file', path: 'docs/brief.md' }
+      ]
     })).toEqual({
       requestId: 'request-1',
       conversationId: 'conversation-1',
       projectHandle: 'project-handle-1',
-      input: '建立一份产品发布演示'
+      input: '建立一份产品发布演示',
+      references: [
+        { type: 'file', path: 'docs/brief.md' },
+        { type: 'skill', name: 'presentation-design' }
+      ]
     })
   })
 
@@ -77,6 +86,31 @@ describe('normalizeAgentPromptInput', () => {
       .toThrow('请输入要交给 agent 的内容')
     expect(() => normalizeAgentPromptInput({ ...baseInput, input: 'a'.repeat(100_001) }))
       .toThrow('输入内容长度超出限制')
+  })
+
+  it('rejects malformed prompt references', () => {
+    const baseInput = {
+      requestId: 'request-1',
+      conversationId: 'conversation-1',
+      projectHandle: 'project-handle-1',
+      input: 'hello'
+    }
+
+    expect(() => normalizeAgentPromptInput({
+      ...baseInput,
+      references: [{ type: 'file', path: '../\0secret' }]
+    })).toThrow('Agent 文件引用无效')
+    expect(() => normalizeAgentPromptInput({
+      ...baseInput,
+      references: [{ type: 'skill', name: '../secret' }]
+    })).toThrow('Agent skill 引用无效')
+    expect(() => normalizeAgentPromptInput({
+      ...baseInput,
+      references: Array.from({ length: 21 }, (_, index) => ({
+        type: 'file',
+        path: `${index}.md`
+      }))
+    })).toThrow('Agent 引用格式无效')
   })
 
 })

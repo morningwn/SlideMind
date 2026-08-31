@@ -94,6 +94,7 @@ export interface ProjectApi {
   open(path: string): Promise<OpenedProject>
   removeRecent(path: string): Promise<ProjectInfo[]>
   listDirectory(projectHandle: string, relativePath: string): Promise<ProjectFileEntry[]>
+  listFiles(projectHandle: string): Promise<ProjectFileEntry[]>
   createDirectory(projectHandle: string, relativePath: string): Promise<ProjectFileEntry>
   createMarkdownFile(projectHandle: string, relativePath: string): Promise<ProjectFileEntry>
   renameFile(

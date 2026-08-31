@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld('desktop', desktopApi)
 const agentApi: Readonly<AgentApi> = Object.freeze({
   getConfig: () => ipcRenderer.invoke('agent:get-config'),
   saveConfig: (input: SaveAgentConfigInput) => ipcRenderer.invoke('agent:save-config', input),
+  listSkills: (projectHandle: string) => ipcRenderer.invoke('agent:list-skills', projectHandle),
   getTodos: (input: AgentConversationInput) => ipcRenderer.invoke('agent:get-todos', input),
   prompt: (input: AgentPromptInput) => ipcRenderer.invoke('agent:prompt', input),
   onStream: (listener: (event: AgentStreamEvent) => void) => {
@@ -79,6 +80,7 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
   removeRecent: (path: string) => ipcRenderer.invoke('project:remove-recent', path),
   listDirectory: (projectHandle: string, relativePath: string) =>
     ipcRenderer.invoke('project:list-directory', projectHandle, relativePath),
+  listFiles: (projectHandle: string) => ipcRenderer.invoke('project:list-files', projectHandle),
   createDirectory: (projectHandle: string, relativePath: string) =>
     ipcRenderer.invoke('project:create-directory', projectHandle, relativePath),
   createMarkdownFile: (projectHandle: string, relativePath: string) =>

@@ -13,6 +13,7 @@ import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node
 import type { ProjectFileEntry, RenameProjectFileInput } from '../../shared/project'
 
 const MAX_DIRECTORY_ENTRIES = 250
+const MAX_REFERENCE_FILES = 5_000
 const MAX_VERSIONED_DIRECTORY_FILES = 10_000
 const INTERNAL_PROJECT_DIRECTORIES = new Set(['.git', '.slidemind'])
 const VERSION_EXCLUDED_DIRECTORIES = new Set([
@@ -77,7 +78,7 @@ export function projectFileRenamePaths(inputValue: unknown): {
   }
 }
 
-async function resolveRegularProjectFile(
+export async function resolveRegularProjectFile(
   projectPathInput: unknown,
   relativePathInput: unknown
 ): Promise<{ relativePath: string; targetPath: string }> {
@@ -227,6 +228,30 @@ export async function listProjectDirectory(
       name: entry.name,
       path: relative(projectPath, resolve(targetPath, entry.name))
     }))
+}
+
+export async function listProjectFiles(projectPathInput: unknown): Promise<ProjectFileEntry[]> {
+  const projectPath = await realpath(validatePathInput(projectPathInput, '项目路径'))
+  const files: ProjectFileEntry[] = []
+
+  const visit = async (directoryPath: string): Promise<void> => {
+    const entries = (await readdir(directoryPath, { withFileTypes: true }))
+      .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'))
+    for (const entry of entries) {
+      if (files.length >= MAX_REFERENCE_FILES || entry.isSymbolicLink()) continue
+      if (entry.isDirectory()) {
+        if (VERSION_EXCLUDED_DIRECTORIES.has(entry.name.toLocaleLowerCase())) continue
+        await visit(resolve(directoryPath, entry.name))
+      } else if (entry.isFile()) {
+        const path = relative(projectPath, resolve(directoryPath, entry.name))
+        if (hasInternalSegment(path)) continue
+        files.push({ kind: 'file', name: entry.name, path })
+      }
+    }
+  }
+
+  await visit(projectPath)
+  return files
 }
 
 export async function createProjectDirectory(

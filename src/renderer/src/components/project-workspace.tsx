@@ -7,7 +7,11 @@ import {
   type FormEvent,
   type KeyboardEvent
 } from 'react'
-import type { AgentTodo } from '../../../shared/agent'
+import type {
+  AgentPromptReference,
+  AgentSkillOption,
+  AgentTodo
+} from '../../../shared/agent'
 import { isPresentationPath, PRESENTATION_FILE_SUFFIX } from '../../../shared/presentation'
 import type {
   ConversationMessage,
@@ -30,6 +34,13 @@ import {
 } from './document-editor'
 import type { OpenPresentationDocument } from './presentation-editor'
 import { ProjectHistoryPanel } from './project-history-panel'
+import {
+  findComposerReferenceTrigger,
+  promptReferenceKey,
+  promptReferenceLabel,
+  removeComposerReferenceTrigger,
+  type ComposerReferenceTrigger
+} from '../lib/composer-references'
 
 const PresentationEditor = lazy(async () => {
   const module = await import('./presentation-editor')
@@ -49,6 +60,14 @@ interface Conversation {
 interface ProjectWorkspaceProps {
   project: OpenedProject
   onDirtyChange: (isDirty: boolean) => void
+}
+
+interface ComposerReferenceOption {
+  key: string
+  reference: AgentPromptReference
+  title: string
+  description: string
+  badge: 'FILE' | 'SKILL'
 }
 
 interface FileTreeLevelProps {
@@ -119,6 +138,46 @@ function nextAvailableEntryName(
     name = `${stem}-${suffix}${extension}`
   }
   return name
+}
+
+function composerReferenceOptions(
+  trigger: ComposerReferenceTrigger | null,
+  files: readonly ProjectFileEntry[],
+  skills: readonly AgentSkillOption[],
+  selectedReferences: readonly AgentPromptReference[]
+): ComposerReferenceOption[] {
+  if (!trigger) return []
+  const selectedKeys = new Set(selectedReferences.map(promptReferenceKey))
+  const query = trigger.query.toLocaleLowerCase()
+  const options: ComposerReferenceOption[] = trigger.type === 'file'
+    ? files.map((file) => ({
+        key: `file:${file.path}`,
+        reference: { type: 'file', path: file.path },
+        title: file.name,
+        description: file.path,
+        badge: 'FILE'
+      }))
+    : skills.map((skill) => ({
+        key: `skill:${skill.name}`,
+        reference: { type: 'skill', name: skill.name },
+        title: skill.name,
+        description: skill.description,
+        badge: 'SKILL'
+      }))
+
+  return options
+    .filter((option) => !selectedKeys.has(option.key))
+    .filter((option) => (
+      !query ||
+      option.title.toLocaleLowerCase().includes(query) ||
+      option.description.toLocaleLowerCase().includes(query)
+    ))
+    .sort((left, right) => {
+      const leftStarts = left.title.toLocaleLowerCase().startsWith(query) ? 0 : 1
+      const rightStarts = right.title.toLocaleLowerCase().startsWith(query) ? 0 : 1
+      return leftStarts - rightStarts || left.title.localeCompare(right.title, 'zh-CN')
+    })
+    .slice(0, 8)
 }
 
 function editableNameLength(entry: ProjectFileEntry): number {
@@ -424,6 +483,13 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [conversations, setConversations] = useState<Conversation[]>(() => [createConversation()])
   const [selectedConversationId, setSelectedConversationId] = useState(() => conversations[0].id)
   const [draft, setDraft] = useState('')
+  const [promptReferences, setPromptReferences] = useState<AgentPromptReference[]>([])
+  const [referenceFiles, setReferenceFiles] = useState<ProjectFileEntry[]>([])
+  const [skillOptions, setSkillOptions] = useState<AgentSkillOption[]>([])
+  const [referenceTrigger, setReferenceTrigger] = useState<ComposerReferenceTrigger | null>(null)
+  const [activeReferenceIndex, setActiveReferenceIndex] = useState(0)
+  const [isReferenceOptionsLoading, setIsReferenceOptionsLoading] = useState(true)
+  const [referenceOptionsError, setReferenceOptionsError] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [chatError, setChatError] = useState('')
   const [conversationError, setConversationError] = useState('')
@@ -446,6 +512,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [openingFilePaths, setOpeningFilePaths] = useState<Set<string>>(new Set())
   const messageEndRef = useRef<HTMLDivElement>(null)
+  const composerTextareaRef = useRef<HTMLTextAreaElement>(null)
   const createMenuRef = useRef<HTMLDivElement>(null)
   const lastSavedConversationSnapshotRef = useRef('')
   const latestConversationStateRef = useRef<ProjectConversationState>(
@@ -464,6 +531,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   )
   const activeFile = activeDocument ?? activePresentation
   const selectedTodos = todosByConversation[selectedConversation.id] ?? []
+  const filteredReferenceOptions = composerReferenceOptions(
+    referenceTrigger,
+    referenceFiles,
+    skillOptions,
+    promptReferences
+  )
   const hasDirtyDocuments = openDocuments.some(
     (document) => document.content !== document.savedContent
   ) || openPresentations.some(
@@ -548,6 +621,34 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }, [project.handle])
 
+  useEffect(() => {
+    let active = true
+    setIsReferenceOptionsLoading(true)
+    setReferenceOptionsError('')
+    setPromptReferences([])
+    setReferenceTrigger(null)
+
+    void Promise.all([
+      window.projects.listFiles(project.handle),
+      window.agent.listSkills(project.handle)
+    ]).then(([files, skills]) => {
+      if (!active) return
+      setReferenceFiles(files)
+      setSkillOptions(skills)
+    }).catch((error: unknown) => {
+      if (!active) return
+      setReferenceOptionsError(
+        error instanceof Error ? error.message : '无法读取文件与 skill 列表'
+      )
+    }).finally(() => {
+      if (active) setIsReferenceOptionsLoading(false)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [project.handle])
+
   useEffect(() => window.presentations.onChanged((event) => {
     if (event.projectHandle !== project.handle) return
     void window.projects.listDirectory(project.handle, '').then((entries) => {
@@ -598,6 +699,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   useEffect(() => window.projects.onFileChanged((event) => {
     if (event.projectHandle !== project.handle) return
+    void window.projects.listFiles(project.handle).then(setReferenceFiles).catch(() => undefined)
     void handleProjectFileChanged(event)
   }), [project.handle])
 
@@ -780,6 +882,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     if (existingDraft) {
       setSelectedConversationId(existingDraft.id)
       setDraft('')
+      setPromptReferences([])
+      setReferenceTrigger(null)
       setChatError('')
       return
     }
@@ -790,12 +894,16 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setLoadedConversationIds((current) => new Set(current).add(conversation.id))
     setChatError('')
     setDraft('')
+    setPromptReferences([])
+    setReferenceTrigger(null)
   }
 
   async function selectConversation(conversationId: string): Promise<void> {
     setActiveDocumentPath(null)
     setSelectedConversationId(conversationId)
     setChatError('')
+    setPromptReferences([])
+    setReferenceTrigger(null)
     if (loadedConversationIds.has(conversationId) || loadingConversationIds.has(conversationId)) {
       return
     }
@@ -1593,7 +1701,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   async function sendMessage(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
-    const prompt = draft.trim()
+    const promptBody = draft.trim()
+    const referenceLine = promptReferences.map(promptReferenceLabel).join(' ')
+    const prompt = [referenceLine, promptBody].filter(Boolean).join('\n')
     if (
       !prompt ||
       isSending ||
@@ -1611,6 +1721,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       isStreaming: true
     }
     setDraft('')
+    setPromptReferences([])
+    setReferenceTrigger(null)
     setChatError('')
     setIsSending(true)
     setConversations((current) => current.map((conversation) =>
@@ -1628,7 +1740,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         requestId,
         conversationId,
         projectHandle: project.handle,
-        input: prompt
+        input: prompt,
+        references: promptReferences
       })
       setConversations((current) => current.map((conversation) =>
         conversation.id === conversationId
@@ -1658,10 +1771,58 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   }
 
   function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
+    if (event.nativeEvent.isComposing) return
+    if (referenceTrigger) {
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        if (filteredReferenceOptions.length > 0) {
+          const direction = event.key === 'ArrowDown' ? 1 : -1
+          setActiveReferenceIndex((current) => (
+            current + direction + filteredReferenceOptions.length
+          ) % filteredReferenceOptions.length)
+        }
+        return
+      }
+      if ((event.key === 'Enter' || event.key === 'Tab') && filteredReferenceOptions.length > 0) {
+        event.preventDefault()
+        selectComposerReference(
+          filteredReferenceOptions[Math.min(activeReferenceIndex, filteredReferenceOptions.length - 1)]
+        )
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setReferenceTrigger(null)
+        return
+      }
+    }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
       event.currentTarget.form?.requestSubmit()
     }
+  }
+
+  function updateReferenceTrigger(value: string, selectionStart: number | null): void {
+    setReferenceTrigger(findComposerReferenceTrigger(value, selectionStart))
+    setActiveReferenceIndex(0)
+  }
+
+  function selectComposerReference(option: ComposerReferenceOption): void {
+    if (!referenceTrigger) return
+    if (promptReferences.length >= 20) {
+      setChatError('单条消息最多引用 20 个文件或 skill')
+      return
+    }
+
+    const next = removeComposerReferenceTrigger(draft, referenceTrigger)
+    setDraft(next.value)
+    setPromptReferences((current) => [...current, option.reference])
+    setReferenceTrigger(null)
+    setChatError('')
+    window.requestAnimationFrame(() => {
+      composerTextareaRef.current?.focus()
+      composerTextareaRef.current?.setSelectionRange(next.caret, next.caret)
+    })
   }
 
   function openHistory(): void {
@@ -2052,21 +2213,108 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               <TodoProgress todos={selectedTodos} />
               {conversationError ? <p className="composer-error" role="alert">{conversationError}</p> : null}
               {chatError ? <p className="composer-error" role="alert">{chatError}</p> : null}
-              <div className="composer-box">
-                <textarea
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={handleComposerKeyDown}
-                  placeholder="输入消息，和 SlideMind 一起梳理演示…"
-                  rows={2}
-                  disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
-                  aria-label="对话消息"
-                />
-                <div className="composer-footer">
-                  <span>Enter 发送 · Shift Enter 换行</span>
-                  <div className="composer-actions">
-                    <AgentModelSelect disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} />
-                    <button className="composer-send" type="submit" disabled={!draft.trim() || isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} aria-label="发送消息">↑</button>
+              {referenceOptionsError ? (
+                <p className="composer-error" role="alert">{referenceOptionsError}</p>
+              ) : null}
+              <div className="composer-input-shell">
+                {referenceTrigger ? (
+                  <div className="composer-reference-menu" role="listbox" id="composer-reference-options">
+                    <header>
+                      <span>{referenceTrigger.type === 'file' ? '项目文件' : '可用 Skills'}</span>
+                      <small>
+                        {referenceTrigger.type === 'file' ? '@ 引用材料' : '/ 注入工作流'}
+                      </small>
+                    </header>
+                    {isReferenceOptionsLoading ? (
+                      <p>正在建立项目索引…</p>
+                    ) : filteredReferenceOptions.length === 0 ? (
+                      <p>
+                        {referenceTrigger.query
+                          ? `没有匹配“${referenceTrigger.query}”的结果`
+                          : referenceTrigger.type === 'file'
+                            ? '项目中没有可引用的文件'
+                            : '当前没有注入的 skill'}
+                      </p>
+                    ) : (
+                      <div className="composer-reference-list">
+                        {filteredReferenceOptions.map((option, index) => (
+                          <button
+                            className={index === activeReferenceIndex ? 'is-active' : ''}
+                            id={`composer-reference-option-${index}`}
+                            key={option.key}
+                            type="button"
+                            role="option"
+                            aria-selected={index === activeReferenceIndex}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onMouseEnter={() => setActiveReferenceIndex(index)}
+                            onClick={() => selectComposerReference(option)}
+                          >
+                            <span className={`composer-reference-badge composer-reference-${option.reference.type}`}>
+                              {option.badge}
+                            </span>
+                            <span>
+                              <strong>{option.title}</strong>
+                              <small>{option.description}</small>
+                            </span>
+                            <kbd>{index === activeReferenceIndex ? '↵' : ''}</kbd>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+                <div className="composer-box">
+                  {promptReferences.length > 0 ? (
+                    <div className="composer-reference-chips" aria-label="已引用上下文">
+                      {promptReferences.map((reference) => (
+                        <span
+                          className={`composer-reference-chip composer-reference-${reference.type}`}
+                          key={promptReferenceKey(reference)}
+                        >
+                          <i>{reference.type === 'file' ? '@' : '/'}</i>
+                          <span>{reference.type === 'file' ? reference.path : reference.name}</span>
+                          <button
+                            type="button"
+                            aria-label={`移除引用 ${promptReferenceLabel(reference)}`}
+                            onClick={() => setPromptReferences((current) => current.filter(
+                              (candidate) => promptReferenceKey(candidate) !== promptReferenceKey(reference)
+                            ))}
+                          >×</button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  <textarea
+                    ref={composerTextareaRef}
+                    value={draft}
+                    onChange={(event) => {
+                      setDraft(event.target.value)
+                      updateReferenceTrigger(event.target.value, event.target.selectionStart)
+                    }}
+                    onSelect={(event) => updateReferenceTrigger(
+                      event.currentTarget.value,
+                      event.currentTarget.selectionStart
+                    )}
+                    onKeyDown={handleComposerKeyDown}
+                    placeholder="输入消息，@ 引用文件，/ 使用 skill…"
+                    rows={2}
+                    disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
+                    aria-label="对话消息"
+                    aria-autocomplete="list"
+                    aria-controls={referenceTrigger ? 'composer-reference-options' : undefined}
+                    aria-expanded={Boolean(referenceTrigger)}
+                    aria-activedescendant={
+                      referenceTrigger && filteredReferenceOptions.length > 0
+                        ? `composer-reference-option-${Math.min(activeReferenceIndex, filteredReferenceOptions.length - 1)}`
+                        : undefined
+                    }
+                  />
+                  <div className="composer-footer">
+                    <span>@ 文件 · / Skill · Enter 发送</span>
+                    <div className="composer-actions">
+                      <AgentModelSelect disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} />
+                      <button className="composer-send" type="submit" disabled={(!draft.trim() && promptReferences.length === 0) || isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} aria-label="发送消息">↑</button>
+                    </div>
                   </div>
                 </div>
               </div>
