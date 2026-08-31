@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { resolveBundledSkillsDirectory } from './bundled-skills'
+import { queryTemplate } from './template-query'
 
 const EXPECTED_SKILLS = [
   'data-storytelling',
@@ -121,5 +122,16 @@ describe('bundled presentation skills', () => {
     expect(result.slides).toHaveLength(11)
     expect(result.slides.every((slide) => slide.type === 'content')).toBe(true)
     expect(result.slides.some((slide) => slide.textRoles.item === 4)).toBe(true)
+  })
+
+  it('queries one template through the application tool implementation', async () => {
+    const result = await queryTemplate(resolve('skills'), {
+      action: 'slides',
+      templateId: 'template_2',
+      pageType: 'content'
+    })
+
+    expect(result.templateId).toBe('template_2')
+    expect('slides' in result && result.slides).toHaveLength(11)
   })
 })

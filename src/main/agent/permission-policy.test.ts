@@ -32,6 +32,7 @@ describe('createManagedPermissionPolicy', () => {
       find: 'allow',
       ls: 'allow',
       todo: 'allow',
+      template_query: 'allow',
       web_search: 'allow',
       source_check: 'allow',
       fetch_content: 'allow',

@@ -34,6 +34,7 @@ import {
 } from './pi-extensions'
 import { createPresentationToolsExtension } from './presentation-tools'
 import { createProjectMutationToolsExtension } from './project-mutation-tools'
+import { createTemplateToolsExtension } from './template-tools'
 
 const require = createRequire(import.meta.url)
 const MAX_AGENT_SESSIONS = 50
@@ -355,6 +356,12 @@ export class BaseAgentService {
           })
         },
         {
+          name: 'slidemind-template-query',
+          factory: createTemplateToolsExtension({
+            bundledSkillsDirectory: this.bundledSkillsDirectory
+          })
+        },
+        {
           name: 'slidemind-project-mutations',
           factory: createProjectMutationToolsExtension({
             mutations: this.mutations,
@@ -372,7 +379,7 @@ export class BaseAgentService {
     })
     await resourceLoader.reload()
     const extensions = resourceLoader.getExtensions()
-    if (extensions.errors.length > 0 || extensions.extensions.length !== 9) {
+    if (extensions.errors.length > 0 || extensions.extensions.length !== 10) {
       const details = extensions.errors.map((entry) => entry.error).join('; ')
       throw new Error(`Agent 扩展加载失败${details ? `：${details}` : ''}`)
     }
@@ -395,6 +402,7 @@ export class BaseAgentService {
         'slides_read',
         'slides_write',
         'slides_export',
+        'template_query',
         ...PI_AGENT_TOOL_NAMES
       ],
       resourceLoader,

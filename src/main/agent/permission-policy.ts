@@ -56,6 +56,7 @@ export function createManagedPermissionPolicy(
       slides_read: 'allow',
       slides_write: 'allow',
       slides_export: 'allow',
+      template_query: 'allow',
       ...Object.fromEntries(PI_AGENT_TOOL_NAMES.map((name) => [name, 'allow'])),
       ...fileToolRules
     },
