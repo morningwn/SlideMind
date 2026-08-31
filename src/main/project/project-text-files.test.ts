@@ -94,4 +94,36 @@ describe('ProjectTextFileStore', () => {
       store.readPreviewAsset(projectPath, 'docs/notes.md', 'https://example.com/cover.png')
     ).rejects.toThrow('预览资源路径无效')
   })
+
+  it.each([
+    ['cover.png', 'image/png'],
+    ['photo.JPG', 'image/jpeg'],
+    ['animation.gif', 'image/gif'],
+    ['graphic.webp', 'image/webp']
+  ])('loads %s as a standalone image preview', async (name, mimeType) => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-image-files-'))
+    await writeFile(join(projectPath, name), Buffer.from([1, 2, 3]))
+    const store = new ProjectTextFileStore()
+
+    await expect(store.readImage(projectPath, name)).resolves.toMatchObject({
+      path: name,
+      mimeType,
+      dataUrl: `data:${mimeType};base64,AQID`,
+      size: 3
+    })
+  })
+
+  it('rejects unsupported, oversized and symbolic-link image previews', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-image-files-'))
+    const outsidePath = await mkdtemp(join(tmpdir(), 'slidemind-image-files-outside-'))
+    await writeFile(join(projectPath, 'vector.svg'), '<svg />')
+    await writeFile(join(projectPath, 'large.png'), Buffer.alloc(20 * 1024 * 1024 + 1))
+    await writeFile(join(outsidePath, 'outside.png'), Buffer.from([1, 2, 3]))
+    await symlink(join(outsidePath, 'outside.png'), join(projectPath, 'linked.png'))
+    const store = new ProjectTextFileStore()
+
+    await expect(store.readImage(projectPath, 'vector.svg')).rejects.toThrow('仅支持 PNG')
+    await expect(store.readImage(projectPath, 'large.png')).rejects.toThrow('超过 20 MiB')
+    await expect(store.readImage(projectPath, 'linked.png')).rejects.toThrow('符号链接')
+  })
 })

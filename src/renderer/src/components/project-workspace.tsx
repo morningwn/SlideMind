@@ -34,6 +34,7 @@ import {
   type OpenTextDocument
 } from './document-editor'
 import type { OpenPresentationDocument } from './presentation-editor'
+import { ImagePreview, type OpenImageDocument } from './image-preview'
 import { ProjectHistoryPanel } from './project-history-panel'
 import {
   findComposerReferenceTrigger,
@@ -221,6 +222,7 @@ function ProjectFileIcon({ kind }: { kind: ProjectFileDisplayKind }): React.JSX.
   if (kind === 'presentation') return <span className="file-type-badge">PPT</span>
   if (kind === 'markdown') return <span className="file-type-badge">MD</span>
   if (kind === 'text') return <span className="file-type-badge">TXT</span>
+  if (kind === 'image') return <span className="file-type-badge">IMG</span>
   return <FileIcon />
 }
 
@@ -231,6 +233,14 @@ function OpenFileIcon({ kind }: { kind: ProjectFileDisplayKind }): React.JSX.Ele
         <path d="M4 5.5h16v11H4z" />
         <path d="m10 9 4 2.5-4 2.5z" />
         <path d="M9 20h6M12 16.5V20" />
+      </svg>
+    )
+  }
+  if (kind === 'image') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 5.5h16v13H4z" />
+        <path d="m6.5 16 3.5-4 2.7 2.7 1.8-2.2 3 3.5M15.8 9h.1" />
       </svg>
     )
   }
@@ -245,6 +255,7 @@ function OpenFileIcon({ kind }: { kind: ProjectFileDisplayKind }): React.JSX.Ele
 function openFileActionLabel(kind: ProjectFileDisplayKind, name: string): string {
   if (kind === 'presentation') return `编辑演示文稿 ${name}`
   if (kind === 'markdown') return `编辑 Markdown 文档 ${name}`
+  if (kind === 'image') return `预览图片 ${name}`
   return `编辑文本文件 ${name}`
 }
 
@@ -435,7 +446,9 @@ function FileTreeLevel({
                       className={`file-tree-open-action file-tree-open-${displayKind}`}
                       type="button"
                       aria-label={openFileActionLabel(displayKind, entry.name)}
-                      title={displayKind === 'presentation' ? '编辑演示文稿' : '编辑文档'}
+                      title={displayKind === 'presentation'
+                        ? '编辑演示文稿'
+                        : displayKind === 'image' ? '预览图片' : '编辑文档'}
                       onClick={() => onOpenFile(entry)}
                     >
                       <OpenFileIcon kind={displayKind} />
@@ -508,6 +521,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [renameRequestedPath, setRenameRequestedPath] = useState<string | null>(null)
   const [openDocuments, setOpenDocuments] = useState<OpenTextDocument[]>([])
   const [openPresentations, setOpenPresentations] = useState<OpenPresentationDocument[]>([])
+  const [openImages, setOpenImages] = useState<OpenImageDocument[]>([])
   const [activeDocumentPath, setActiveDocumentPath] = useState<string | null>(null)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isHistoryActive, setIsHistoryActive] = useState(false)
@@ -523,6 +537,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const canFlushConversationsRef = useRef(false)
   const openDocumentsRef = useRef<OpenTextDocument[]>([])
   const openPresentationsRef = useRef<OpenPresentationDocument[]>([])
+  const openImagesRef = useRef<OpenImageDocument[]>([])
   const confirmedRestorePathsRef = useRef<Set<string>>(new Set())
 
   const selectedConversation =
@@ -531,7 +546,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const activePresentation = openPresentations.find(
     (presentation) => presentation.path === activeDocumentPath
   )
-  const activeFile = activeDocument ?? activePresentation
+  const activeImage = openImages.find((image) => image.path === activeDocumentPath)
+  const activeFile = activeDocument ?? activePresentation ?? activeImage
   const selectedTodos = todosByConversation[selectedConversation.id] ?? []
   const filteredReferenceOptions = composerReferenceOptions(
     referenceTrigger,
@@ -548,10 +564,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   canFlushConversationsRef.current = canPersistConversations && !isConversationLoading
   openDocumentsRef.current = openDocuments
   openPresentationsRef.current = openPresentations
+  openImagesRef.current = openImages
   const externalWatchScope = {
     files: [
       ...openDocuments.map((document) => document.path),
-      ...openPresentations.map((presentation) => presentation.path)
+      ...openPresentations.map((presentation) => presentation.path),
+      ...openImages.map((image) => image.path)
     ],
     directories: ['', ...expandedPaths]
   }
@@ -710,7 +728,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       for (const directory of ['', ...expandedPaths]) void refreshDirectory(directory)
       for (const path of [
         ...openDocumentsRef.current.map((document) => document.path),
-        ...openPresentationsRef.current.map((presentation) => presentation.path)
+        ...openPresentationsRef.current.map((presentation) => presentation.path),
+        ...openImagesRef.current.map((image) => image.path)
       ]) {
         void handleProjectFileChanged({
           projectHandle: project.handle,
@@ -953,12 +972,14 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     const presentation = openPresentationsRef.current.find(
       (candidate) => candidate.path === event.path
     )
-    if (!textDocument && !presentation) return
+    const image = openImagesRef.current.find((candidate) => candidate.path === event.path)
+    if (!textDocument && !presentation && !image) return
 
     if (event.kind === 'remove' || event.kind === 'remove-directory') {
       if (confirmedRestore) {
         setOpenDocuments((current) => current.filter((document) => document.path !== event.path))
         setOpenPresentations((current) => current.filter((candidate) => candidate.path !== event.path))
+        setOpenImages((current) => current.filter((candidate) => candidate.path !== event.path))
         setActiveDocumentPath((current) => current === event.path ? null : current)
         return
       }
@@ -981,6 +1002,13 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 conflict: true,
                 error: '演示文稿已被外部程序删除。当前编辑内容仍保留在 SlideMind 中。'
               }
+            : candidate
+        ))
+      }
+      if (image) {
+        setOpenImages((current) => current.map((candidate) =>
+          candidate.path === event.path
+            ? { ...candidate, error: '图片已被外部程序删除。' }
             : candidate
         ))
       }
@@ -1022,37 +1050,58 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       return
     }
 
-    try {
-      const file = await window.presentations.read(project.handle, event.path)
-      const serializedDocument = JSON.stringify(file.document)
-      setOpenPresentations((current) => current.map((candidate) => {
-        if (candidate.path !== event.path || candidate.revision === file.revision) return candidate
-        if (!confirmedRestore && candidate.serializedDocument !== candidate.savedSerializedDocument) {
+    if (presentation) {
+      try {
+        const file = await window.presentations.read(project.handle, event.path)
+        const serializedDocument = JSON.stringify(file.document)
+        setOpenPresentations((current) => current.map((candidate) => {
+          if (candidate.path !== event.path || candidate.revision === file.revision) return candidate
+          if (!confirmedRestore && candidate.serializedDocument !== candidate.savedSerializedDocument) {
+            return {
+              ...candidate,
+              conflict: true,
+              error: '演示文稿已在 SlideMind 外部修改。重新载入会放弃当前未保存内容。'
+            }
+          }
           return {
             ...candidate,
-            conflict: true,
-            error: '演示文稿已在 SlideMind 外部修改。重新载入会放弃当前未保存内容。'
+            document: file.document,
+            serializedDocument,
+            savedSerializedDocument: serializedDocument,
+            revision: file.revision,
+            reloadKey: crypto.randomUUID(),
+            isSaving: false,
+            conflict: false,
+            error: ''
           }
-        }
-        return {
-          ...candidate,
-          document: file.document,
-          serializedDocument,
-          savedSerializedDocument: serializedDocument,
-          revision: file.revision,
-          reloadKey: crypto.randomUUID(),
-          isSaving: false,
-          conflict: false,
-          error: ''
-        }
-      }))
+        }))
+      } catch (error) {
+        setOpenPresentations((current) => current.map((candidate) =>
+          candidate.path === event.path
+            ? {
+                ...candidate,
+                conflict: true,
+                error: error instanceof Error ? error.message : '无法读取外部修改后的演示文稿'
+              }
+            : candidate
+        ))
+      }
+      return
+    }
+
+    try {
+      const file = await window.projects.readImageFile(project.handle, event.path)
+      setOpenImages((current) => current.map((candidate) =>
+        candidate.path === event.path && candidate.revision !== file.revision
+          ? { ...candidate, ...file, error: '' }
+          : candidate
+      ))
     } catch (error) {
-      setOpenPresentations((current) => current.map((candidate) =>
+      setOpenImages((current) => current.map((candidate) =>
         candidate.path === event.path
           ? {
               ...candidate,
-              conflict: true,
-              error: error instanceof Error ? error.message : '无法读取外部修改后的演示文稿'
+              error: error instanceof Error ? error.message : '无法读取外部修改后的图片'
             }
           : candidate
       ))
@@ -1110,6 +1159,13 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       setSelectedFilePath(existingPresentation.path)
       return
     }
+    const existingImage = openImages.find((image) => image.path === entry.path)
+    if (existingImage) {
+      setIsHistoryActive(false)
+      setActiveDocumentPath(existingImage.path)
+      setSelectedFilePath(existingImage.path)
+      return
+    }
     if (openingFilePaths.has(entry.path)) return
 
     setOpeningFilePaths((current) => new Set(current).add(entry.path))
@@ -1134,6 +1190,18 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           current.some((candidate) => candidate.path === file.path)
             ? current
             : [...current, presentation]
+        )
+        setIsHistoryActive(false)
+        setActiveDocumentPath(file.path)
+        return
+      }
+      if (projectFileDisplayKind(entry) === 'image') {
+        const file = await window.projects.readImageFile(project.handle, entry.path)
+        const image: OpenImageDocument = { ...file, name: entry.name, error: '' }
+        setOpenImages((current) =>
+          current.some((candidate) => candidate.path === file.path)
+            ? current
+            : [...current, image]
         )
         setIsHistoryActive(false)
         setActiveDocumentPath(file.path)
@@ -1177,6 +1245,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     const matchingPresentations = openPresentationsRef.current.filter((presentation) => (
       matchesEntry(presentation.path)
     ))
+    const matchingImages = openImagesRef.current.filter((image) => matchesEntry(image.path))
     if (
       matchingDocuments.some((document) => document.isSaving || document.conflict) ||
       matchingPresentations.some((presentation) => (
@@ -1225,6 +1294,14 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               }
             : presentation
         )))
+        setOpenImages((current) => current.map((image) => matchesEntry(image.path)
+          ? {
+              ...image,
+              path: replacePathDirectory(image.path, entry.path, renamed.path),
+              error: ''
+            }
+          : image
+        ))
         setActiveDocumentPath((current) => current && matchesEntry(current)
           ? replacePathDirectory(current, entry.path, renamed.path)
           : current
@@ -1248,8 +1325,10 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
       const openDocument = matchingDocuments[0]
       const openPresentation = matchingPresentations[0]
+      const openImage = matchingImages[0]
       const keepsTextDocument = Boolean(openDocument) && /\.(?:md|markdown|txt)$/i.test(renamed.path)
       const keepsPresentation = Boolean(openPresentation) && isPresentationPath(renamed.path)
+      const keepsImage = Boolean(openImage) && /\.(?:gif|jpe?g|png|webp)$/i.test(renamed.path)
       setOpenDocuments((current) => keepsTextDocument
         ? current.map((document) => document.path === entry.path
           ? {
@@ -1276,8 +1355,14 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           : presentation)
         : current.filter((presentation) => presentation.path !== entry.path)
       )
+      setOpenImages((current) => keepsImage
+        ? current.map((image) => image.path === entry.path
+          ? { ...image, path: renamed.path, name: renamed.name, error: '' }
+          : image)
+        : current.filter((image) => image.path !== entry.path)
+      )
       setActiveDocumentPath((current) => current === entry.path
-        ? keepsTextDocument || keepsPresentation ? renamed.path : null
+        ? keepsTextDocument || keepsPresentation || keepsImage ? renamed.path : null
         : current
       )
       setSelectedFilePath(renamed.path)
@@ -1335,6 +1420,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       setOpenPresentations((current) => current.filter(
         (presentation) => !matchesEntry(presentation.path)
       ))
+      setOpenImages((current) => current.filter((image) => !matchesEntry(image.path)))
       setActiveDocumentPath((current) => current && matchesEntry(current) ? null : current)
       setSelectedFilePath((current) => current && matchesEntry(current) ? null : current)
       if (entry.kind === 'directory') {
@@ -1551,7 +1637,22 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setOpenPresentations(remaining)
     if (activeDocumentPath === path) {
       const nextPresentation = remaining[Math.min(presentationIndex, remaining.length - 1)]
-      setActiveDocumentPath(nextPresentation?.path ?? openDocuments.at(-1)?.path ?? null)
+      setActiveDocumentPath(
+        nextPresentation?.path ?? openDocuments.at(-1)?.path ?? openImages.at(-1)?.path ?? null
+      )
+    }
+  }
+
+  function closeImage(path: string): void {
+    const imageIndex = openImages.findIndex((image) => image.path === path)
+    if (imageIndex < 0) return
+    const remaining = openImages.filter((image) => image.path !== path)
+    setOpenImages(remaining)
+    if (activeDocumentPath === path) {
+      const nextImage = remaining[Math.min(imageIndex, remaining.length - 1)]
+      setActiveDocumentPath(
+        nextImage?.path ?? openDocuments.at(-1)?.path ?? openPresentations.at(-1)?.path ?? null
+      )
     }
   }
 
@@ -1697,7 +1798,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setOpenDocuments(remaining)
     if (activeDocumentPath === path) {
       const nextDocument = remaining[Math.min(documentIndex, remaining.length - 1)]
-      setActiveDocumentPath(nextDocument?.path ?? openPresentations.at(-1)?.path ?? null)
+      setActiveDocumentPath(
+        nextDocument?.path ?? openPresentations.at(-1)?.path ?? openImages.at(-1)?.path ?? null
+      )
     }
   }
 
@@ -2128,6 +2231,39 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 </div>
               )
             })}
+            {openImages.map((image) => {
+              const isActive = !isHistoryActive && image.path === activeImage?.path
+              return (
+                <div
+                  className={`workspace-document-tab${isActive ? ' workspace-tab-active' : ''}`}
+                  key={image.path}
+                  role="presentation"
+                >
+                  <button
+                    className="workspace-document-tab-main"
+                    type="button"
+                    role="tab"
+                    aria-label={`${image.name}，图片预览`}
+                    aria-selected={isActive}
+                    title={image.path}
+                    onClick={() => {
+                      setIsHistoryActive(false)
+                      setActiveDocumentPath(image.path)
+                      setSelectedFilePath(image.path)
+                    }}
+                  >
+                    <FileIcon />
+                    <span>{image.name}</span>
+                  </button>
+                  <button
+                    className="workspace-tab-close"
+                    type="button"
+                    aria-label={`关闭 ${image.name}`}
+                    onClick={() => closeImage(image.path)}
+                  >×</button>
+                </div>
+              )
+            })}
             {isHistoryOpen ? (
               <div
                 className={`workspace-document-tab${isHistoryActive ? ' workspace-tab-active' : ''}`}
@@ -2183,6 +2319,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               onSave={(document) => void savePresentation(activePresentation.path, document)}
             />
           </Suspense>
+        ) : activeImage ? (
+          <ImagePreview key={`${activeImage.path}:${activeImage.revision}`} document={activeImage} />
         ) : (
           <section className="chat-panel" aria-labelledby="active-conversation-title">
             <h1 id="active-conversation-title" className="sr-only">

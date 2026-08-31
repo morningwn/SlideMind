@@ -25,6 +25,14 @@ export interface ProjectTextFile {
   hasBom: boolean
 }
 
+export interface ProjectImageFile {
+  path: string
+  mimeType: string
+  dataUrl: string
+  size: number
+  revision: string
+}
+
 export interface SaveProjectTextFileInput {
   path: string
   content: string
@@ -108,6 +116,7 @@ export interface ProjectApi {
   ): Promise<ProjectFileEntry>
   deleteDirectory(projectHandle: string, relativePath: string): Promise<void>
   readTextFile(projectHandle: string, relativePath: string): Promise<ProjectTextFile>
+  readImageFile(projectHandle: string, relativePath: string): Promise<ProjectImageFile>
   readPreviewAsset(
     projectHandle: string,
     documentPath: string,

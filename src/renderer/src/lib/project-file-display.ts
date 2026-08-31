@@ -6,6 +6,7 @@ export type ProjectFileDisplayKind =
   | 'presentation'
   | 'markdown'
   | 'text'
+  | 'image'
   | 'other'
 
 export function projectFileDisplayKind(
@@ -17,9 +18,10 @@ export function projectFileDisplayKind(
   const normalizedPath = entry.path.toLocaleLowerCase()
   if (normalizedPath.endsWith('.md') || normalizedPath.endsWith('.markdown')) return 'markdown'
   if (normalizedPath.endsWith('.txt')) return 'text'
+  if (/\.(?:gif|jpe?g|png|webp)$/.test(normalizedPath)) return 'image'
   return 'other'
 }
 
 export function isOpenableProjectFile(kind: ProjectFileDisplayKind): boolean {
-  return kind === 'presentation' || kind === 'markdown' || kind === 'text'
+  return kind === 'presentation' || kind === 'markdown' || kind === 'text' || kind === 'image'
 }

@@ -187,6 +187,12 @@ export function registerProjectIpc(
   )
 
   ipcMain.handle(
+    'project:read-image-file',
+    (_event, projectHandle: unknown, relativePath: unknown) =>
+      textFileStore.readImage(projectRoots.resolve(projectHandle), relativePath)
+  )
+
+  ipcMain.handle(
     'project:save-text-file',
     (_event, projectHandle: unknown, input: unknown) => {
       if (typeof projectHandle !== 'string') throw new Error('项目授权无效')

@@ -103,6 +103,8 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
     ipcRenderer.invoke('project:delete-directory', projectHandle, relativePath),
   readTextFile: (projectHandle: string, relativePath: string) =>
     ipcRenderer.invoke('project:read-text-file', projectHandle, relativePath),
+  readImageFile: (projectHandle: string, relativePath: string) =>
+    ipcRenderer.invoke('project:read-image-file', projectHandle, relativePath),
   readPreviewAsset: (projectHandle: string, documentPath: string, assetPath: string) =>
     ipcRenderer.invoke('project:read-preview-asset', projectHandle, documentPath, assetPath),
   saveTextFile: (projectHandle: string, input: SaveProjectTextFileInput) =>

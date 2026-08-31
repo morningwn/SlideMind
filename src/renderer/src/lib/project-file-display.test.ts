@@ -9,6 +9,10 @@ describe('projectFileDisplayKind', () => {
     ['a Markdown file', { kind: 'file', path: 'notes.md' }, 'markdown'],
     ['a long Markdown suffix', { kind: 'file', path: 'notes.MARKDOWN' }, 'markdown'],
     ['a text file', { kind: 'file', path: 'outline.txt' }, 'text'],
+    ['a PNG image', { kind: 'file', path: 'images/cover.png' }, 'image'],
+    ['an uppercase JPEG image', { kind: 'file', path: 'PHOTO.JPEG' }, 'image'],
+    ['a GIF image', { kind: 'file', path: 'animation.gif' }, 'image'],
+    ['a WebP image', { kind: 'file', path: 'graphic.webp' }, 'image'],
     ['an unsupported JSON file', { kind: 'file', path: 'data.json' }, 'other']
   ] as const)('classifies %s', (_case, entry, expected) => {
     expect(projectFileDisplayKind(entry)).toBe(expected)
@@ -16,7 +20,7 @@ describe('projectFileDisplayKind', () => {
 })
 
 describe('isOpenableProjectFile', () => {
-  it.each(['presentation', 'markdown', 'text'] as const)('opens supported %s files', (kind) => {
+  it.each(['presentation', 'markdown', 'text', 'image'] as const)('opens supported %s files', (kind) => {
     expect(isOpenableProjectFile(kind)).toBe(true)
   })
 

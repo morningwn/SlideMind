@@ -5,12 +5,14 @@ import { TextDecoder } from 'node:util'
 import type {
   ProjectTextFile,
   ProjectTextFileKind,
+  ProjectImageFile,
   SaveProjectTextFileInput,
   SaveProjectTextFileResult
 } from '../../shared/project'
 
 const MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024
 const MAX_PREVIEW_ASSET_BYTES = 5 * 1024 * 1024
+const MAX_IMAGE_FILE_BYTES = 20 * 1024 * 1024
 const INTERNAL_PROJECT_DIRECTORY = '.slidemind'
 const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf])
 const SUPPORTED_EXTENSIONS = new Map<string, ProjectTextFileKind>([
@@ -25,6 +27,15 @@ const PREVIEW_ASSET_TYPES = new Map<string, string>([
   ['.png', 'image/png'],
   ['.webp', 'image/webp']
 ])
+
+function imageMimeType(
+  path: string,
+  unsupportedMessage = '当前仅支持 PNG、JPEG、GIF 和 WebP 图片预览'
+): string {
+  const mimeType = PREVIEW_ASSET_TYPES.get(extname(path).toLocaleLowerCase())
+  if (!mimeType) throw new Error(unsupportedMessage)
+  return mimeType
+}
 
 function validateString(value: unknown, label: string): string {
   if (
@@ -133,6 +144,25 @@ export class ProjectTextFileStore {
     }
   }
 
+  async readImage(
+    projectPathInput: unknown,
+    relativePathInput: unknown
+  ): Promise<ProjectImageFile> {
+    const imageFile = await resolveRegularProjectFile(projectPathInput, relativePathInput)
+    const mimeType = imageMimeType(imageFile.relativePath)
+    if (imageFile.size > MAX_IMAGE_FILE_BYTES) throw new Error('图片超过 20 MiB，无法预览')
+
+    const bytes = await readFile(imageFile.targetPath)
+    if (bytes.byteLength > MAX_IMAGE_FILE_BYTES) throw new Error('图片超过 20 MiB，无法预览')
+    return {
+      path: imageFile.relativePath,
+      mimeType,
+      dataUrl: `data:${mimeType};base64,${bytes.toString('base64')}`,
+      size: bytes.byteLength,
+      revision: fileRevision(bytes)
+    }
+  }
+
   async readPreviewAsset(
     projectPathInput: unknown,
     documentPathInput: unknown,
@@ -155,8 +185,10 @@ export class ProjectTextFileStore {
 
     const relativeAssetPath = join(dirname(documentFile.relativePath), decodedAssetPath)
     const assetFile = await resolveRegularProjectFile(projectPathInput, relativeAssetPath)
-    const mimeType = PREVIEW_ASSET_TYPES.get(extname(assetFile.relativePath).toLocaleLowerCase())
-    if (!mimeType) throw new Error('Markdown 预览仅支持 PNG、JPEG、GIF 和 WebP 图片')
+    const mimeType = imageMimeType(
+      assetFile.relativePath,
+      'Markdown 预览仅支持 PNG、JPEG、GIF 和 WebP 图片'
+    )
     if (assetFile.size > MAX_PREVIEW_ASSET_BYTES) throw new Error('预览图片超过 5 MiB')
 
     const bytes = await readFile(assetFile.targetPath)
