@@ -9,7 +9,6 @@ import { UniverRenderEnginePlugin } from '@univerjs/engine-render'
 import { SlideDataModel, UniverSlidesPlugin, type ISlideData } from '@univerjs/slides'
 import {
   ISlideEditorBridgeService,
-  UpdateSlideElementOperation,
   UniverSlidesUIPlugin
 } from '@univerjs/slides-ui'
 import SlidesUIZhCN from '@univerjs/slides-ui/locale/zh-CN'
@@ -17,6 +16,7 @@ import { UniverUIPlugin } from '@univerjs/ui'
 import UIZhCN from '@univerjs/ui/locale/zh-CN'
 import { useEffect, useRef, useState } from 'react'
 import type { PresentationDocument } from '../../../shared/presentation'
+import { finishPresentationTextSession } from '../lib/presentation-text-session'
 
 import '@univerjs/design/lib/index.css'
 import '@univerjs/ui/lib/index.css'
@@ -202,58 +202,28 @@ export function PresentationEditor({
         }
         closeTextEditor = cleanup
 
-        const finish = async (commit: boolean, restoreSelection = false): Promise<void> => {
+        const finish = (commit: boolean): void => {
           if (destroyed) return
           const text = input.value
-          const previousText = richText.text
 
           // Model updates can move focus and dispatch blur again. Destroy the DOM editor
           // before ending Univer's edit session to prevent a recursive submit path.
           cleanup()
           if (!active) return
 
-          // End Univer's hidden native session first. It otherwise remains focused and can
-          // intercept the next double-click or overwrite the custom editor's document data.
-          transformer.clearControls()
-          if (restoreSelection) transformer.activeAnObject(richText)
-          if (!commit || text === previousText) return
-          if (!element || !('richText' in element) || !element.richText) {
-            setSetupError('无法定位当前文本对象，请重新打开演示文稿后再试')
-            return
-          }
-
-          const body = richText.documentData.body
-          if (body) {
-            const textRun = body.textRuns?.[0]
-            body.dataStream = `${text}\r\n`
-            body.textRuns = [{ ...textRun, st: 0, ed: text.length }]
-            body.paragraphs = undefined
-            body.sectionBreaks = undefined
-            richText.refreshDocumentByDocData()
-            richText.resizeToContentSize()
-          }
-
-          const updated = await univerApi.executeCommand(UpdateSlideElementOperation.id, {
-            unitId: model.getUnitId(),
-            oKey: richText.oKey,
-            props: {
-              richText: {
-                ...element.richText,
-                text
-              }
-            }
-          })
-          if (!updated && active) setSetupError('文本修改失败，请重新打开演示文稿后再试')
+          // The hidden editor shares this document body. Ending its page-scene session
+          // refreshes the render object and commits exactly one model operation.
+          finishPresentationTextSession(richText, transformer, text, commit)
         }
 
         input.onblur = () => void finish(true)
         input.onkeydown = (event: KeyboardEvent) => {
           if (event.key === 'Escape') {
             event.preventDefault()
-            void finish(false, true)
+            finish(false)
           } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()
-            void finish(true)
+            finish(true)
           }
         }
 
