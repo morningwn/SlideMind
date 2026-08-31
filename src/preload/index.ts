@@ -39,6 +39,9 @@ const desktopApi: Readonly<DesktopApi> = Object.freeze({
     chrome: process.versions.chrome,
     node: process.versions.node
   }),
+  clearLogs: () => ipcRenderer.invoke('logging:clear'),
+  exportDiagnosticBundle: () => ipcRenderer.invoke('logging:export-diagnostics'),
+  openLogDirectory: () => ipcRenderer.invoke('logging:open-directory'),
   reportDiagnosticEvent: (event: RendererDiagnosticEvent) => {
     ipcRenderer.send('logging:renderer-event', event)
   },

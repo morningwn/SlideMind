@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, renameSync, unlinkSync } from 'node:fs'
+import { existsSync, readdirSync, renameSync, unlinkSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, extname, join } from 'node:path'
 import electronLog from 'electron-log/main'
@@ -9,6 +9,7 @@ import { sanitizeContext, sanitizeError, sanitizeText, type SanitizedError } fro
 const LOG_FILE_NAME = 'slidemind.log'
 const LOG_FILE_MAX_SIZE = 5 * 1024 * 1024
 const LOG_ARCHIVE_COUNT = 4
+const LOG_FILE_PATTERN = /^slidemind(?:\.\d+)?\.log$/
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 export type LogProcess = 'main' | 'renderer' | 'worker'
@@ -50,6 +51,7 @@ const sessionId = randomUUID()
 const identifierSalt = randomUUID()
 const sensitivePaths = [homedir()]
 const sanitizeOptions = { sensitivePaths }
+let logsDirectory: string | undefined
 let sink: (record: LogRecord) => void = fallbackSink
 
 function fallbackSink(record: LogRecord): void {
@@ -84,6 +86,7 @@ function writeFailure(error: unknown): void {
 }
 
 export function initializeApplicationLogging(options: LoggingOptions): void {
+  logsDirectory = options.logsDirectory
   electronLog.transports.file.level = options.isPackaged ? 'info' : 'debug'
   electronLog.transports.file.format = '{text}'
   electronLog.transports.file.maxSize = LOG_FILE_MAX_SIZE
@@ -114,6 +117,33 @@ export function initializeApplicationLogging(options: LoggingOptions): void {
       writeFailure(error)
     }
   }
+}
+
+export function applicationLogsDirectory(): string {
+  if (!logsDirectory) throw new Error('应用日志尚未初始化')
+  return logsDirectory
+}
+
+export function isApplicationLogFileName(name: string): boolean {
+  return LOG_FILE_PATTERN.test(name)
+}
+
+export function clearArchivedLogFiles(directory: string): void {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (entry.name === LOG_FILE_NAME || !isApplicationLogFileName(entry.name)) continue
+    if (entry.isFile() || entry.isSymbolicLink()) unlinkSync(join(directory, entry.name))
+  }
+}
+
+export function clearApplicationLogs(): void {
+  if (!electronLog.transports.file.getFile().clear()) {
+    throw new Error('无法清空当前日志文件')
+  }
+  clearArchivedLogFiles(applicationLogsDirectory())
+}
+
+export function sanitizeDiagnosticLog(content: string): string {
+  return sanitizeText(content, sanitizeOptions, Number.POSITIVE_INFINITY)
 }
 
 export function diagnosticId(value: string): string {

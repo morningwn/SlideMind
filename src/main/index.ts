@@ -248,7 +248,24 @@ app.whenReady().then(() => {
 
   registerAgentIpc(configStore, agentService)
   registerDesktopIpc()
-  registerLoggingIpc()
+  registerLoggingIpc({
+    downloadsDirectory: app.getPath('downloads'),
+    logsDirectory: app.getPath('logs'),
+    environment: {
+      application: {
+        isPackaged: app.isPackaged,
+        name: app.getName(),
+        version: app.getVersion()
+      },
+      runtime: {
+        arch: process.arch,
+        chrome: process.versions.chrome,
+        electron: process.versions.electron,
+        node: process.versions.node,
+        platform: process.platform
+      }
+    }
+  })
   registerProjectIpc(
     recentProjectStore,
     conversationStore,
