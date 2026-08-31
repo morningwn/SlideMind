@@ -1077,6 +1077,95 @@ button:disabled {
   font-size: 11px;
 }
 
+.file-tree-row {
+  position: relative;
+}
+
+.file-tree-row:has(.file-tree-actions) .file-tree-item {
+  padding-right: 53px;
+}
+
+.file-tree-actions {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.file-tree-row:hover .file-tree-actions,
+.file-tree-row:focus-within .file-tree-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.file-tree-actions button {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: #68758b;
+  background: #edf1f7;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  place-items: center;
+}
+
+.file-tree-actions button:hover,
+.file-tree-actions button:focus-visible {
+  color: #24488e;
+  background: #dfe7f5;
+}
+
+.file-tree-actions button:last-child:hover,
+.file-tree-actions button:last-child:focus-visible {
+  color: #a93631;
+  background: #f8dfdd;
+}
+
+.file-tree-rename-form {
+  grid-template-columns: 14px 17px minmax(0, 1fr) 23px 23px;
+  gap: 4px;
+  padding-right: 4px;
+  background: #edf1f7;
+}
+
+.file-tree-rename-form input {
+  min-width: 0;
+  height: 23px;
+  padding: 0 5px;
+  border: 1px solid #7e9bcf;
+  border-radius: 4px;
+  outline: none;
+  color: #34435d;
+  background: white;
+  font: inherit;
+}
+
+.file-tree-rename-form button {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: #52647f;
+  background: #dde6f5;
+  cursor: pointer;
+  place-items: center;
+}
+
+.file-tree-rename-form button:hover,
+.file-tree-rename-form button:focus-visible {
+  color: #24488e;
+  background: #cfdbef;
+}
+
 button.file-tree-directory {
   cursor: pointer;
 }

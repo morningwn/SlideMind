@@ -32,8 +32,14 @@ export interface SaveProjectTextFileInput {
   hasBom: boolean
 }
 
+export interface RenameProjectFileInput {
+  path: string
+  name: string
+}
+
 export type ProjectMutationSource =
   | 'agent'
+  | 'file-tree'
   | 'import'
   | 'presentation-editor'
   | 'restore'
@@ -86,6 +92,11 @@ export interface ProjectApi {
   open(path: string): Promise<OpenedProject>
   removeRecent(path: string): Promise<ProjectInfo[]>
   listDirectory(projectHandle: string, relativePath: string): Promise<ProjectFileEntry[]>
+  renameFile(
+    projectHandle: string,
+    input: RenameProjectFileInput
+  ): Promise<ProjectFileEntry>
+  deleteFile(projectHandle: string, relativePath: string): Promise<void>
   readTextFile(projectHandle: string, relativePath: string): Promise<ProjectTextFile>
   readPreviewAsset(
     projectHandle: string,

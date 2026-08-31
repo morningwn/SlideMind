@@ -1,5 +1,5 @@
 import * as fs from 'node:fs'
-import { mkdir, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { listFiles, log, readBlob, resolveRef, statusMatrix } from 'isomorphic-git'
@@ -225,6 +225,32 @@ describe('ProjectVersionService', () => {
       code: 'ENOENT'
     })
     expect(await readFile(join(projectPath, 'external.md'), 'utf8')).toBe('# external\n')
+  })
+
+  it('records a file-tree rename as one removed and one added file', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-versions-'))
+    await writeFile(join(projectPath, 'draft.md'), '# draft\n')
+    const versions = new ProjectVersionService()
+    const mutations = new ProjectMutationService(versions)
+
+    await mutations.run(
+      {
+        projectPath,
+        projectHandle: 'project-1',
+        paths: ['draft.md', 'final.md'],
+        source: 'file-tree'
+      },
+      () => rename(join(projectPath, 'draft.md'), join(projectPath, 'final.md'))
+    )
+    await versions.flush(projectPath)
+
+    expect((await versions.listVersions(projectPath)).versions[0]).toMatchObject({
+      sources: ['file-tree'],
+      changes: [
+        { path: 'draft.md', kind: 'removed' },
+        { path: 'final.md', kind: 'added' }
+      ]
+    })
   })
 
   it('recreates a missing parent directory when restoring a tracked file', async () => {

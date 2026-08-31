@@ -25,6 +25,7 @@ interface DiffLine {
 
 const sourceLabels: Record<ProjectMutationSource, string> = {
   agent: 'Agent',
+  'file-tree': '文件树',
   import: '导入',
   'presentation-editor': '演示编辑器',
   restore: '版本恢复',

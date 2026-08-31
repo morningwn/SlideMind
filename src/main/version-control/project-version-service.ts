@@ -42,6 +42,7 @@ const EXCLUDED_SEGMENTS = new Set([
 ])
 const VERSION_SOURCES = new Set<ProjectMutationSource>([
   'agent',
+  'file-tree',
   'import',
   'presentation-editor',
   'restore',

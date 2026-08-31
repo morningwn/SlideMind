@@ -54,6 +54,8 @@ interface FileTreeLevelProps {
   activeFilePath: string | null
   selectedFilePath: string | null
   onOpenFile: (entry: ProjectFileEntry) => void
+  onDeleteFile: (entry: ProjectFileEntry) => void
+  onRenameFile: (entry: ProjectFileEntry, name: string) => Promise<boolean>
   onSelectFile: (path: string) => void
   onToggle: (entry: ProjectFileEntry) => void
 }
@@ -178,10 +180,28 @@ function FileTreeLevel({
   activeFilePath,
   selectedFilePath,
   onOpenFile,
+  onDeleteFile,
+  onRenameFile,
   onSelectFile,
   onToggle
 }: FileTreeLevelProps): React.JSX.Element {
   const entries = entriesByDirectory[directoryPath] ?? []
+  const [renamingPath, setRenamingPath] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+
+  function startRenaming(entry: ProjectFileEntry): void {
+    setRenamingPath(entry.path)
+    setRenameDraft(entry.name)
+  }
+
+  async function submitRename(entry: ProjectFileEntry): Promise<void> {
+    const name = renameDraft.trim()
+    if (!name || name === entry.name) {
+      setRenamingPath(null)
+      return
+    }
+    if (await onRenameFile(entry, name)) setRenamingPath(null)
+  }
 
   return (
     <div role={depth === 0 ? 'tree' : 'group'}>
@@ -189,34 +209,87 @@ function FileTreeLevel({
         const isDirectory = entry.kind === 'directory'
         const isExpanded = expandedPaths.has(entry.path)
         const isLoading = loadingPaths.has(entry.path)
+        const isRenaming = renamingPath === entry.path
         return (
           <div className="file-tree-branch" key={entry.path}>
-            <button
-              className={`file-tree-item${isDirectory ? ' file-tree-directory' : ''}${entry.path === selectedFilePath ? ' file-tree-item-selected' : ''}${entry.path === activeFilePath ? ' file-tree-item-active' : ''}`}
-              style={{ '--tree-depth': depth } as React.CSSProperties}
-              type="button"
-              role="treeitem"
-              aria-expanded={isDirectory ? isExpanded : undefined}
-              onClick={() => {
-                if (isDirectory) onToggle(entry)
-                else onSelectFile(entry.path)
-              }}
-              onDoubleClick={() => {
-                if (!isDirectory) onOpenFile(entry)
-              }}
-              onKeyDown={(event) => {
-                if (!isDirectory && event.key === 'Enter') onOpenFile(entry)
-              }}
-              tabIndex={0}
-            >
-              <span className="tree-chevron" aria-hidden="true">
-                {isDirectory ? (isLoading ? '·' : isExpanded ? '⌄' : '›') : ''}
-              </span>
-              <span className="tree-entry-icon" aria-hidden="true">
-                {isDirectory ? <FolderIcon /> : <FileIcon />}
-              </span>
-              <span title={entry.path}>{entry.name}</span>
-            </button>
+            <div className="file-tree-row">
+              {isRenaming ? (
+                <form
+                  className="file-tree-item file-tree-rename-form"
+                  style={{ '--tree-depth': depth } as React.CSSProperties}
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void submitRename(entry)
+                  }}
+                >
+                  <span className="tree-chevron" aria-hidden="true" />
+                  <span className="tree-entry-icon" aria-hidden="true"><FileIcon /></span>
+                  <input
+                    value={renameDraft}
+                    aria-label={`输入 ${entry.name} 的新文件名`}
+                    autoFocus
+                    onChange={(event) => setRenameDraft(event.target.value)}
+                    onFocus={(event) => event.currentTarget.select()}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        event.preventDefault()
+                        setRenamingPath(null)
+                      }
+                    }}
+                  />
+                  <button type="submit" aria-label="确认重命名" title="确认">✓</button>
+                  <button
+                    type="button"
+                    aria-label="取消重命名"
+                    title="取消"
+                    onClick={() => setRenamingPath(null)}
+                  >×</button>
+                </form>
+              ) : (
+                <button
+                  className={`file-tree-item${isDirectory ? ' file-tree-directory' : ''}${entry.path === selectedFilePath ? ' file-tree-item-selected' : ''}${entry.path === activeFilePath ? ' file-tree-item-active' : ''}`}
+                  style={{ '--tree-depth': depth } as React.CSSProperties}
+                  type="button"
+                  role="treeitem"
+                  aria-expanded={isDirectory ? isExpanded : undefined}
+                  onClick={() => {
+                    if (isDirectory) onToggle(entry)
+                    else onSelectFile(entry.path)
+                  }}
+                  onDoubleClick={() => {
+                    if (!isDirectory) onOpenFile(entry)
+                  }}
+                  onKeyDown={(event) => {
+                    if (!isDirectory && event.key === 'Enter') onOpenFile(entry)
+                  }}
+                  tabIndex={0}
+                >
+                  <span className="tree-chevron" aria-hidden="true">
+                    {isDirectory ? (isLoading ? '·' : isExpanded ? '⌄' : '›') : ''}
+                  </span>
+                  <span className="tree-entry-icon" aria-hidden="true">
+                    {isDirectory ? <FolderIcon /> : <FileIcon />}
+                  </span>
+                  <span title={entry.path}>{entry.name}</span>
+                </button>
+              )}
+              {!isDirectory && !isRenaming ? (
+                <span className="file-tree-actions">
+                  <button
+                    type="button"
+                    aria-label={`重命名 ${entry.name}`}
+                    title="重命名"
+                    onClick={() => startRenaming(entry)}
+                  >✎</button>
+                  <button
+                    type="button"
+                    aria-label={`删除 ${entry.name}`}
+                    title="删除"
+                    onClick={() => onDeleteFile(entry)}
+                  >×</button>
+                </span>
+              ) : null}
+            </div>
             {isDirectory && isExpanded ? (
               <FileTreeLevel
                 directoryPath={entry.path}
@@ -227,6 +300,8 @@ function FileTreeLevel({
                 activeFilePath={activeFilePath}
                 selectedFilePath={selectedFilePath}
                 onOpenFile={onOpenFile}
+                onDeleteFile={onDeleteFile}
+                onRenameFile={onRenameFile}
                 onSelectFile={onSelectFile}
                 onToggle={onToggle}
               />
@@ -856,6 +931,117 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }
 
+  async function renameFile(entry: ProjectFileEntry, name: string): Promise<boolean> {
+    const openDocument = openDocumentsRef.current.find((document) => document.path === entry.path)
+    const openPresentation = openPresentationsRef.current.find(
+      (presentation) => presentation.path === entry.path
+    )
+    if (
+      openDocument?.isSaving ||
+      openDocument?.conflict ||
+      openPresentation?.isSaving ||
+      openPresentation?.isExporting ||
+      openPresentation?.conflict
+    ) {
+      setFileError('文件正在处理或存在冲突，暂时无法重命名')
+      return false
+    }
+    if (
+      (openDocument && openDocument.content !== openDocument.savedContent) ||
+      (openPresentation &&
+        openPresentation.serializedDocument !== openPresentation.savedSerializedDocument)
+    ) {
+      setFileError('请先保存文件，再进行重命名')
+      return false
+    }
+
+    setSelectedFilePath(entry.path)
+    setFileError('')
+    try {
+      const renamed = await window.projects.renameFile(project.handle, {
+        path: entry.path,
+        name
+      })
+      const keepsTextDocument = Boolean(openDocument) && /\.(?:md|markdown|txt)$/i.test(renamed.path)
+      const keepsPresentation = Boolean(openPresentation) && isPresentationPath(renamed.path)
+      setOpenDocuments((current) => keepsTextDocument
+        ? current.map((document) => document.path === entry.path
+          ? {
+              ...document,
+              path: renamed.path,
+              name: renamed.name,
+              kind: /\.(?:md|markdown)$/i.test(renamed.path) ? 'markdown' : 'text',
+              viewMode: /\.(?:md|markdown)$/i.test(renamed.path) ? document.viewMode : 'edit',
+              conflict: false,
+              error: ''
+            }
+          : document)
+        : current.filter((document) => document.path !== entry.path)
+      )
+      setOpenPresentations((current) => keepsPresentation
+        ? current.map((presentation) => presentation.path === entry.path
+          ? {
+              ...presentation,
+              path: renamed.path,
+              name: renamed.name,
+              conflict: false,
+              error: ''
+            }
+          : presentation)
+        : current.filter((presentation) => presentation.path !== entry.path)
+      )
+      setActiveDocumentPath((current) => current === entry.path
+        ? keepsTextDocument || keepsPresentation ? renamed.path : null
+        : current
+      )
+      setSelectedFilePath(renamed.path)
+      await refreshDirectory(parentDirectory(entry.path))
+      return true
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : '无法重命名文件')
+      return false
+    }
+  }
+
+  async function deleteFile(entry: ProjectFileEntry): Promise<void> {
+    const openDocument = openDocumentsRef.current.find((document) => document.path === entry.path)
+    const openPresentation = openPresentationsRef.current.find(
+      (presentation) => presentation.path === entry.path
+    )
+    if (
+      openDocument?.isSaving ||
+      openPresentation?.isSaving ||
+      openPresentation?.isExporting
+    ) {
+      setFileError('文件正在处理，暂时无法删除')
+      return
+    }
+    const hasUnsavedChanges = Boolean(
+      (openDocument && openDocument.content !== openDocument.savedContent) ||
+      (openPresentation &&
+        openPresentation.serializedDocument !== openPresentation.savedSerializedDocument)
+    )
+    const warning = hasUnsavedChanges
+      ? '\n当前未保存内容也会丢失。'
+      : '\n文件将从当前项目中移除。'
+    if (!window.confirm(`确定删除“${entry.name}”吗？${warning}`)) return
+
+    setSelectedFilePath(entry.path)
+    setFileError('')
+    try {
+      await window.projects.deleteFile(project.handle, entry.path)
+      setOpenDocuments((current) => current.filter((document) => document.path !== entry.path))
+      setOpenPresentations((current) => current.filter(
+        (presentation) => presentation.path !== entry.path
+      ))
+      setActiveDocumentPath((current) => current === entry.path ? null : current)
+      setSelectedFilePath((current) => current === entry.path ? null : current)
+      await refreshDirectory(parentDirectory(entry.path))
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : '无法删除文件')
+    }
+  }
+
   async function createPresentation(): Promise<void> {
     const existingNames = new Set(
       (entriesByDirectory[''] ?? []).map((entry) => entry.name.toLocaleLowerCase())
@@ -1329,6 +1515,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 activeFilePath={activeDocumentPath}
                 selectedFilePath={selectedFilePath}
                 onOpenFile={(entry) => void openFile(entry)}
+                onDeleteFile={(entry) => void deleteFile(entry)}
+                onRenameFile={renameFile}
                 onSelectFile={setSelectedFilePath}
                 onToggle={(entry) => void toggleDirectory(entry)}
               />
