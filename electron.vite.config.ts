@@ -8,6 +8,7 @@ import IconsResolver from 'unplugin-icons/resolver'
 import Components from 'unplugin-vue-components/vite'
 
 const pptistSource = resolve('node_modules/pptist/src')
+const pptistPublic = resolve('node_modules/pptist/public')
 
 export default defineConfig({
   main: {
@@ -27,6 +28,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()]
   },
   renderer: {
+    publicDir: pptistPublic,
     optimizeDeps: {
       esbuildOptions: {
         loader: {
