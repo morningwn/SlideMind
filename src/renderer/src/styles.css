@@ -113,8 +113,27 @@ button:disabled {
 .title-bar-identity {
   display: flex;
   min-width: 0;
+  flex: 1 1 auto;
   align-items: center;
   gap: 9px;
+}
+
+.title-bar-action-slot {
+  display: flex;
+  min-width: 0;
+  height: 100%;
+  flex: 0 1 auto;
+  align-items: center;
+  margin-left: auto;
+  padding-left: 12px;
+  -webkit-app-region: no-drag;
+}
+
+.title-bar-actions {
+  display: flex;
+  min-width: max-content;
+  align-items: center;
+  gap: 8px;
 }
 
 .title-bar-icon {
@@ -1362,9 +1381,8 @@ button.file-tree-item:not(.file-tree-directory) {
 }
 
 .workspace-bar {
-  display: grid;
+  display: flex;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) auto;
   border-bottom: 1px solid var(--line);
   background: #f7f9fc;
 }
@@ -1372,6 +1390,7 @@ button.file-tree-item:not(.file-tree-directory) {
 .workspace-tabs {
   display: flex;
   min-width: 0;
+  flex: 1;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: thin;
@@ -1486,25 +1505,9 @@ button.file-tree-item:not(.file-tree-directory) {
   content: '';
 }
 
-.workspace-document-actions,
 .workspace-view-switch {
   display: flex;
   align-items: center;
-}
-
-.workspace-document-actions {
-  min-width: max-content;
-  gap: 8px;
-  padding: 0 7px 0 9px;
-  border-left: 1px solid #e2e8f1;
-  box-shadow: -10px 0 18px rgb(45 60 90 / 4%);
-}
-
-.workspace-file-kind {
-  color: #758299;
-  font-size: 9px;
-  font-weight: 720;
-  letter-spacing: 0.08em;
 }
 
 .workspace-view-switch {
@@ -1548,6 +1551,29 @@ button.file-tree-item:not(.file-tree-directory) {
 .workspace-save-button:disabled {
   border-color: #d8e0ec;
   color: #95a0b1;
+  background: #edf1f6;
+  cursor: default;
+}
+
+.workspace-export-button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #cbd7e9;
+  border-radius: 7px;
+  color: #315aab;
+  background: white;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 680;
+}
+
+.workspace-export-button:hover:not(:disabled) {
+  border-color: #aebed9;
+  background: #f9fbff;
+}
+
+.workspace-export-button:disabled {
+  color: #9aa5b5;
   background: #edf1f6;
   cursor: default;
 }
@@ -2194,24 +2220,6 @@ button.file-tree-item:not(.file-tree-directory) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.presentation-statusbar button {
-  height: 23px;
-  padding: 0 9px;
-  border: 1px solid #cbd7e9;
-  border-radius: 6px;
-  color: #315aab;
-  background: white;
-  cursor: pointer;
-  font-size: 9px;
-  font-weight: 680;
-}
-
-.presentation-statusbar button:disabled {
-  color: #9aa5b5;
-  background: #edf1f6;
-  cursor: default;
 }
 
 .presentation-pptist-frame {
@@ -3338,7 +3346,43 @@ button.file-tree-item:not(.file-tree-directory) {
 
 }
 
+@media (max-width: 560px) {
+  .title-bar-identity {
+    display: none;
+  }
+
+  .title-bar-action-slot {
+    padding-left: 0;
+  }
+
+  .title-bar-actions {
+    gap: 4px;
+  }
+
+  .workspace-history-button {
+    padding: 0 6px;
+  }
+
+  .workspace-view-switch button {
+    padding: 0 4px;
+  }
+
+  .workspace-export-button,
+  .workspace-save-button {
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+}
+
 @media (max-width: 980px) {
+  .title-bar-project select {
+    width: min(220px, 28vw);
+  }
+
+  .workspace-history-button span {
+    display: none;
+  }
+
   .project-workspace {
     grid-template-columns: 250px minmax(0, 1fr);
   }

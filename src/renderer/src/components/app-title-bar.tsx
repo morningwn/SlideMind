@@ -62,6 +62,7 @@ export function AppTitleBar({
           </label>
         ) : null}
       </div>
+      <div id="app-title-bar-actions" className="title-bar-action-slot" />
     </header>
   )
 }

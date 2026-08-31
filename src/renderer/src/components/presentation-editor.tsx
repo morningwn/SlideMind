@@ -22,7 +22,6 @@ export interface OpenPresentationDocument {
 interface PresentationEditorProps {
   document: OpenPresentationDocument
   onChange: (document: PresentationDocument) => void
-  onExport: () => void
   onReload: () => void
   onSave: (document?: PresentationDocument) => void
 }
@@ -43,7 +42,6 @@ function isPptistPresentation(value: unknown): value is PptistPresentation {
 export function PresentationEditor({
   document,
   onChange,
-  onExport,
   onReload,
   onSave
 }: PresentationEditorProps): React.JSX.Element {
@@ -121,13 +119,6 @@ export function PresentationEditor({
       ) : null}
       <div className="presentation-statusbar">
         <span>{document.lastExportPath ? `已导出：${document.lastExportPath}` : 'PPTist · 1000 × 562.5'}</span>
-        <div>
-          <button
-            type="button"
-            onClick={onExport}
-            disabled={document.isExporting || document.conflict}
-          >{document.isExporting ? '导出中…' : '导出 PPTX'}</button>
-        </div>
       </div>
       <iframe
         className="presentation-pptist-frame"

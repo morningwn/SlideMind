@@ -7,6 +7,7 @@ import {
   type FormEvent,
   type KeyboardEvent
 } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   AgentPromptReference,
   AgentSkillOption,
@@ -1854,8 +1855,77 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }, 3_000)
   }
 
+  const titleBarActionSlot = globalThis.document.getElementById('app-title-bar-actions')
+
   return (
     <section className="project-workspace" aria-label={`${project.name} 项目工作区`}>
+      {titleBarActionSlot ? createPortal(
+        <div className="title-bar-actions" aria-label="编辑操作">
+          <button
+            className={`workspace-history-button${isHistoryActive ? ' workspace-history-button-active' : ''}`}
+            type="button"
+            title="版本历史 (Ctrl/⌘ Shift H)"
+            aria-pressed={isHistoryActive}
+            onClick={openHistory}
+          >
+            <HistoryIcon />
+            <span>版本历史</span>
+          </button>
+          {!isHistoryActive && activeDocument ? (
+            <>
+              {activeDocument.kind === 'markdown' ? (
+                <div className="workspace-view-switch" aria-label="Markdown 查看方式">
+                  {(['edit', 'split', 'preview'] as const).map((mode) => (
+                    <button
+                      className={activeDocument.viewMode === mode ? 'workspace-view-active' : ''}
+                      key={mode}
+                      type="button"
+                      aria-pressed={activeDocument.viewMode === mode}
+                      onClick={() => updateDocumentViewMode(activeDocument.path, mode)}
+                    >
+                      {mode === 'edit' ? '编辑' : mode === 'split' ? '分栏' : '预览'}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <button
+                className="workspace-save-button"
+                type="button"
+                title="保存 (Ctrl/⌘S)"
+                aria-label={`保存 ${activeDocument.name}`}
+                onClick={() => void saveDocument(activeDocument.path)}
+                disabled={
+                  activeDocument.content === activeDocument.savedContent ||
+                  activeDocument.isSaving ||
+                  activeDocument.conflict
+                }
+              >保存</button>
+            </>
+          ) : !isHistoryActive && activePresentation ? (
+            <>
+              <button
+                className="workspace-export-button"
+                type="button"
+                onClick={() => void exportPresentation(activePresentation.path)}
+                disabled={activePresentation.isExporting || activePresentation.conflict}
+              >{activePresentation.isExporting ? '导出中…' : '导出 PPTX'}</button>
+              <button
+                className="workspace-save-button"
+                type="button"
+                title="保存 (Ctrl/⌘S)"
+                aria-label={`保存 ${activePresentation.name}`}
+                onClick={() => void savePresentation(activePresentation.path)}
+                disabled={
+                  activePresentation.serializedDocument === activePresentation.savedSerializedDocument ||
+                  activePresentation.isSaving ||
+                  activePresentation.conflict
+                }
+              >保存</button>
+            </>
+          ) : null}
+        </div>,
+        titleBarActionSlot
+      ) : null}
       <aside className="project-sidebar">
         <section className="conversation-pane" aria-labelledby="conversation-list-title">
           <header className="sidebar-section-heading">
@@ -2085,65 +2155,6 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             ) : null}
           </nav>
 
-          <div className="workspace-document-actions">
-            <button
-              className={`workspace-history-button${isHistoryActive ? ' workspace-history-button-active' : ''}`}
-              type="button"
-              title="版本历史 (Ctrl/⌘ Shift H)"
-              aria-pressed={isHistoryActive}
-              onClick={openHistory}
-            >
-              <HistoryIcon />
-              <span>版本历史</span>
-            </button>
-            {!isHistoryActive && activeDocument ? (
-              <>
-                {activeDocument.kind === 'markdown' ? (
-                <div className="workspace-view-switch" aria-label="Markdown 查看方式">
-                  {(['edit', 'split', 'preview'] as const).map((mode) => (
-                    <button
-                      className={activeDocument.viewMode === mode ? 'workspace-view-active' : ''}
-                      key={mode}
-                      type="button"
-                      aria-pressed={activeDocument.viewMode === mode}
-                      onClick={() => updateDocumentViewMode(activeDocument.path, mode)}
-                    >
-                      {mode === 'edit' ? '编辑' : mode === 'split' ? '分栏' : '预览'}
-                    </button>
-                  ))}
-                </div>
-                ) : null}
-                <button
-                  className="workspace-save-button"
-                  type="button"
-                  title="保存 (Ctrl/⌘S)"
-                  aria-label={`保存 ${activeDocument.name}`}
-                  onClick={() => void saveDocument(activeDocument.path)}
-                  disabled={
-                    activeDocument.content === activeDocument.savedContent ||
-                    activeDocument.isSaving ||
-                    activeDocument.conflict
-                  }
-                >保存</button>
-              </>
-            ) : !isHistoryActive && activePresentation ? (
-              <>
-                <span className="workspace-file-kind">SLIDES</span>
-                <button
-                  className="workspace-save-button"
-                  type="button"
-                  title="保存 (Ctrl/⌘S)"
-                  aria-label={`保存 ${activePresentation.name}`}
-                  onClick={() => void savePresentation(activePresentation.path)}
-                  disabled={
-                    activePresentation.serializedDocument === activePresentation.savedSerializedDocument ||
-                    activePresentation.isSaving ||
-                    activePresentation.conflict
-                  }
-                >保存</button>
-              </>
-            ) : null}
-          </div>
         </header>
 
         {isHistoryActive ? (
@@ -2169,7 +2180,6 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               onChange={(document) => updatePresentation(activePresentation.path, document)}
               onReload={() => void reloadPresentation(activePresentation.path)}
               onSave={(document) => void savePresentation(activePresentation.path, document)}
-              onExport={() => void exportPresentation(activePresentation.path)}
             />
           </Suspense>
         ) : (
