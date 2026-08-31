@@ -2007,12 +2007,29 @@ button.file-tree-item:not(.file-tree-directory) {
   cursor: default;
 }
 
-.presentation-univer-host {
+.presentation-univer-stage {
   position: relative;
   min-width: 0;
   min-height: 0;
   flex: 1;
   overflow: hidden;
+}
+
+.presentation-univer-host {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.presentation-univer-preview {
+  z-index: 10001;
+  display: none;
+  pointer-events: none;
+  background: white;
+}
+
+.presentation-univer-preview.is-visible {
+  display: block;
 }
 
 .presentation-univer-host > div {

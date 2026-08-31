@@ -54,6 +54,7 @@ export function PresentationEditor({
   onSave
 }: PresentationEditorProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
+  const previewRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
   const [setupError, setSetupError] = useState('')
@@ -63,14 +64,37 @@ export function PresentationEditor({
 
   useEffect(() => {
     const host = hostRef.current
-    if (!host) return
+    const preview = previewRef.current
+    if (!host || !preview) return
     let univer: Univer | undefined
     let changeTimer: number | undefined
+    let previewFrame = 0
+    let previewCleanupFrame = 0
     let closeTextEditor: (() => void) | undefined
     let active = true
     let ready = false
     let refreshAfterTextCommit = false
     let lastSerializedSnapshot = JSON.stringify(document.document.snapshot)
+
+    const captureEditorPreview = (): void => {
+      const clonedHost = host.cloneNode(true) as HTMLDivElement
+      preview.replaceChildren(...Array.from(clonedHost.childNodes))
+      const sourceCanvases = host.querySelectorAll('canvas')
+      const previewCanvases = preview.querySelectorAll('canvas')
+      sourceCanvases.forEach((sourceCanvas, index) => {
+        const previewCanvas = previewCanvases.item(index)
+        if (!previewCanvas) return
+        previewCanvas.width = sourceCanvas.width
+        previewCanvas.height = sourceCanvas.height
+        previewCanvas.getContext('2d')?.drawImage(sourceCanvas, 0, 0)
+      })
+      preview.classList.add('is-visible')
+    }
+
+    const hideEditorPreview = (): void => {
+      preview.classList.remove('is-visible')
+      preview.replaceChildren()
+    }
 
     try {
       setSetupError('')
@@ -271,16 +295,24 @@ export function PresentationEditor({
             ...document.document,
             snapshot: JSON.parse(serializedSnapshot) as ISlideData
           })
-          if (shouldRefreshEditor) setEditorGeneration((current) => current + 1)
+          if (shouldRefreshEditor) {
+            captureEditorPreview()
+            setEditorGeneration((current) => current + 1)
+          }
         }, 120)
       })
       queueMicrotask(() => {
         ready = true
+        previewFrame = window.requestAnimationFrame(() => {
+          previewCleanupFrame = window.requestAnimationFrame(hideEditorPreview)
+        })
       })
 
       return () => {
         active = false
         if (changeTimer !== undefined) window.clearTimeout(changeTimer)
+        window.cancelAnimationFrame(previewFrame)
+        window.cancelAnimationFrame(previewCleanupFrame)
         closeTextEditor?.()
         commandSubscription.dispose()
         editorVisibilitySubscription.unsubscribe()
@@ -291,6 +323,7 @@ export function PresentationEditor({
     } catch (error) {
       univer?.dispose()
       host.replaceChildren()
+      hideEditorPreview()
       setSetupError(error instanceof Error ? error.message : '无法初始化 Univer Slides')
     }
   }, [document.path, document.reloadKey, editorGeneration])
@@ -326,7 +359,14 @@ export function PresentationEditor({
           >{document.isExporting ? '导出中…' : '导出 PPTX'}</button>
         </div>
       </div>
-      <div className="presentation-univer-host" ref={hostRef} />
+      <div className="presentation-univer-stage">
+        <div className="presentation-univer-host" ref={hostRef} />
+        <div
+          aria-hidden="true"
+          className="presentation-univer-host presentation-univer-preview"
+          ref={previewRef}
+        />
+      </div>
     </section>
   )
 }
