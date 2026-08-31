@@ -1,0 +1,50 @@
+# 映射到 SlideMind 工具
+
+本参考结合 PPTist 官方画布、数据结构和 AI 数据说明，并以 SlideMind 当前 `slides_write` 参数为最终边界。
+
+## 坐标与层级
+
+- 默认画布为 1000 × 562.5，左上角是 `(0, 0)`，`x` 向右、`y` 向下。
+- PPTist 的 `left/top/width/height` 映射为 `slides_write` 的 `x/y/width/height`。
+- `rotate` 映射为 `rotation`，均为顺时针角度。
+- PPTist 的元素数组顺序就是层级顺序，后面的元素覆盖前面的元素。转换后保持相同顺序。
+- 只有 `slides_read` 返回不同画布时才按比例缩放所有坐标和尺寸。
+
+## 元素映射
+
+| PPTist 元素 | `slides_write` | 处理方式 |
+| --- | --- | --- |
+| `text` | `text` | 提取可见文字；保留位置、字号、字体、颜色、粗体和斜体意图 |
+| 矩形 `shape` | `shape` | 使用普通矩形；圆角矩形使用 `shape: "roundRect"` |
+| 复杂 `shape` | 简化的 `shape` 或省略 | 只保留承担信息层级或主要构图的形状 |
+| `line` | 窄矩形或省略 | 分隔线可用窄矩形近似；连接关系不能被装饰性近似掩盖 |
+| `image` | `image` | 仅当已有 `data:image/...` 时写入 |
+| 表格、图表、媒体、公式、动画 | 无直接映射 | 改用工具支持的文本、形状或现成内嵌图片；不能声称无损保留 |
+
+`slides_write` 接受纯文本，不接受 PPTist 的完整富文本 HTML。提取内容时保留换行与文字含义；只通过工具暴露的字段表达样式。
+
+## 主题
+
+PPTist 状态将 `theme` 与 `slides` 分开保存，主题包含背景色、主题色、字体颜色和字体。当前 `slides_write` 不暴露全局主题参数，因此：
+
+- 在每页背景、文本和形状上显式使用所选模板的颜色与字体；
+- 保持跨页位置和视觉角色一致；
+- 不得声称已经修改演示文稿的全局 `theme`；
+- 字体优先使用模板指定值。空字体优先使用 `SourceHanSans`；只使用 SlideMind 已提供的字体。
+
+## 图片与外部资源
+
+PPTist AI 数据说明允许网络图片地址，但 SlideMind 当前工具只允许 `data:image/...`。这是工具边界，不是模板数据错误。
+
+- 用户或其他工具已提供合法内嵌图片时，按 `background`、`pageFigure`、`itemFigure` 的角色放置；
+- 没有内嵌图片时，删除示例图并重新平衡版式；
+- 不伪造 data URL，不写本地路径，也不把模板的 Pexels 示例图当作事实性配图。
+
+## 写入检查
+
+- 所有元素必须在画布内；旋转元素按旋转后的视觉边界人工留余量。
+- 文本框需要为 PPTist 默认内边距和段间距预留空间，长文本优先压缩、拆页或换布局。
+- 写入已有演示前确认当前页面能由受支持元素重建；否则停止整体覆盖并说明限制。
+- 写入后再次调用 `slides_read` 检查页数、标题、坐标、尺寸和元素类型。结构检查不能代替 PPTist 中的视觉验收。
+
+官方依据：[AI 数据结构](https://github.com/pipipi-pikachu/PPTist/blob/master/doc/AI_PPT_SCHEMA.md)、[画布原理](https://github.com/pipipi-pikachu/PPTist/blob/master/doc/Canvas.md)、[目录与数据](https://github.com/pipipi-pikachu/PPTist/blob/master/doc/DirectoryAndData.md)。
