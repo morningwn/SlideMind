@@ -57,6 +57,7 @@ export function PresentationEditor({
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
   const [setupError, setSetupError] = useState('')
+  const [editorGeneration, setEditorGeneration] = useState(0)
   onChangeRef.current = onChange
   onSaveRef.current = onSave
 
@@ -68,6 +69,7 @@ export function PresentationEditor({
     let closeTextEditor: (() => void) | undefined
     let active = true
     let ready = false
+    let refreshAfterTextCommit = false
     let lastSerializedSnapshot = JSON.stringify(document.document.snapshot)
 
     try {
@@ -205,6 +207,7 @@ export function PresentationEditor({
         const finish = (commit: boolean): void => {
           if (destroyed) return
           const text = input.value
+          refreshAfterTextCommit = commit && text !== richText.text
 
           // Model updates can move focus and dispatch blur again. Destroy the DOM editor
           // before ending Univer's edit session to prevent a recursive submit path.
@@ -262,10 +265,13 @@ export function PresentationEditor({
           const serializedSnapshot = JSON.stringify(model.getSnapshot())
           if (serializedSnapshot === lastSerializedSnapshot) return
           lastSerializedSnapshot = serializedSnapshot
+          const shouldRefreshEditor = refreshAfterTextCommit
+          refreshAfterTextCommit = false
           onChangeRef.current({
             ...document.document,
             snapshot: JSON.parse(serializedSnapshot) as ISlideData
           })
+          if (shouldRefreshEditor) setEditorGeneration((current) => current + 1)
         }, 120)
       })
       queueMicrotask(() => {
@@ -287,7 +293,7 @@ export function PresentationEditor({
       host.replaceChildren()
       setSetupError(error instanceof Error ? error.message : '无法初始化 Univer Slides')
     }
-  }, [document.path, document.reloadKey])
+  }, [document.path, document.reloadKey, editorGeneration])
 
   useEffect(() => {
     function saveShortcut(event: KeyboardEvent): void {
