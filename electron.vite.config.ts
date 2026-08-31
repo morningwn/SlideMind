@@ -37,6 +37,7 @@ export default defineConfig({
     resolve: {
       alias: {
         '@': pptistSource,
+        '@pptist-theme': resolve('src/renderer/pptist-theme.scss'),
         '@renderer': resolve('src/renderer/src')
       }
     },
@@ -44,8 +45,8 @@ export default defineConfig({
       preprocessorOptions: {
         scss: {
           additionalData: `
-            @import '@/assets/styles/variable.scss';
-            @import '@/assets/styles/mixin.scss';
+            @use '@pptist-theme' as *;
+            @use '@/assets/styles/mixin.scss' as *;
           `
         }
       }
