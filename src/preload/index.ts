@@ -12,6 +12,7 @@ import type {
   ProjectConversationState,
   ProjectExternalWatchScope,
   ProjectFileChangedEvent,
+  RenameProjectDirectoryInput,
   RenameProjectFileInput,
   SaveProjectTextFileInput
 } from '../shared/project'
@@ -74,6 +75,10 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
     ipcRenderer.invoke('project:rename-file', projectHandle, input),
   deleteFile: (projectHandle: string, relativePath: string) =>
     ipcRenderer.invoke('project:delete-file', projectHandle, relativePath),
+  renameDirectory: (projectHandle: string, input: RenameProjectDirectoryInput) =>
+    ipcRenderer.invoke('project:rename-directory', projectHandle, input),
+  deleteDirectory: (projectHandle: string, relativePath: string) =>
+    ipcRenderer.invoke('project:delete-directory', projectHandle, relativePath),
   readTextFile: (projectHandle: string, relativePath: string) =>
     ipcRenderer.invoke('project:read-text-file', projectHandle, relativePath),
   readPreviewAsset: (projectHandle: string, documentPath: string, assetPath: string) =>

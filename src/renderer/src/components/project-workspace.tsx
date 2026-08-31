@@ -86,6 +86,18 @@ function parentDirectory(path: string): string {
   return separatorIndex < 0 ? '' : path.slice(0, separatorIndex)
 }
 
+function isPathInside(path: string, directoryPath: string): boolean {
+  return path === directoryPath ||
+    path.startsWith(`${directoryPath}/`) ||
+    path.startsWith(`${directoryPath}\\`)
+}
+
+function replacePathDirectory(path: string, sourcePath: string, destinationPath: string): string {
+  return isPathInside(path, sourcePath)
+    ? `${destinationPath}${path.slice(sourcePath.length)}`
+    : path
+}
+
 function ConversationIcon(): React.JSX.Element {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -215,7 +227,7 @@ function FileTreeLevel({
             <div className="file-tree-row">
               {isRenaming ? (
                 <form
-                  className="file-tree-item file-tree-rename-form"
+                  className={`file-tree-item file-tree-rename-form${isDirectory ? ' file-tree-directory' : ''}`}
                   style={{ '--tree-depth': depth } as React.CSSProperties}
                   onSubmit={(event) => {
                     event.preventDefault()
@@ -223,10 +235,12 @@ function FileTreeLevel({
                   }}
                 >
                   <span className="tree-chevron" aria-hidden="true" />
-                  <span className="tree-entry-icon" aria-hidden="true"><FileIcon /></span>
+                  <span className="tree-entry-icon" aria-hidden="true">
+                    {isDirectory ? <FolderIcon /> : <FileIcon />}
+                  </span>
                   <input
                     value={renameDraft}
-                    aria-label={`输入 ${entry.name} 的新文件名`}
+                    aria-label={`输入 ${entry.name} 的新名称`}
                     autoFocus
                     onChange={(event) => setRenameDraft(event.target.value)}
                     onFocus={(event) => event.currentTarget.select()}
@@ -273,7 +287,7 @@ function FileTreeLevel({
                   <span title={entry.path}>{entry.name}</span>
                 </button>
               )}
-              {!isDirectory && !isRenaming ? (
+              {!isRenaming ? (
                 <span className="file-tree-actions">
                   <button
                     type="button"
@@ -931,37 +945,87 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }
 
-  async function renameFile(entry: ProjectFileEntry, name: string): Promise<boolean> {
-    const openDocument = openDocumentsRef.current.find((document) => document.path === entry.path)
-    const openPresentation = openPresentationsRef.current.find(
-      (presentation) => presentation.path === entry.path
-    )
+  async function renameEntry(entry: ProjectFileEntry, name: string): Promise<boolean> {
+    const matchesEntry = (path: string): boolean => entry.kind === 'directory'
+      ? isPathInside(path, entry.path)
+      : path === entry.path
+    const matchingDocuments = openDocumentsRef.current.filter((document) => (
+      matchesEntry(document.path)
+    ))
+    const matchingPresentations = openPresentationsRef.current.filter((presentation) => (
+      matchesEntry(presentation.path)
+    ))
     if (
-      openDocument?.isSaving ||
-      openDocument?.conflict ||
-      openPresentation?.isSaving ||
-      openPresentation?.isExporting ||
-      openPresentation?.conflict
+      matchingDocuments.some((document) => document.isSaving || document.conflict) ||
+      matchingPresentations.some((presentation) => (
+        presentation.isSaving || presentation.isExporting || presentation.conflict
+      ))
     ) {
-      setFileError('文件正在处理或存在冲突，暂时无法重命名')
+      setFileError('文件或文件夹正在处理或存在冲突，暂时无法重命名')
       return false
     }
     if (
-      (openDocument && openDocument.content !== openDocument.savedContent) ||
-      (openPresentation &&
-        openPresentation.serializedDocument !== openPresentation.savedSerializedDocument)
+      matchingDocuments.some((document) => document.content !== document.savedContent) ||
+      matchingPresentations.some((presentation) => (
+        presentation.serializedDocument !== presentation.savedSerializedDocument
+      ))
     ) {
-      setFileError('请先保存文件，再进行重命名')
+      setFileError(entry.kind === 'directory'
+        ? '请先保存文件夹内所有文件，再进行重命名'
+        : '请先保存文件，再进行重命名'
+      )
       return false
     }
 
     setSelectedFilePath(entry.path)
     setFileError('')
     try {
-      const renamed = await window.projects.renameFile(project.handle, {
-        path: entry.path,
-        name
-      })
+      const renamed = entry.kind === 'directory'
+        ? await window.projects.renameDirectory(project.handle, { path: entry.path, name })
+        : await window.projects.renameFile(project.handle, { path: entry.path, name })
+      if (entry.kind === 'directory') {
+        setOpenDocuments((current) => current.map((document) => matchesEntry(document.path)
+          ? {
+              ...document,
+              path: replacePathDirectory(document.path, entry.path, renamed.path),
+              conflict: false,
+              error: ''
+            }
+          : document
+        ))
+        setOpenPresentations((current) => current.map((presentation) => (
+          matchesEntry(presentation.path)
+            ? {
+                ...presentation,
+                path: replacePathDirectory(presentation.path, entry.path, renamed.path),
+                conflict: false,
+                error: ''
+              }
+            : presentation
+        )))
+        setActiveDocumentPath((current) => current && matchesEntry(current)
+          ? replacePathDirectory(current, entry.path, renamed.path)
+          : current
+        )
+        setSelectedFilePath((current) => current && matchesEntry(current)
+          ? replacePathDirectory(current, entry.path, renamed.path)
+          : renamed.path
+        )
+        setExpandedPaths((current) => new Set(
+          [...current].filter((path) => !isPathInside(path, entry.path))
+        ))
+        setLoadingPaths((current) => new Set(
+          [...current].filter((path) => !isPathInside(path, entry.path))
+        ))
+        setEntriesByDirectory((current) => Object.fromEntries(
+          Object.entries(current).filter(([path]) => !isPathInside(path, entry.path))
+        ))
+        await refreshDirectory(parentDirectory(entry.path))
+        return true
+      }
+
+      const openDocument = matchingDocuments[0]
+      const openPresentation = matchingPresentations[0]
       const keepsTextDocument = Boolean(openDocument) && /\.(?:md|markdown|txt)$/i.test(renamed.path)
       const keepsPresentation = Boolean(openPresentation) && isPresentationPath(renamed.path)
       setOpenDocuments((current) => keepsTextDocument
@@ -998,47 +1062,73 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       await refreshDirectory(parentDirectory(entry.path))
       return true
     } catch (error) {
-      setFileError(error instanceof Error ? error.message : '无法重命名文件')
+      setFileError(error instanceof Error ? error.message : '无法重命名文件或文件夹')
       return false
     }
   }
 
-  async function deleteFile(entry: ProjectFileEntry): Promise<void> {
-    const openDocument = openDocumentsRef.current.find((document) => document.path === entry.path)
-    const openPresentation = openPresentationsRef.current.find(
-      (presentation) => presentation.path === entry.path
-    )
+  async function deleteEntry(entry: ProjectFileEntry): Promise<void> {
+    const matchesEntry = (path: string): boolean => entry.kind === 'directory'
+      ? isPathInside(path, entry.path)
+      : path === entry.path
+    const matchingDocuments = openDocumentsRef.current.filter((document) => (
+      matchesEntry(document.path)
+    ))
+    const matchingPresentations = openPresentationsRef.current.filter((presentation) => (
+      matchesEntry(presentation.path)
+    ))
     if (
-      openDocument?.isSaving ||
-      openPresentation?.isSaving ||
-      openPresentation?.isExporting
+      matchingDocuments.some((document) => document.isSaving) ||
+      matchingPresentations.some((presentation) => (
+        presentation.isSaving || presentation.isExporting
+      ))
     ) {
-      setFileError('文件正在处理，暂时无法删除')
+      setFileError('文件或文件夹正在处理，暂时无法删除')
       return
     }
     const hasUnsavedChanges = Boolean(
-      (openDocument && openDocument.content !== openDocument.savedContent) ||
-      (openPresentation &&
-        openPresentation.serializedDocument !== openPresentation.savedSerializedDocument)
+      matchingDocuments.some((document) => document.content !== document.savedContent) ||
+      matchingPresentations.some((presentation) => (
+        presentation.serializedDocument !== presentation.savedSerializedDocument
+      ))
     )
-    const warning = hasUnsavedChanges
-      ? '\n当前未保存内容也会丢失。'
-      : '\n文件将从当前项目中移除。'
+    const warning = entry.kind === 'directory'
+      ? `\n文件夹及其中的全部内容都将被移除。${
+          hasUnsavedChanges ? '\n当前未保存内容也会丢失。' : ''
+        }`
+      : hasUnsavedChanges
+        ? '\n当前未保存内容也会丢失。'
+        : '\n文件将从当前项目中移除。'
     if (!window.confirm(`确定删除“${entry.name}”吗？${warning}`)) return
 
     setSelectedFilePath(entry.path)
     setFileError('')
     try {
-      await window.projects.deleteFile(project.handle, entry.path)
-      setOpenDocuments((current) => current.filter((document) => document.path !== entry.path))
+      if (entry.kind === 'directory') {
+        await window.projects.deleteDirectory(project.handle, entry.path)
+      } else {
+        await window.projects.deleteFile(project.handle, entry.path)
+      }
+      setOpenDocuments((current) => current.filter((document) => !matchesEntry(document.path)))
       setOpenPresentations((current) => current.filter(
-        (presentation) => presentation.path !== entry.path
+        (presentation) => !matchesEntry(presentation.path)
       ))
-      setActiveDocumentPath((current) => current === entry.path ? null : current)
-      setSelectedFilePath((current) => current === entry.path ? null : current)
+      setActiveDocumentPath((current) => current && matchesEntry(current) ? null : current)
+      setSelectedFilePath((current) => current && matchesEntry(current) ? null : current)
+      if (entry.kind === 'directory') {
+        setExpandedPaths((current) => new Set(
+          [...current].filter((path) => !isPathInside(path, entry.path))
+        ))
+        setLoadingPaths((current) => new Set(
+          [...current].filter((path) => !isPathInside(path, entry.path))
+        ))
+        setEntriesByDirectory((current) => Object.fromEntries(
+          Object.entries(current).filter(([path]) => !isPathInside(path, entry.path))
+        ))
+      }
       await refreshDirectory(parentDirectory(entry.path))
     } catch (error) {
-      setFileError(error instanceof Error ? error.message : '无法删除文件')
+      setFileError(error instanceof Error ? error.message : '无法删除文件或文件夹')
     }
   }
 
@@ -1515,8 +1605,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 activeFilePath={activeDocumentPath}
                 selectedFilePath={selectedFilePath}
                 onOpenFile={(entry) => void openFile(entry)}
-                onDeleteFile={(entry) => void deleteFile(entry)}
-                onRenameFile={renameFile}
+                onDeleteFile={(entry) => void deleteEntry(entry)}
+                onRenameFile={renameEntry}
                 onSelectFile={setSelectedFilePath}
                 onToggle={(entry) => void toggleDirectory(entry)}
               />

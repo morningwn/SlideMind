@@ -7,9 +7,13 @@ import type {
 import { ProjectConversationStore } from './conversation-store'
 import { RecentProjectStore, resolveProject } from './recent-project-store'
 import {
+  deleteProjectDirectory,
   deleteProjectFile,
   listProjectDirectory,
+  projectDirectoryDeletePaths,
+  projectDirectoryRenamePaths,
   projectFileRenamePaths,
+  renameProjectDirectory,
   renameProjectFile
 } from './project-files'
 import { ProjectRootRegistry } from './project-root-registry'
@@ -104,6 +108,34 @@ export function registerProjectIpc(
     return mutations.run(
       { projectPath, projectHandle, paths: [relativePath], source: 'file-tree' },
       () => deleteProjectFile(projectPath, relativePath)
+    )
+  })
+
+  ipcMain.handle('project:rename-directory', async (
+    _event,
+    projectHandle: unknown,
+    inputValue: unknown
+  ) => {
+    if (typeof projectHandle !== 'string') throw new Error('项目授权无效')
+    const projectPath = projectRoots.resolve(projectHandle)
+    const { input, paths } = await projectDirectoryRenamePaths(projectPath, inputValue)
+    return mutations.run(
+      { projectPath, projectHandle, paths, source: 'file-tree' },
+      () => renameProjectDirectory(projectPath, input)
+    )
+  })
+
+  ipcMain.handle('project:delete-directory', async (
+    _event,
+    projectHandle: unknown,
+    relativePath: unknown
+  ) => {
+    if (typeof projectHandle !== 'string') throw new Error('项目授权无效')
+    const projectPath = projectRoots.resolve(projectHandle)
+    const prepared = await projectDirectoryDeletePaths(projectPath, relativePath)
+    return mutations.run(
+      { projectPath, projectHandle, paths: prepared.paths, source: 'file-tree' },
+      () => deleteProjectDirectory(projectPath, prepared.path)
     )
   })
 

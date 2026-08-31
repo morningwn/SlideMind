@@ -4,6 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { listFiles, log, readBlob, resolveRef, statusMatrix } from 'isomorphic-git'
 import { describe, expect, it } from 'vitest'
+import {
+  projectDirectoryRenamePaths,
+  renameProjectDirectory
+} from '../project/project-files'
 import { ProjectMutationService } from './project-mutation-service'
 import { ProjectVersionService } from './project-version-service'
 
@@ -249,6 +253,40 @@ describe('ProjectVersionService', () => {
       changes: [
         { path: 'draft.md', kind: 'removed' },
         { path: 'final.md', kind: 'added' }
+      ]
+    })
+  })
+
+  it('records every file moved by a directory rename', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-versions-'))
+    await mkdir(join(projectPath, 'drafts'))
+    await writeFile(join(projectPath, 'drafts', 'outline.md'), '# outline\n')
+    await writeFile(join(projectPath, 'drafts', 'notes.txt'), 'notes\n')
+    const versions = new ProjectVersionService()
+    const mutations = new ProjectMutationService(versions)
+    const prepared = await projectDirectoryRenamePaths(projectPath, {
+      path: 'drafts',
+      name: 'published'
+    })
+
+    await mutations.run(
+      {
+        projectPath,
+        projectHandle: 'project-1',
+        paths: prepared.paths,
+        source: 'file-tree'
+      },
+      () => renameProjectDirectory(projectPath, prepared.input)
+    )
+    await versions.flush(projectPath)
+
+    expect((await versions.listVersions(projectPath)).versions[0]).toMatchObject({
+      sources: ['file-tree'],
+      changes: [
+        { path: 'drafts/notes.txt', kind: 'removed' },
+        { path: 'drafts/outline.md', kind: 'removed' },
+        { path: 'published/notes.txt', kind: 'added' },
+        { path: 'published/outline.md', kind: 'added' }
       ]
     })
   })

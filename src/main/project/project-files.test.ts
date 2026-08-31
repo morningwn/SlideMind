@@ -3,8 +3,12 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vitest'
 import {
+  deleteProjectDirectory,
   deleteProjectFile,
   listProjectDirectory,
+  projectDirectoryDeletePaths,
+  projectDirectoryRenamePaths,
+  renameProjectDirectory,
   renameProjectFile
 } from './project-files'
 
@@ -78,7 +82,7 @@ describe('listProjectDirectory', () => {
     await expect(renameProjectFile(projectPath, {
       path: 'first.md',
       name: '../outside.md'
-    })).rejects.toThrow('新文件名无效')
+    })).rejects.toThrow('新名称无效')
     await expect(renameProjectFile(projectPath, {
       path: 'first.md',
       name: 'second.md'
@@ -105,5 +109,67 @@ describe('listProjectDirectory', () => {
     )).rejects.toThrow('内部文件')
     await expect(listProjectDirectory(projectPath, '.slideMind')).rejects.toThrow('内部目录')
     await expect(listProjectDirectory(projectPath, '.git')).rejects.toThrow('内部目录')
+  })
+
+  it('renames a directory and prepares old and new version paths', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-files-'))
+    await mkdir(join(projectPath, 'drafts', 'nested'), { recursive: true })
+    await writeFile(join(projectPath, 'drafts', 'outline.md'), 'Outline')
+    await writeFile(join(projectPath, 'drafts', 'nested', 'notes.txt'), 'Notes')
+    const input = { path: 'drafts', name: 'published' }
+
+    await expect(projectDirectoryRenamePaths(projectPath, input)).resolves.toEqual({
+      input,
+      paths: [
+        join('drafts', 'nested', 'notes.txt'),
+        join('drafts', 'outline.md'),
+        join('published', 'nested', 'notes.txt'),
+        join('published', 'outline.md')
+      ]
+    })
+    await expect(renameProjectDirectory(projectPath, input)).resolves.toEqual({
+      kind: 'directory',
+      name: 'published',
+      path: 'published'
+    })
+    await expect(readFile(
+      join(projectPath, 'published', 'nested', 'notes.txt'),
+      'utf8'
+    )).resolves.toBe('Notes')
+    await expect(access(join(projectPath, 'drafts'))).rejects.toThrow()
+  })
+
+  it('recursively deletes a directory and reports its versioned files', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-files-'))
+    await mkdir(join(projectPath, 'obsolete', 'nested'), { recursive: true })
+    await writeFile(join(projectPath, 'obsolete', 'first.md'), 'First')
+    await writeFile(join(projectPath, 'obsolete', 'nested', 'second.md'), 'Second')
+
+    await expect(projectDirectoryDeletePaths(projectPath, 'obsolete')).resolves.toEqual({
+      path: 'obsolete',
+      paths: [
+        join('obsolete', 'first.md'),
+        join('obsolete', 'nested', 'second.md')
+      ]
+    })
+    await expect(deleteProjectDirectory(projectPath, 'obsolete')).resolves.toBeUndefined()
+    await expect(access(join(projectPath, 'obsolete'))).rejects.toThrow()
+  })
+
+  it('rejects root, internal, symbolic-link and duplicate directory operations', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-files-'))
+    const outsidePath = await mkdtemp(join(tmpdir(), 'slidemind-files-outside-'))
+    await mkdir(join(projectPath, 'first'))
+    await mkdir(join(projectPath, 'second'))
+    await mkdir(join(projectPath, '.slideMind'))
+    await symlink(outsidePath, join(projectPath, 'linked'))
+
+    await expect(deleteProjectDirectory(projectPath, '.')).rejects.toThrow('超出项目范围')
+    await expect(deleteProjectDirectory(projectPath, '.slideMind')).rejects.toThrow('内部目录')
+    await expect(deleteProjectDirectory(projectPath, 'linked')).rejects.toThrow('符号链接')
+    await expect(renameProjectDirectory(projectPath, {
+      path: 'first',
+      name: 'second'
+    })).rejects.toThrow('同名文件夹已存在')
   })
 })

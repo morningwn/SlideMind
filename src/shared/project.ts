@@ -37,6 +37,8 @@ export interface RenameProjectFileInput {
   name: string
 }
 
+export type RenameProjectDirectoryInput = RenameProjectFileInput
+
 export type ProjectMutationSource =
   | 'agent'
   | 'file-tree'
@@ -97,6 +99,11 @@ export interface ProjectApi {
     input: RenameProjectFileInput
   ): Promise<ProjectFileEntry>
   deleteFile(projectHandle: string, relativePath: string): Promise<void>
+  renameDirectory(
+    projectHandle: string,
+    input: RenameProjectDirectoryInput
+  ): Promise<ProjectFileEntry>
+  deleteDirectory(projectHandle: string, relativePath: string): Promise<void>
   readTextFile(projectHandle: string, relativePath: string): Promise<ProjectTextFile>
   readPreviewAsset(
     projectHandle: string,
