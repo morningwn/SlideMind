@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
@@ -16,6 +16,14 @@ const EXPECTED_SKILLS = [
 
 const EXPECTED_TEMPLATE_SLIDE_COUNTS = [38, 36, 36, 36, 27, 28, 26, 30]
 const execFileAsync = promisify(execFile)
+
+async function listFiles(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true })
+  return (await Promise.all(entries.map((entry) => {
+    const path = resolve(directory, entry.name)
+    return entry.isDirectory() ? listFiles(path) : [path]
+  }))).flat()
+}
 
 describe('resolveBundledSkillsDirectory', () => {
   it('uses the source directory during development', () => {
@@ -88,6 +96,13 @@ describe('bundled presentation skills', () => {
         new Set(['cover', 'contents', 'transition', 'content', 'end'])
       )
     }
+  })
+
+  it('keeps every bundled skill resource offline', async () => {
+    const files = await listFiles(resolve('skills'))
+    const contents = await Promise.all(files.map((file) => readFile(file, 'utf8')))
+
+    expect(contents.some((content) => /https?:\/\//i.test(content))).toBe(false)
   })
 
   it('queries one template without loading the complete library', async () => {

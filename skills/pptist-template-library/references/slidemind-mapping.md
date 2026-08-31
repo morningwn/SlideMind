@@ -30,14 +30,16 @@ PPTist 状态将 `theme` 与 `slides` 分开保存，主题包含背景色、主
 - 在每页背景、文本和形状上显式使用所选模板的颜色与字体；
 - 保持跨页位置和视觉角色一致；
 - 不得声称已经修改演示文稿的全局 `theme`；
+- PPTist 的预设主题默认只影响后续新建的元素或页面；既有内容只有在显式执行“应用主题到全部”后才会更新，而当前工具不提供该操作；
 - 字体优先使用模板指定值。空字体优先使用 `SourceHanSans`；只使用 SlideMind 已提供的字体。
 
 ## 图片与外部资源
 
-PPTist AI 数据说明允许网络图片地址，但 SlideMind 当前工具只允许 `data:image/...`。这是工具边界，不是模板数据错误。
+SlideMind 当前工具只允许 `data:image/...`。内置模板中的图片已替换为本地内嵌占位图，执行时不得搜索、下载或恢复原始网络示例图。
 
 - 用户或其他工具已提供合法内嵌图片时，按 `background`、`pageFigure`、`itemFigure` 的角色放置；
-- 没有内嵌图片时，删除示例图并重新平衡版式；
+- 没有用户提供的内嵌图片时，删除离线占位图并重新平衡版式；
+- 内嵌图片会直接增加演示数据体积；避免重复嵌入相同的大图，并优先为实际展示尺寸准备合适分辨率；
 - 不伪造 data URL，不写本地路径，也不把模板的 Pexels 示例图当作事实性配图。
 
 ## 写入检查
@@ -47,4 +49,4 @@ PPTist AI 数据说明允许网络图片地址，但 SlideMind 当前工具只�
 - 写入已有演示前确认当前页面能由受支持元素重建；否则停止整体覆盖并说明限制。
 - 写入后再次调用 `slides_read` 检查页数、标题、坐标、尺寸和元素类型。结构检查不能代替 PPTist 中的视觉验收。
 
-官方依据：[AI 数据结构](https://github.com/pipipi-pikachu/PPTist/blob/master/doc/AI_PPT_SCHEMA.md)、[画布原理](https://github.com/pipipi-pikachu/PPTist/blob/master/doc/Canvas.md)、[目录与数据](https://github.com/pipipi-pikachu/PPTist/blob/master/doc/DirectoryAndData.md)。
+画布、数据结构、主题和图片约束已经从 PPTist 官方说明提炼并完整保存在本文件中，执行时不读取外部文档。

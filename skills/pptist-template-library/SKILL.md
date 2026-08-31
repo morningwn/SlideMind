@@ -18,7 +18,7 @@ node "${SKILL_DIR}/scripts/query-template.mjs" get template_2 17
 
 不要猜测 `SKILL_DIR`，也不要依赖当前工作目录。第一个命令列出候选页的节点容量，第二个命令只返回选中页面及其主题。只有脚本不可用时才直接读取对应的 `assets/template_N.json`。
 
-将页面转换为 `slides_write` 参数前，读取 [references/slidemind-mapping.md](references/slidemind-mapping.md)。占位文字与示例图片不是用户内容，不得原样保留。
+将页面转换为 `slides_write` 参数前，读取 [references/slidemind-mapping.md](references/slidemind-mapping.md)。所有参考规则和模板资产都已内置，不要为了补充说明或图片访问网络。占位文字与离线示例图不是用户内容，不得原样保留。
 
 ## 转换到 SlideMind
 
@@ -26,4 +26,4 @@ node "${SKILL_DIR}/scripts/query-template.mjs" get template_2 17
 - 先完成内容结构，再匹配封面、目录、过渡、内容和结束页面。不要为使用模板而保留无内容的页面。
 - 写入前调用 `slides_read` 获取最新 revision。编辑已有演示时，如果当前工具无法保留其复杂元素，不得整体覆盖。
 
-原始模板资产来自项目固定版本的 PPTist，随 SlideMind 一起按 AGPL-3.0 使用和分发。
+原始模板资产来自项目固定版本的 PPTist，随 SlideMind 一起按 AGPL-3.0 使用和分发。执行该 Skill 不依赖外部文档、图片服务或网络请求。
