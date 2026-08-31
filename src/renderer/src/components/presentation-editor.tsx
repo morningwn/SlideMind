@@ -1,18 +1,13 @@
-import { LocaleType, mergeLocales, Univer, UniverInstanceType } from '@univerjs/core'
+import { getColorStyle, LocaleType, mergeLocales, Univer, UniverInstanceType } from '@univerjs/core'
 import { FUniver } from '@univerjs/core/facade'
 import DesignZhCN from '@univerjs/design/locale/zh-CN'
 import { UniverDocsPlugin } from '@univerjs/docs'
 import { UniverDocsUIPlugin } from '@univerjs/docs-ui'
 import DocsUIZhCN from '@univerjs/docs-ui/locale/zh-CN'
 import { UniverDrawingPlugin } from '@univerjs/drawing'
-import {
-  ObjectType,
-  UniverRenderEnginePlugin,
-  type RichText
-} from '@univerjs/engine-render'
+import { UniverRenderEnginePlugin } from '@univerjs/engine-render'
 import { SlideDataModel, UniverSlidesPlugin, type ISlideData } from '@univerjs/slides'
 import {
-  CanvasView,
   ISlideEditorBridgeService,
   UniverSlidesUIPlugin,
   UpdateSlideElementOperation
@@ -61,7 +56,6 @@ export function PresentationEditor({
   const hostRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
-  const editSelectedTextRef = useRef<() => void>(() => undefined)
   const [setupError, setSetupError] = useState('')
   onChangeRef.current = onChange
   onSaveRef.current = onSave
@@ -110,68 +104,108 @@ export function PresentationEditor({
       const univerApi = FUniver.newAPI(univer)
       const injector = univer.__getInjector()
       const editorBridge = injector.get(ISlideEditorBridgeService)
-      const canvasView = injector.get(CanvasView)
-      let lastTextEditorRect: ReturnType<typeof editorBridge.getEditorRect> | undefined
+      const nativeEditorSelector = [
+        '.univer-absolute',
+        '.univer-z-10',
+        '.univer-box-border',
+        '.univer-flex'
+      ].join('')
+
+      const positionInlineEditor = (
+        input: HTMLTextAreaElement,
+        editorRect: ReturnType<typeof editorBridge.getEditorRect>
+      ): boolean => {
+        const hostBounds = host.getBoundingClientRect()
+        const nativeEditor = host.querySelector<HTMLElement>(nativeEditorSelector)
+        const nativeBounds = nativeEditor?.getBoundingClientRect()
+
+        if (
+          nativeBounds &&
+          nativeBounds.width > 4 &&
+          nativeBounds.height > 4 &&
+          nativeBounds.right > hostBounds.left &&
+          nativeBounds.bottom > hostBounds.top
+        ) {
+          input.style.left = `${nativeBounds.left - hostBounds.left}px`
+          input.style.top = `${nativeBounds.top - hostBounds.top}px`
+          input.style.width = `${nativeBounds.width}px`
+          input.style.height = `${nativeBounds.height}px`
+          return true
+        }
+
+        const editState = editorBridge.getEditRectState()
+        if (!editState) return false
+        const canvas = editorRect.engine.getCanvasElement()
+        const canvasBounds = canvas.getBoundingClientRect()
+        const canvasStyleWidth = Number.parseFloat(canvas.style.width)
+        const scaleAdjust = canvasStyleWidth > 0 ? canvasBounds.width / canvasStyleWidth : 1
+        const { position, slideCardOffset } = editState
+        input.style.left = `${canvasBounds.left - hostBounds.left +
+          (position.startX + slideCardOffset.left) * scaleAdjust}px`
+        input.style.top = `${canvasBounds.top - hostBounds.top +
+          (position.startY + slideCardOffset.top) * scaleAdjust}px`
+        input.style.width = `${(position.endX - position.startX) * scaleAdjust}px`
+        input.style.height = `${(position.endY - position.startY) * scaleAdjust}px`
+        return false
+      }
+
       const openTextEditor = (
         editorRect: ReturnType<typeof editorBridge.getEditorRect>,
         hideNativeEditor?: () => void
       ): void => {
         if (!active || !editorRect) return
-        lastTextEditorRect = editorRect
         closeTextEditor?.()
         const richText = editorRect.richTextObj
-        richText.show()
-        hideNativeEditor?.()
-
-        const overlay = window.document.createElement('div')
-        overlay.className = 'presentation-text-editor'
-        overlay.style.setProperty('width', 'min(520px, calc(100% - 36px))', 'important')
-        overlay.style.setProperty('height', 'auto', 'important')
-        overlay.setAttribute('role', 'dialog')
-        overlay.setAttribute('aria-label', '编辑幻灯片文本')
-
-        const label = window.document.createElement('label')
-        label.textContent = '编辑文本'
-
         const input = window.document.createElement('textarea')
+        input.className = 'presentation-inline-text-editor'
         input.value = richText.text
-        input.rows = 3
-        input.setAttribute('aria-label', '幻灯片文本')
+        input.setAttribute('aria-label', '编辑幻灯片文本')
+        input.spellcheck = false
 
-        const actions = window.document.createElement('div')
-        const hint = window.document.createElement('span')
-        hint.textContent = 'Ctrl/⌘ Enter 完成 · Esc 取消'
-        const cancelButton = window.document.createElement('button')
-        cancelButton.type = 'button'
-        cancelButton.textContent = '取消'
-        const applyButton = window.document.createElement('button')
-        applyButton.type = 'button'
-        applyButton.textContent = '完成'
-        applyButton.className = 'primary'
-        actions.append(hint, cancelButton, applyButton)
-        overlay.append(label, input, actions)
-        host.appendChild(overlay)
+        const snapshot = model.getSnapshot()
+        const page = snapshot.body?.pages[editorRect.pageId]
+        const element = page?.pageElements[richText.oKey]
+        const richTextStyle = element && 'richText' in element ? element.richText : undefined
+        const canvas = editorRect.engine.getCanvasElement()
+        const canvasBounds = canvas.getBoundingClientRect()
+        const canvasStyleWidth = Number.parseFloat(canvas.style.width)
+        const scaleAdjust = canvasStyleWidth > 0 ? canvasBounds.width / canvasStyleWidth : 1
+        const fontSize = (richTextStyle?.fs ?? richText.fs) * scaleAdjust
+        const color = getColorStyle(richTextStyle?.cl)
+        input.style.fontSize = `${fontSize}px`
+        input.style.fontWeight = richTextStyle?.bl ? '700' : '400'
+        input.style.fontStyle = richTextStyle?.it ? 'italic' : 'normal'
+        if (color) input.style.color = color
+        if (richTextStyle?.ff) input.style.fontFamily = richTextStyle.ff
+        if (richText.angle) input.style.transform = `rotate(${richText.angle}deg)`
 
-        const close = (): void => {
+        host.appendChild(input)
+        positionInlineEditor(input, editorRect)
+        richText.hide()
+
+        let settled = false
+        let positionFrame = 0
+        const close = (restoreSelection = false): void => {
           if (closeTextEditor !== close) return
           closeTextEditor = undefined
-          overlay.remove()
-          const transformer = editorRect.scene.getTransformer()
-          transformer?.clearControls()
-          transformer?.activeAnObject(richText)
+          settled = true
+          window.cancelAnimationFrame(positionFrame)
+          hideNativeEditor?.()
+          input.remove()
+          richText.show()
+          if (restoreSelection) editorRect.scene.getTransformer()?.activeAnObject(richText)
         }
         closeTextEditor = close
 
         const apply = async (): Promise<void> => {
+          if (settled) return
+          settled = true
           if (!active) {
             close()
             return
           }
 
           const text = input.value
-          const snapshot = model.getSnapshot()
-          const page = snapshot.body?.pages[editorRect.pageId]
-          const element = page?.pageElements[richText.oKey]
           if (!element || !('richText' in element) || !element.richText) {
             setSetupError('无法定位当前文本对象，请重新打开演示文稿后再试')
             close()
@@ -187,7 +221,6 @@ export function PresentationEditor({
             body.sectionBreaks = undefined
             richText.refreshDocumentByDocData()
             richText.resizeToContentSize()
-            richText.show()
           }
 
           const updated = await univerApi.executeCommand(UpdateSlideElementOperation.id, {
@@ -204,12 +237,11 @@ export function PresentationEditor({
           close()
         }
 
-        cancelButton.addEventListener('click', close)
-        applyButton.addEventListener('click', () => void apply())
+        input.addEventListener('blur', () => void apply())
         input.addEventListener('keydown', (event: KeyboardEvent) => {
           if (event.key === 'Escape') {
             event.preventDefault()
-            close()
+            close(true)
           } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()
             void apply()
@@ -217,38 +249,21 @@ export function PresentationEditor({
         })
         input.focus({ preventScroll: true })
         input.setSelectionRange(input.value.length, input.value.length)
-      }
-      editSelectedTextRef.current = () => {
-        const activePage = model.getActivePage()
-        if (!activePage) {
-          setSetupError('当前没有可编辑的幻灯片')
-          return
-        }
 
-        const renderUnit = canvasView.getRenderUnitByPageId(activePage.id, model.getUnitId())
-        const selectedObject = renderUnit.scene
-          .getTransformer()
-          ?.getSelectedObjectMap()
-          .values()
-          .next().value
-        const previousEditorRect = lastTextEditorRect ?? editorBridge.getEditorRect()
-        const editorRect = selectedObject?.objectType === ObjectType.RICH_TEXT
-          ? {
-              ...renderUnit,
-              unitId: model.getUnitId(),
-              pageId: activePage.id,
-              richTextObj: selectedObject as RichText
-            }
-          : previousEditorRect?.pageId === activePage.id
-            ? previousEditorRect
-            : undefined
-        if (!editorRect) {
-          setSetupError('请先在幻灯片中选中一个文本框')
-          return
+        let positionAttempts = 0
+        const syncPosition = (): void => {
+          if (settled || !active) return
+          positionAttempts += 1
+          const foundNativeEditor = positionInlineEditor(input, editorRect)
+          if (!foundNativeEditor && positionAttempts < 4) {
+            positionFrame = window.requestAnimationFrame(syncPosition)
+            return
+          }
+          hideNativeEditor?.()
+          richText.hide()
+          input.focus({ preventScroll: true })
         }
-
-        setSetupError('')
-        openTextEditor(editorRect)
+        positionFrame = window.requestAnimationFrame(syncPosition)
       }
       const editorVisibilitySubscription = editorBridge.visible$.subscribe((visibility) => {
         if (!active || !visibility.visible) return
@@ -278,7 +293,6 @@ export function PresentationEditor({
 
       return () => {
         active = false
-        editSelectedTextRef.current = () => undefined
         if (changeTimer !== undefined) window.clearTimeout(changeTimer)
         closeTextEditor?.()
         commandSubscription.dispose()
@@ -318,18 +332,6 @@ export function PresentationEditor({
       <div className="presentation-statusbar">
         <span>{document.lastExportPath ? `已导出：${document.lastExportPath}` : 'Univer Slides · 960 × 540'}</span>
         <div>
-          <button
-            type="button"
-            onMouseDown={(event) => {
-              if (event.button !== 0) return
-              event.preventDefault()
-              editSelectedTextRef.current()
-            }}
-            onClick={(event) => {
-              if (event.detail === 0) editSelectedTextRef.current()
-            }}
-            disabled={document.conflict}
-          >编辑所选文本</button>
           <button
             type="button"
             onClick={onExport}
