@@ -24,7 +24,7 @@ export const PI_WEB_TOOL_NAMES = [
   'get_search_content'
 ] as const
 
-export const PI_AGENT_TOOL_NAMES = [...PI_WEB_TOOL_NAMES] as const
+export const PI_AGENT_TOOL_NAMES = [...PI_WEB_TOOL_NAMES, 'download_asset'] as const
 
 const WEB_TOOLS_WITH_PROXY = new Set(['web_search', 'source_check', 'fetch_content'])
 const FETCH_CONTENT_EXTERNAL_OPTIONS = ['auth', 'forceClone', 'frames', 'model', 'timestamp']

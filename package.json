@@ -31,6 +31,7 @@
     "@earendil-works/pi-ai": "0.84.3",
     "@earendil-works/pi-coding-agent": "0.84.3",
     "@juicesharp/rpiv-todo": "2.8.0",
+    "@microsoft/antissrf": "1.0.0",
     "chokidar": "5.0.0",
     "codemirror": "^6.0.2",
     "diff": "8.0.4",

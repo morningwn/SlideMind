@@ -167,8 +167,8 @@ describe('Pi extension integration', () => {
     }
   })
 
-  it('activates only the four pure-JavaScript web tools', () => {
-    expect(PI_AGENT_TOOL_NAMES).toEqual(PI_WEB_TOOL_NAMES)
+  it('activates four pure-JavaScript web tools and the managed downloader', () => {
+    expect(PI_AGENT_TOOL_NAMES).toEqual([...PI_WEB_TOOL_NAMES, 'download_asset'])
   })
 })
 

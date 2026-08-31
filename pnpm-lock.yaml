@@ -29,6 +29,9 @@ importers:
       '@juicesharp/rpiv-todo':
         specifier: 2.8.0
         version: 2.8.0(@earendil-works/pi-ai@0.84.3(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-coding-agent@0.84.3(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))
+      '@microsoft/antissrf':
+        specifier: 1.0.0
+        version: 1.0.0
       animate.css:
         specifier: ^4.1.1
         version: 4.1.1
@@ -925,6 +928,9 @@ packages:
   '@mariozechner/clipboard@0.3.9':
     resolution: {integrity: sha512-ABnA53mdfkGZwOFUdZNv2S0CWGO/EIuPj8Vv9xmBFmSYg/qFc7ihO6q5FcQjvoE67kZpWkEc4AhD6B/os04yuA==}
     engines: {node: '>= 10'}
+
+  '@microsoft/antissrf@1.0.0':
+    resolution: {integrity: sha512-AmO1ykSha52Ef/7UXvHgu8ElsGdgcLkF5nTl7YZGyR1AkbmlQYtiVeWp+CsjkFaJzKAH5ofXLZveMmOHwX/7Jw==}
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
@@ -5074,6 +5080,8 @@ snapshots:
       '@mariozechner/clipboard-win32-arm64-msvc': 0.3.9
       '@mariozechner/clipboard-win32-x64-msvc': 0.3.9
     optional: true
+
+  '@microsoft/antissrf@1.0.0': {}
 
   '@mixmark-io/domino@2.2.0': {}
 

@@ -35,7 +35,8 @@ describe('createManagedPermissionPolicy', () => {
       web_search: 'allow',
       source_check: 'allow',
       fetch_content: 'allow',
-      get_search_content: 'allow'
+      get_search_content: 'allow',
+      download_asset: 'allow'
     })
     expect(policy.bash['*']).toBe('deny')
   })
