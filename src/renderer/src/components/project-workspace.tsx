@@ -19,6 +19,11 @@ import type {
 import { AgentModelSelect } from './agent-model-select'
 import { AgentMarkdown } from './agent-markdown'
 import {
+  isOpenableProjectFile,
+  projectFileDisplayKind,
+  type ProjectFileDisplayKind
+} from '../lib/project-file-display'
+import {
   DocumentEditor,
   type MarkdownViewMode,
   type OpenTextDocument
@@ -150,6 +155,38 @@ function FileIcon(): React.JSX.Element {
   )
 }
 
+function ProjectFileIcon({ kind }: { kind: ProjectFileDisplayKind }): React.JSX.Element {
+  if (kind === 'directory') return <FolderIcon />
+  if (kind === 'presentation') return <span className="file-type-badge">PPT</span>
+  if (kind === 'markdown') return <span className="file-type-badge">MD</span>
+  if (kind === 'text') return <span className="file-type-badge">TXT</span>
+  return <FileIcon />
+}
+
+function OpenFileIcon({ kind }: { kind: ProjectFileDisplayKind }): React.JSX.Element {
+  if (kind === 'presentation') {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 5.5h16v11H4z" />
+        <path d="m10 9 4 2.5-4 2.5z" />
+        <path d="M9 20h6M12 16.5V20" />
+      </svg>
+    )
+  }
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 3.5h8l4 4v13H6z" />
+      <path d="M14 3.5v4h4M9 12h6M9 15.5h6" />
+    </svg>
+  )
+}
+
+function openFileActionLabel(kind: ProjectFileDisplayKind, name: string): string {
+  if (kind === 'presentation') return `编辑演示文稿 ${name}`
+  if (kind === 'markdown') return `编辑 Markdown 文档 ${name}`
+  return `编辑文本文件 ${name}`
+}
+
 function HistoryIcon(): React.JSX.Element {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -257,6 +294,8 @@ function FileTreeLevel({
     <div role={depth === 0 ? 'tree' : 'group'}>
       {entries.map((entry) => {
         const isDirectory = entry.kind === 'directory'
+        const displayKind = projectFileDisplayKind(entry)
+        const isOpenable = isOpenableProjectFile(displayKind)
         const isExpanded = expandedPaths.has(entry.path)
         const isLoading = loadingPaths.has(entry.path)
         const isRenaming = renamingPath === entry.path
@@ -265,7 +304,7 @@ function FileTreeLevel({
             <div className="file-tree-row">
               {isRenaming ? (
                 <form
-                  className={`file-tree-item file-tree-rename-form${isDirectory ? ' file-tree-directory' : ''}`}
+                  className={`file-tree-item file-tree-rename-form file-tree-${displayKind}${isDirectory ? ' file-tree-directory' : ''}`}
                   style={{ '--tree-depth': depth } as React.CSSProperties}
                   onSubmit={(event) => {
                     event.preventDefault()
@@ -274,7 +313,7 @@ function FileTreeLevel({
                 >
                   <span className="tree-chevron" aria-hidden="true" />
                   <span className="tree-entry-icon" aria-hidden="true">
-                    {isDirectory ? <FolderIcon /> : <FileIcon />}
+                    <ProjectFileIcon kind={displayKind} />
                   </span>
                   <input
                     value={renameDraft}
@@ -302,7 +341,7 @@ function FileTreeLevel({
                 </form>
               ) : (
                 <button
-                  className={`file-tree-item${isDirectory ? ' file-tree-directory' : ''}${entry.path === selectedFilePath ? ' file-tree-item-selected' : ''}${entry.path === activeFilePath ? ' file-tree-item-active' : ''}`}
+                  className={`file-tree-item file-tree-${displayKind}${isDirectory ? ' file-tree-directory' : ''}${entry.path === selectedFilePath ? ' file-tree-item-selected' : ''}${entry.path === activeFilePath ? ' file-tree-item-active' : ''}`}
                   style={{ '--tree-depth': depth } as React.CSSProperties}
                   type="button"
                   role="treeitem"
@@ -312,10 +351,10 @@ function FileTreeLevel({
                     else onSelectFile(entry.path)
                   }}
                   onDoubleClick={() => {
-                    if (!isDirectory) onOpenFile(entry)
+                    if (isOpenable) onOpenFile(entry)
                   }}
                   onKeyDown={(event) => {
-                    if (!isDirectory && event.key === 'Enter') onOpenFile(entry)
+                    if (isOpenable && event.key === 'Enter') onOpenFile(entry)
                   }}
                   tabIndex={0}
                 >
@@ -323,13 +362,24 @@ function FileTreeLevel({
                     {isDirectory ? (isLoading ? '·' : isExpanded ? '⌄' : '›') : ''}
                   </span>
                   <span className="tree-entry-icon" aria-hidden="true">
-                    {isDirectory ? <FolderIcon /> : <FileIcon />}
+                    <ProjectFileIcon kind={displayKind} />
                   </span>
                   <span title={entry.path}>{entry.name}</span>
                 </button>
               )}
               {!isRenaming ? (
                 <span className="file-tree-actions">
+                  {isOpenable ? (
+                    <button
+                      className={`file-tree-open-action file-tree-open-${displayKind}`}
+                      type="button"
+                      aria-label={openFileActionLabel(displayKind, entry.name)}
+                      title={displayKind === 'presentation' ? '编辑演示文稿' : '编辑文档'}
+                      onClick={() => onOpenFile(entry)}
+                    >
+                      <OpenFileIcon kind={displayKind} />
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     aria-label={`重命名 ${entry.name}`}

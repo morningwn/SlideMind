@@ -1103,7 +1103,7 @@ button:disabled {
 
 .file-tree-item {
   display: grid;
-  grid-template-columns: 14px 17px minmax(0, 1fr);
+  grid-template-columns: 14px 27px minmax(0, 1fr);
   gap: 5px;
   align-items: center;
   width: 100%;
@@ -1123,6 +1123,10 @@ button:disabled {
 
 .file-tree-row:has(.file-tree-actions) .file-tree-item {
   padding-right: 53px;
+}
+
+.file-tree-row:has(.file-tree-open-action) .file-tree-item {
+  padding-right: 78px;
 }
 
 .file-tree-actions {
@@ -1162,6 +1166,38 @@ button:disabled {
   background: #dfe7f5;
 }
 
+.file-tree-actions .file-tree-open-action {
+  color: #44608c;
+  background: #e5ebf5;
+}
+
+.file-tree-actions .file-tree-open-presentation {
+  color: #a85a22;
+  background: #f9e8d8;
+}
+
+.file-tree-actions .file-tree-open-action:hover,
+.file-tree-actions .file-tree-open-action:focus-visible {
+  color: #24488e;
+  background: #d8e3f5;
+}
+
+.file-tree-actions .file-tree-open-presentation:hover,
+.file-tree-actions .file-tree-open-presentation:focus-visible {
+  color: #8d4518;
+  background: #f4d9c1;
+}
+
+.file-tree-actions svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
 .file-tree-actions button:last-child:hover,
 .file-tree-actions button:last-child:focus-visible {
   color: #a93631;
@@ -1169,7 +1205,7 @@ button:disabled {
 }
 
 .file-tree-rename-form {
-  grid-template-columns: 14px 17px minmax(0, 1fr) 23px 23px;
+  grid-template-columns: 14px 27px minmax(0, 1fr) 23px 23px;
   gap: 4px;
   padding-right: 4px;
   background: #edf1f7;
@@ -1260,6 +1296,48 @@ button.file-tree-item:not(.file-tree-directory) {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.6;
+}
+
+.file-type-badge {
+  display: grid;
+  min-width: 25px;
+  height: 16px;
+  padding: 0 3px;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 7px;
+  font-weight: 780;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.file-tree-presentation .tree-entry-icon {
+  color: #b65d25;
+}
+
+.file-tree-presentation .file-type-badge {
+  border-color: #e8b78f;
+  background: #fff1e6;
+}
+
+.file-tree-markdown .tree-entry-icon {
+  color: #3e67aa;
+}
+
+.file-tree-markdown .file-type-badge {
+  border-color: #adc1e2;
+  background: #eef4ff;
+}
+
+.file-tree-text .tree-entry-icon {
+  color: #63748d;
+}
+
+.file-tree-text .file-type-badge {
+  border-color: #c4cedc;
+  background: #f2f5f9;
 }
 
 .sidebar-error,
