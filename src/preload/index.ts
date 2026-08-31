@@ -29,14 +29,22 @@ import type {
   ProjectVersionCreatedEvent,
   RestoreProjectVersionInput
 } from '../shared/project-version'
+import type { DesktopApi, DesktopCloseResponse } from '../shared/desktop'
 
-const desktopApi = Object.freeze({
+const desktopApi: Readonly<DesktopApi> = Object.freeze({
   platform: process.platform,
   versions: Object.freeze({
     electron: process.versions.electron,
     chrome: process.versions.chrome,
     node: process.versions.node
-  })
+  }),
+  onCloseRequested: (listener: () => void) => {
+    const handler = (): void => listener()
+    ipcRenderer.on('desktop:close-requested', handler)
+    return () => ipcRenderer.removeListener('desktop:close-requested', handler)
+  },
+  resolveCloseRequest: (response: DesktopCloseResponse) =>
+    ipcRenderer.invoke('desktop:resolve-close-request', response)
 })
 
 contextBridge.exposeInMainWorld('desktop', desktopApi)
@@ -71,6 +79,10 @@ const projectApi: Readonly<ProjectApi> = Object.freeze({
   removeRecent: (path: string) => ipcRenderer.invoke('project:remove-recent', path),
   listDirectory: (projectHandle: string, relativePath: string) =>
     ipcRenderer.invoke('project:list-directory', projectHandle, relativePath),
+  createDirectory: (projectHandle: string, relativePath: string) =>
+    ipcRenderer.invoke('project:create-directory', projectHandle, relativePath),
+  createMarkdownFile: (projectHandle: string, relativePath: string) =>
+    ipcRenderer.invoke('project:create-markdown-file', projectHandle, relativePath),
   renameFile: (projectHandle: string, input: RenameProjectFileInput) =>
     ipcRenderer.invoke('project:rename-file', projectHandle, input),
   deleteFile: (projectHandle: string, relativePath: string) =>

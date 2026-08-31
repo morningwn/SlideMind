@@ -9,6 +9,7 @@ import type { OpenedProject, ProjectInfo } from '../../shared/project'
 import { AppTitleBar } from './components/app-title-bar'
 import { ProjectWorkspace } from './components/project-workspace'
 import { SettingsPage } from './components/settings-page'
+import { resolveCloseBehavior } from './lib/close-behavior'
 
 const projectColors = ['#6f7cff', '#d59a32', '#48ad87', '#bd62c9', '#31a6bc', '#d8628c']
 
@@ -103,6 +104,29 @@ function App(): React.JSX.Element {
       active = false
     }
   }, [])
+
+  useEffect(() => {
+    return window.desktop.onCloseRequested(() => {
+      const behavior = resolveCloseBehavior(
+        activeProject !== null,
+        hasUnsavedDocuments,
+        () => window.confirm(
+          '当前项目有未保存的文件。关闭项目将丢失这些修改，是否继续？'
+        )
+      )
+
+      if (behavior === 'close-project') {
+        setHasUnsavedDocuments(false)
+        setIsSettingsOpen(false)
+        setQuery('')
+        setActiveProject(null)
+      }
+
+      void window.desktop.resolveCloseRequest(
+        behavior === 'exit-application' ? 'exit-application' : 'keep-window-open'
+      )
+    })
+  }, [activeProject, hasUnsavedDocuments])
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent): void {

@@ -17,6 +17,7 @@ import type {
   ProjectFileEntry
 } from '../../../shared/project'
 import { AgentModelSelect } from './agent-model-select'
+import { AgentMarkdown } from './agent-markdown'
 import {
   DocumentEditor,
   type MarkdownViewMode,
@@ -53,9 +54,11 @@ interface FileTreeLevelProps {
   loadingPaths: ReadonlySet<string>
   activeFilePath: string | null
   selectedFilePath: string | null
+  renameRequestedPath: string | null
   onOpenFile: (entry: ProjectFileEntry) => void
   onDeleteFile: (entry: ProjectFileEntry) => void
   onRenameFile: (entry: ProjectFileEntry, name: string) => Promise<boolean>
+  onRenameRequestHandled: () => void
   onSelectFile: (path: string) => void
   onToggle: (entry: ProjectFileEntry) => void
 }
@@ -96,6 +99,30 @@ function replacePathDirectory(path: string, sourcePath: string, destinationPath:
   return isPathInside(path, sourcePath)
     ? `${destinationPath}${path.slice(sourcePath.length)}`
     : path
+}
+
+function nextAvailableEntryName(
+  entries: readonly ProjectFileEntry[],
+  stem: string,
+  extension = ''
+): string {
+  const existingNames = new Set(entries.map((entry) => entry.name.toLocaleLowerCase()))
+  let suffix = 1
+  let name = `${stem}${extension}`
+  while (existingNames.has(name.toLocaleLowerCase())) {
+    suffix += 1
+    name = `${stem}-${suffix}${extension}`
+  }
+  return name
+}
+
+function editableNameLength(entry: ProjectFileEntry): number {
+  if (entry.kind === 'directory') return entry.name.length
+  if (isPresentationPath(entry.name)) {
+    return entry.name.length - PRESENTATION_FILE_SUFFIX.length
+  }
+  const markdownSuffix = /\.(?:markdown|md)$/i.exec(entry.name)?.[0]
+  return markdownSuffix ? entry.name.length - markdownSuffix.length : entry.name.length
 }
 
 function ConversationIcon(): React.JSX.Element {
@@ -191,15 +218,26 @@ function FileTreeLevel({
   loadingPaths,
   activeFilePath,
   selectedFilePath,
+  renameRequestedPath,
   onOpenFile,
   onDeleteFile,
   onRenameFile,
+  onRenameRequestHandled,
   onSelectFile,
   onToggle
 }: FileTreeLevelProps): React.JSX.Element {
   const entries = entriesByDirectory[directoryPath] ?? []
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
+
+  useEffect(() => {
+    if (!renameRequestedPath) return
+    const entry = entries.find((candidate) => candidate.path === renameRequestedPath)
+    if (!entry) return
+    setRenamingPath(entry.path)
+    setRenameDraft(entry.name)
+    onRenameRequestHandled()
+  }, [entries, onRenameRequestHandled, renameRequestedPath])
 
   function startRenaming(entry: ProjectFileEntry): void {
     setRenamingPath(entry.path)
@@ -243,7 +281,10 @@ function FileTreeLevel({
                     aria-label={`输入 ${entry.name} 的新名称`}
                     autoFocus
                     onChange={(event) => setRenameDraft(event.target.value)}
-                    onFocus={(event) => event.currentTarget.select()}
+                    onFocus={(event) => event.currentTarget.setSelectionRange(
+                      0,
+                      editableNameLength(entry)
+                    )}
                     onKeyDown={(event) => {
                       if (event.key === 'Escape') {
                         event.preventDefault()
@@ -313,9 +354,11 @@ function FileTreeLevel({
                 loadingPaths={loadingPaths}
                 activeFilePath={activeFilePath}
                 selectedFilePath={selectedFilePath}
+                renameRequestedPath={renameRequestedPath}
                 onOpenFile={onOpenFile}
                 onDeleteFile={onDeleteFile}
                 onRenameFile={onRenameFile}
+                onRenameRequestHandled={onRenameRequestHandled}
                 onSelectFile={onSelectFile}
                 onToggle={onToggle}
               />
@@ -343,6 +386,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set(['']))
   const [fileError, setFileError] = useState('')
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
+  const [renameRequestedPath, setRenameRequestedPath] = useState<string | null>(null)
   const [openDocuments, setOpenDocuments] = useState<OpenTextDocument[]>([])
   const [openPresentations, setOpenPresentations] = useState<OpenPresentationDocument[]>([])
   const [activeDocumentPath, setActiveDocumentPath] = useState<string | null>(null)
@@ -351,6 +396,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [openingFilePaths, setOpeningFilePaths] = useState<Set<string>>(new Set())
   const messageEndRef = useRef<HTMLDivElement>(null)
+  const createMenuRef = useRef<HTMLDivElement>(null)
   const lastSavedConversationSnapshotRef = useRef('')
   const latestConversationStateRef = useRef<ProjectConversationState>(
     toPersistedState(conversations, selectedConversationId)
@@ -403,6 +449,22 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     window.addEventListener('beforeunload', protectUnsavedDocuments)
     return () => window.removeEventListener('beforeunload', protectUnsavedDocuments)
   }, [hasDirtyDocuments])
+
+  useEffect(() => {
+    if (!isCreateMenuOpen) return
+    const closeOnPointerDown = (event: PointerEvent): void => {
+      if (!createMenuRef.current?.contains(event.target as Node)) setIsCreateMenuOpen(false)
+    }
+    const closeOnEscape = (event: globalThis.KeyboardEvent): void => {
+      if (event.key === 'Escape') setIsCreateMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', closeOnPointerDown)
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPointerDown)
+      window.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isCreateMenuOpen])
 
   useEffect(() => {
     function openHistoryShortcut(event: globalThis.KeyboardEvent): void {
@@ -1133,19 +1195,18 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   }
 
   async function createPresentation(): Promise<void> {
-    const existingNames = new Set(
-      (entriesByDirectory[''] ?? []).map((entry) => entry.name.toLocaleLowerCase())
-    )
-    let suffix = 1
-    let fileName = `presentation${PRESENTATION_FILE_SUFFIX}`
-    while (existingNames.has(fileName.toLocaleLowerCase())) {
-      suffix += 1
-      fileName = `presentation-${suffix}${PRESENTATION_FILE_SUFFIX}`
-    }
-    const path = fileName
-    const title = '未命名演示文稿'
+    setIsCreateMenuOpen(false)
     setFileError('')
     try {
+      const rootEntries = await window.projects.listDirectory(project.handle, '')
+      setEntriesByDirectory((current) => ({ ...current, '': rootEntries }))
+      const fileName = nextAvailableEntryName(
+        rootEntries,
+        'presentation',
+        PRESENTATION_FILE_SUFFIX
+      )
+      const path = fileName
+      const title = '未命名演示文稿'
       const file = await window.presentations.create(project.handle, { path, title })
       const serializedDocument = JSON.stringify(file.document)
       const presentation: OpenPresentationDocument = {
@@ -1163,8 +1224,44 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       setIsHistoryActive(false)
       setActiveDocumentPath(file.path)
       setSelectedFilePath(file.path)
+      await refreshDirectory('')
+      setRenameRequestedPath(file.path)
     } catch (error) {
       setFileError(error instanceof Error ? error.message : '无法新建演示文稿')
+    }
+  }
+
+  async function createDirectory(): Promise<void> {
+    setIsCreateMenuOpen(false)
+    setFileError('')
+    try {
+      const rootEntries = await window.projects.listDirectory(project.handle, '')
+      setEntriesByDirectory((current) => ({ ...current, '': rootEntries }))
+      const path = nextAvailableEntryName(rootEntries, 'folder')
+      const entry = await window.projects.createDirectory(project.handle, path)
+      setExpandedPaths((current) => new Set(current).add(entry.path))
+      setEntriesByDirectory((current) => ({ ...current, [entry.path]: [] }))
+      setSelectedFilePath(entry.path)
+      await refreshDirectory('')
+      setRenameRequestedPath(entry.path)
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : '无法新建文件夹')
+    }
+  }
+
+  async function createMarkdownDocument(): Promise<void> {
+    setIsCreateMenuOpen(false)
+    setFileError('')
+    try {
+      const rootEntries = await window.projects.listDirectory(project.handle, '')
+      setEntriesByDirectory((current) => ({ ...current, '': rootEntries }))
+      const path = nextAvailableEntryName(rootEntries, 'document', '.md')
+      const entry = await window.projects.createMarkdownFile(project.handle, path)
+      await refreshDirectory('')
+      await openFile(entry)
+      setRenameRequestedPath(entry.path)
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : '无法新建 Markdown 文档')
     }
   }
 
@@ -1584,12 +1681,34 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               <span>项目内容</span>
               <h2 id="project-files-title">文件</h2>
             </div>
-            <button
-              type="button"
-              onClick={() => void createPresentation()}
-              aria-label="新建演示文稿"
-              title="新建演示文稿"
-            >＋</button>
+            <div className="file-create-control" ref={createMenuRef}>
+              <button
+                className="file-create-trigger"
+                type="button"
+                aria-label="新建项目内容"
+                aria-expanded={isCreateMenuOpen}
+                aria-haspopup="menu"
+                title="新建"
+                onClick={() => setIsCreateMenuOpen((current) => !current)}
+              >＋</button>
+              {isCreateMenuOpen ? (
+                <div className="file-create-menu" role="menu" aria-label="新建项目内容">
+                  <button type="button" role="menuitem" onClick={() => void createDirectory()}>
+                    新建文件夹
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void createPresentation()}
+                  >PPT 原始数据 (.slides.json)</button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void createMarkdownDocument()}
+                  >Markdown 文档 (.md)</button>
+                </div>
+              ) : null}
+            </div>
           </header>
           <div className="file-tree-scroll">
             {fileError ? <p className="sidebar-error" role="alert">{fileError}</p> : null}
@@ -1604,9 +1723,11 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 loadingPaths={loadingPaths}
                 activeFilePath={activeDocumentPath}
                 selectedFilePath={selectedFilePath}
+                renameRequestedPath={renameRequestedPath}
                 onOpenFile={(entry) => void openFile(entry)}
                 onDeleteFile={(entry) => void deleteEntry(entry)}
                 onRenameFile={renameEntry}
+                onRenameRequestHandled={() => setRenameRequestedPath(null)}
                 onSelectFile={setSelectedFilePath}
                 onToggle={(entry) => void toggleDirectory(entry)}
               />
@@ -1865,6 +1986,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                       <span>{message.role === 'user' ? '你' : 'SM'}</span>
                       {message.isStreaming && !message.text ? (
                         <p><i /><i /><i /></p>
+                      ) : message.role === 'assistant' ? (
+                        <AgentMarkdown source={message.text} />
                       ) : (
                         <p>{message.text}</p>
                       )}

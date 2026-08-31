@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import { join } from 'node:path'
 import { BaseAgentService } from './agent/base-agent'
 import { AgentConfigStore } from './agent/config-store'
@@ -14,8 +14,11 @@ import { registerProjectVersionIpc } from './version-control/ipc'
 import { ProjectMutationService } from './version-control/project-mutation-service'
 import { ProjectVersionService } from './version-control/project-version-service'
 import { getTitleBarWindowOptions } from './window-options'
+import type { DesktopCloseResponse } from '../shared/desktop'
 
 const APP_URL_PROTOCOLS = new Set(['http:', 'https:'])
+const pendingWindowCloseRequests = new Set<number>()
+let isApplicationQuitting = false
 
 function isSafeExternalUrl(rawUrl: string): boolean {
   try {
@@ -77,6 +80,43 @@ function installApplicationMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
 }
 
+function registerDesktopIpc(): void {
+  ipcMain.handle(
+    'desktop:resolve-close-request',
+    async (event, response: unknown): Promise<boolean> => {
+      if (response !== 'keep-window-open' && response !== 'exit-application') {
+        throw new Error('窗口关闭响应无效')
+      }
+
+      const mainWindow = BrowserWindow.fromWebContents(event.sender)
+      if (!mainWindow || !pendingWindowCloseRequests.has(mainWindow.id)) return false
+
+      if ((response satisfies DesktopCloseResponse) === 'keep-window-open') {
+        pendingWindowCloseRequests.delete(mainWindow.id)
+        return false
+      }
+
+      const choice = await dialog.showMessageBox(mainWindow, {
+        type: 'question',
+        buttons: ['退出应用', '取消'],
+        defaultId: 1,
+        cancelId: 1,
+        title: '退出 SlideMind？',
+        message: '确定退出 SlideMind 吗？'
+      })
+      if (choice.response !== 0) {
+        pendingWindowCloseRequests.delete(mainWindow.id)
+        return false
+      }
+
+      pendingWindowCloseRequests.delete(mainWindow.id)
+      isApplicationQuitting = true
+      app.quit()
+      return true
+    }
+  )
+}
+
 function createWindow(): BrowserWindow {
   const mainWindow = new BrowserWindow({
     width: 1180,
@@ -97,6 +137,20 @@ function createWindow(): BrowserWindow {
   })
 
   mainWindow.once('ready-to-show', () => mainWindow.show())
+
+  mainWindow.on('close', (event) => {
+    if (isApplicationQuitting) return
+
+    event.preventDefault()
+    if (pendingWindowCloseRequests.has(mainWindow.id)) return
+
+    pendingWindowCloseRequests.add(mainWindow.id)
+    mainWindow.webContents.send('desktop:close-requested')
+  })
+
+  mainWindow.on('closed', () => {
+    pendingWindowCloseRequests.delete(mainWindow.id)
+  })
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (isSafeExternalUrl(url)) {
@@ -125,7 +179,11 @@ function createWindow(): BrowserWindow {
       title: '存在未保存的文件',
       message: '部分文件尚未保存。确定放弃修改并退出吗？'
     })
-    if (choice === 0) event.preventDefault()
+    if (choice === 0) {
+      event.preventDefault()
+    } else {
+      isApplicationQuitting = false
+    }
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
@@ -157,6 +215,7 @@ app.whenReady().then(() => {
   const conversationStore = new ProjectConversationStore()
 
   registerAgentIpc(configStore, agentService)
+  registerDesktopIpc()
   registerProjectIpc(
     recentProjectStore,
     conversationStore,
@@ -179,6 +238,10 @@ app.whenReady().then(() => {
     void versionService.flushAll()
     void externalChangeMonitor.closeAll()
   })
+})
+
+app.on('before-quit', () => {
+  isApplicationQuitting = true
 })
 
 app.on('window-all-closed', () => {

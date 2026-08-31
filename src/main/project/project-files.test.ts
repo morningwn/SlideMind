@@ -3,6 +3,8 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vitest'
 import {
+  createProjectDirectory,
+  createProjectMarkdownFile,
   deleteProjectDirectory,
   deleteProjectFile,
   listProjectDirectory,
@@ -52,6 +54,50 @@ describe('listProjectDirectory', () => {
       '目录路径超出项目范围'
     )
     await expect(listProjectDirectory(projectPath, projectPath)).rejects.toThrow('目录路径无效')
+  })
+
+  it('creates project directories and Markdown documents', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-files-'))
+
+    await expect(createProjectDirectory(projectPath, 'docs')).resolves.toEqual({
+      kind: 'directory',
+      name: 'docs',
+      path: 'docs'
+    })
+    await expect(createProjectMarkdownFile(
+      projectPath,
+      join('docs', 'notes.md')
+    )).resolves.toEqual({
+      kind: 'file',
+      name: 'notes.md',
+      path: join('docs', 'notes.md')
+    })
+    await expect(readFile(join(projectPath, 'docs', 'notes.md'), 'utf8')).resolves.toBe(
+      '# 未命名文档\n'
+    )
+  })
+
+  it('rejects unsafe, duplicate and unsupported creation targets', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-files-'))
+    const outsidePath = await mkdtemp(join(tmpdir(), 'slidemind-files-outside-'))
+    await mkdir(join(projectPath, '.slideMind'))
+    await mkdir(join(projectPath, 'existing'))
+    await symlink(outsidePath, join(projectPath, 'linked'))
+
+    await expect(createProjectDirectory(projectPath, '../outside')).rejects.toThrow(
+      '超出项目范围'
+    )
+    await expect(createProjectDirectory(projectPath, '.slideMind/private')).rejects.toThrow(
+      '内部目录'
+    )
+    await expect(createProjectDirectory(projectPath, 'existing')).rejects.toThrow('同名')
+    await expect(createProjectMarkdownFile(projectPath, 'notes.txt')).rejects.toThrow(
+      'Markdown 文件必须使用'
+    )
+    await expect(createProjectMarkdownFile(
+      projectPath,
+      join('linked', 'notes.md')
+    )).rejects.toThrow('符号链接')
   })
 
   it('renames a regular file without leaving the project', async () => {

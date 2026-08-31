@@ -7,6 +7,8 @@ import type {
 import { ProjectConversationStore } from './conversation-store'
 import { RecentProjectStore, resolveProject } from './recent-project-store'
 import {
+  createProjectDirectory,
+  createProjectMarkdownFile,
   deleteProjectDirectory,
   deleteProjectFile,
   listProjectDirectory,
@@ -82,6 +84,39 @@ export function registerProjectIpc(
     (_event, projectHandle: unknown, relativePath: unknown) =>
       listProjectDirectory(projectRoots.resolve(projectHandle), relativePath)
   )
+
+  ipcMain.handle('project:create-directory', async (
+    _event,
+    projectHandle: unknown,
+    relativePath: unknown
+  ) => {
+    if (typeof projectHandle !== 'string') throw new Error('项目授权无效')
+    const entry = await createProjectDirectory(
+      projectRoots.resolve(projectHandle),
+      relativePath
+    )
+    emitChanged({
+      projectHandle,
+      path: entry.path,
+      kind: 'add-directory',
+      source: 'file-tree'
+    })
+    return entry
+  })
+
+  ipcMain.handle('project:create-markdown-file', (
+    _event,
+    projectHandle: unknown,
+    relativePath: unknown
+  ) => {
+    if (typeof projectHandle !== 'string') throw new Error('项目授权无效')
+    const projectPath = projectRoots.resolve(projectHandle)
+    if (typeof relativePath !== 'string') throw new Error('新建路径无效')
+    return mutations.run(
+      { projectPath, projectHandle, paths: [relativePath], source: 'file-tree' },
+      () => createProjectMarkdownFile(projectPath, relativePath)
+    )
+  })
 
   ipcMain.handle('project:rename-file', (
     _event,

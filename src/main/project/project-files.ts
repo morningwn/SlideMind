@@ -1,5 +1,15 @@
-import { lstat, readdir, realpath, rename, rm, stat, unlink } from 'node:fs/promises'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import {
+  lstat,
+  mkdir,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  stat,
+  unlink,
+  writeFile
+} from 'node:fs/promises'
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import type { ProjectFileEntry, RenameProjectFileInput } from '../../shared/project'
 
 const MAX_DIRECTORY_ENTRIES = 250
@@ -121,6 +131,39 @@ async function resolveRegularProjectDirectory(
   return { relativePath: normalizedRelativePath, targetPath }
 }
 
+async function resolveNewProjectEntry(
+  projectPathInput: unknown,
+  relativePathInput: unknown
+): Promise<{ relativePath: string; targetPath: string }> {
+  const projectPath = await realpath(validatePathInput(projectPathInput, '项目路径'))
+  const relativePath = validatePathInput(relativePathInput, '新建路径')
+  if (isAbsolute(relativePath)) throw new Error('新建路径无效')
+
+  const targetPath = resolve(projectPath, relativePath)
+  if (!isInsideProject(projectPath, targetPath) || targetPath === projectPath) {
+    throw new Error('新建路径超出项目范围')
+  }
+  const normalizedRelativePath = relative(projectPath, targetPath)
+  if (hasInternalSegment(normalizedRelativePath)) throw new Error('不能在项目内部目录中创建')
+
+  const parentRelativePath = relative(projectPath, dirname(targetPath))
+  let currentPath = projectPath
+  for (const segment of parentRelativePath ? parentRelativePath.split(sep) : []) {
+    currentPath = resolve(currentPath, segment)
+    const stats = await lstat(currentPath)
+    if (stats.isSymbolicLink()) throw new Error('不能通过符号链接目录创建')
+    if (!stats.isDirectory()) throw new Error('新建位置不是文件夹')
+  }
+
+  try {
+    await lstat(targetPath)
+    throw new Error('同名文件或文件夹已存在')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+  }
+  return { relativePath: normalizedRelativePath, targetPath }
+}
+
 async function collectVersionedDirectoryFiles(
   targetPath: string,
   relativePath: string
@@ -184,6 +227,49 @@ export async function listProjectDirectory(
       name: entry.name,
       path: relative(projectPath, resolve(targetPath, entry.name))
     }))
+}
+
+export async function createProjectDirectory(
+  projectPathInput: unknown,
+  relativePathInput: unknown
+): Promise<ProjectFileEntry> {
+  const target = await resolveNewProjectEntry(projectPathInput, relativePathInput)
+  try {
+    await mkdir(target.targetPath)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw new Error('同名文件或文件夹已存在')
+    }
+    throw error
+  }
+  return {
+    kind: 'directory',
+    name: target.relativePath.split(sep).at(-1)!,
+    path: target.relativePath
+  }
+}
+
+export async function createProjectMarkdownFile(
+  projectPathInput: unknown,
+  relativePathInput: unknown
+): Promise<ProjectFileEntry> {
+  const target = await resolveNewProjectEntry(projectPathInput, relativePathInput)
+  if (!['.md', '.markdown'].includes(extname(target.relativePath).toLocaleLowerCase())) {
+    throw new Error('Markdown 文件必须使用 .md 或 .markdown 扩展名')
+  }
+  try {
+    await writeFile(target.targetPath, '# 未命名文档\n', { flag: 'wx' })
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+      throw new Error('同名文件或文件夹已存在')
+    }
+    throw error
+  }
+  return {
+    kind: 'file',
+    name: target.relativePath.split(sep).at(-1)!,
+    path: target.relativePath
+  }
 }
 
 export async function renameProjectFile(
