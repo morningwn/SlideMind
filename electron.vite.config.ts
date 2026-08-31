@@ -1,6 +1,13 @@
 import { resolve } from 'node:path'
 import react from '@vitejs/plugin-react'
+import vue from '@vitejs/plugin-vue'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import Icons from 'unplugin-icons/vite'
+import { FileSystemIconLoader } from 'unplugin-icons/loaders'
+import IconsResolver from 'unplugin-icons/resolver'
+import Components from 'unplugin-vue-components/vite'
+
+const pptistSource = resolve('node_modules/pptist/src')
 
 export default defineConfig({
   main: {
@@ -20,11 +27,60 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()]
   },
   renderer: {
+    optimizeDeps: {
+      esbuildOptions: {
+        loader: {
+          '.ts': 'ts'
+        }
+      }
+    },
     resolve: {
       alias: {
+        '@': pptistSource,
         '@renderer': resolve('src/renderer/src')
       }
     },
-    plugins: [react()]
+    css: {
+      preprocessorOptions: {
+        scss: {
+          additionalData: `
+            @import '@/assets/styles/variable.scss';
+            @import '@/assets/styles/mixin.scss';
+          `
+        }
+      }
+    },
+    plugins: [
+      react(),
+      vue(),
+      Components({
+        dirs: [],
+        dts: false,
+        exclude: [/[\\/]\.git[\\/]/, /[\\/]\.nuxt[\\/]/],
+        resolvers: [
+          IconsResolver({
+            prefix: 'i',
+            customCollections: ['custom']
+          })
+        ]
+      }),
+      Icons({
+        compiler: 'vue3',
+        autoInstall: false,
+        customCollections: {
+          custom: FileSystemIconLoader(resolve(pptistSource, 'assets/icons'))
+        },
+        scale: 1,
+        defaultClass: 'i-icon'
+      })
+    ],
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/renderer/index.html'),
+          pptist: resolve('src/renderer/pptist.html')
+        }
+      }
+    }
   }
 })

@@ -1,9 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { ExtensionFactory } from '@earendil-works/pi-coding-agent'
-import type { IPageElement, ISlideData } from '@univerjs/slides'
 import {
-  PRESENTATION_FORMAT,
-  PRESENTATION_FORMAT_VERSION,
+  type PptistElement,
   type PresentationDocument
 } from '../../shared/presentation'
 import type { PresentationService } from '../presentation/presentation-service'
@@ -54,60 +52,74 @@ type SlideInput = {
   >
 }
 
-function color(value: string | undefined, fallback: string): { rgb: string } {
-  return { rgb: value?.trim() || fallback }
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
-function createElement(
-  element: SlideInput['elements'][number],
-  zIndex: number
-): IPageElement {
-  const id = randomUUID()
+function textHtml(value: string, options?: {
+  bold?: boolean
+  color?: string
+  fontFamily?: string
+  fontSize?: number
+  italic?: boolean
+}): string {
+  const styles = [
+    options?.fontSize ? `font-size: ${options.fontSize}px` : '',
+    options?.fontFamily ? `font-family: ${escapeHtml(options.fontFamily)}` : '',
+    options?.color ? `color: ${escapeHtml(options.color)}` : '',
+    options?.bold ? 'font-weight: bold' : '',
+    options?.italic ? 'font-style: italic' : ''
+  ].filter(Boolean).join('; ')
+  const content = escapeHtml(value).replace(/\r?\n/g, '<br>')
+  return `<p${styles ? ` style="${styles}"` : ''}>${content}</p>`
+}
+
+function createElement(element: SlideInput['elements'][number]): PptistElement {
   const base = {
-    id,
-    zIndex,
+    id: randomUUID(),
     left: element.x,
     top: element.y,
     width: element.width,
     height: element.height,
-    angle: element.rotation ?? 0,
-    title: element.type,
-    description: ''
+    rotate: element.rotation ?? 0
   }
   if (element.type === 'text') {
     return {
       ...base,
-      type: 2,
-      richText: {
-        text: element.text,
-        fs: element.fontSize ?? 24,
-        ff: element.fontFamily,
-        cl: color(element.color, '#333333'),
-        bl: element.bold ? 1 : 0,
-        it: element.italic ? 1 : 0
-      }
+      type: 'text',
+      content: textHtml(element.text, element),
+      defaultFontName: element.fontFamily ?? '',
+      defaultColor: element.color ?? '#333333'
     }
   }
   if (element.type === 'shape') {
     return {
       ...base,
-      type: 0,
-      shape: {
-        shapeType: (element.shape ?? 'rect') as NonNullable<IPageElement['shape']>['shapeType'],
-        text: element.text ?? '',
-        shapeProperties: {
-          shapeBackgroundFill: color(element.fill, '#DCE7FF'),
-          outline: {
-            outlineFill: color(element.lineColor, '#8EA4CC'),
-            weight: element.lineWidth ?? 1
-          }
-        }
+      type: 'shape',
+      viewBox: [200, 200],
+      path: 'M 0 0 L 200 0 L 200 200 L 0 200 Z',
+      pathFormula: element.shape === 'roundRect' ? 'roundRect' : undefined,
+      fixedRatio: false,
+      fill: element.fill ?? '#DCE7FF',
+      outline: {
+        color: element.lineColor ?? '#8EA4CC',
+        width: element.lineWidth ?? 1,
+        style: 'solid'
       },
-      richText: element.text
+      text: element.text
         ? {
-            text: element.text,
-            fs: element.fontSize ?? 18,
-            cl: color(element.color, '#333333')
+            content: textHtml(element.text, {
+              color: element.color,
+              fontSize: element.fontSize
+            }),
+            defaultFontName: '',
+            defaultColor: element.color ?? '#333333',
+            align: 'middle'
           }
         : undefined
     }
@@ -117,11 +129,10 @@ function createElement(
   }
   return {
     ...base,
-    type: 1,
-    description: element.alt ?? '',
-    image: {
-      imageProperties: { contentUrl: element.source }
-    }
+    type: 'image',
+    src: element.source,
+    fixedRatio: false,
+    name: element.alt ?? ''
   }
 }
 
@@ -130,65 +141,56 @@ function slidesToDocument(
   title: string,
   slides: SlideInput[]
 ): PresentationDocument {
-  const pages: NonNullable<ISlideData['body']>['pages'] = {}
-  const pageOrder: string[] = []
-  slides.forEach((slide, pageIndex) => {
-    const pageId = randomUUID()
-    pageOrder.push(pageId)
-    const pageElements = Object.fromEntries(slide.elements.map((element, elementIndex) => {
-      const created = createElement(element, elementIndex + 1)
-      return [created.id, created]
-    }))
-    pages[pageId] = {
-      id: pageId,
-      pageType: 0,
-      zIndex: pageIndex + 1,
-      title: slide.title,
-      description: '',
-      pageBackgroundFill: color(slide.background, '#FFFFFF'),
-      pageElements
-    }
-  })
   return {
-    format: PRESENTATION_FORMAT,
-    version: PRESENTATION_FORMAT_VERSION,
-    snapshot: {
-      ...current.snapshot,
+    ...current,
+    presentation: {
+      ...current.presentation,
       title,
-      body: { pages, pageOrder }
+      slides: slides.map((slide) => ({
+        id: randomUUID(),
+        elements: slide.elements.map(createElement),
+        ...(slide.background
+          ? { background: { type: 'solid', color: slide.background } }
+          : {}),
+        name: slide.title
+      }))
     }
   }
 }
 
-function snapshotSummary(snapshot: ISlideData): Record<string, unknown> {
-  const body = snapshot.body
+function plainText(value: unknown): string {
+  return typeof value === 'string'
+    ? value.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '').trim()
+    : ''
+}
+
+function presentationSummary(document: PresentationDocument): Record<string, unknown> {
+  const presentation = document.presentation
   return {
-    id: snapshot.id,
-    title: snapshot.title,
-    pageSize: snapshot.pageSize,
-    slides: body?.pageOrder.map((pageId) => {
-      const page = body.pages[pageId]
-      return {
-        id: pageId,
-        title: page?.title ?? '',
-        background: page?.pageBackgroundFill.rgb ?? '#FFFFFF',
-        elements: Object.values(page?.pageElements ?? {}).map((element) => ({
-          id: element.id,
-          type: element.type === 0 ? 'shape' : element.type === 1 ? 'image' : 'text',
-          x: element.left ?? 0,
-          y: element.top ?? 0,
-          width: element.width ?? 0,
-          height: element.height ?? 0,
-          rotation: element.angle ?? 0,
-          text: element.richText?.text ?? element.shape?.text ?? '',
-          shape: element.shape?.shapeType,
-          fill: element.shape?.shapeProperties.shapeBackgroundFill.rgb,
-          fontSize: element.richText?.fs,
-          color: element.richText?.cl?.rgb,
-          image: element.image ? '[embedded image]' : undefined
-        }))
-      }
-    }) ?? []
+    title: presentation.title,
+    viewportSize: presentation.viewportSize,
+    viewportRatio: presentation.viewportRatio,
+    slides: presentation.slides.map((slide, index) => ({
+      id: slide.id,
+      title: typeof slide.name === 'string' ? slide.name : `第 ${index + 1} 页`,
+      background: typeof slide.background === 'object' ? slide.background : undefined,
+      elements: slide.elements.map((element) => ({
+        id: element.id,
+        type: element.type,
+        x: element.left,
+        y: element.top,
+        width: element.width,
+        height: element.height,
+        rotation: element.rotate ?? 0,
+        text: plainText(element.content) || (
+          typeof element.text === 'object' && element.text !== null
+            ? plainText((element.text as Record<string, unknown>).content)
+            : ''
+        ),
+        fill: element.fill,
+        image: element.type === 'image' ? '[embedded image]' : undefined
+      }))
+    }))
   }
 }
 
@@ -252,8 +254,8 @@ export function createPresentationToolsExtension(options: {
     pi.registerTool({
       name: 'slides_create',
       label: '新建演示文稿',
-      description: '在当前项目中新建一个 SlideMind/Univer 演示文稿。文件名必须以 .slides.json 结尾。',
-      promptSnippet: 'Create an editable SlideMind presentation.',
+      description: '在当前项目中新建一个 SlideMind/PPTist 演示文稿。文件名必须以 .slides.json 结尾。',
+      promptSnippet: 'Create an editable PPTist presentation.',
       parameters: Type.Object({
         file: Type.String({ minLength: 1, maxLength: 4096 }),
         title: Type.Optional(Type.String({ minLength: 1, maxLength: 200 }))
@@ -268,7 +270,7 @@ export function createPresentationToolsExtension(options: {
         return toolText({
           file: created.path,
           revision: created.revision,
-          ...snapshotSummary(created.document.snapshot)
+          ...presentationSummary(created.document)
         })
       }
     })
@@ -276,8 +278,8 @@ export function createPresentationToolsExtension(options: {
     pi.registerTool({
       name: 'slides_read',
       label: '读取演示文稿',
-      description: '读取演示文稿结构和当前修订号。写入前必须先读取并使用返回的 revision。',
-      promptSnippet: 'Inspect an editable SlideMind presentation.',
+      description: '读取 PPTist 演示文稿结构和当前修订号。写入前必须先读取并使用返回的 revision。',
+      promptSnippet: 'Inspect an editable PPTist presentation.',
       parameters: Type.Object({
         file: Type.String({ minLength: 1, maxLength: 4096 })
       }, { additionalProperties: false }),
@@ -286,7 +288,7 @@ export function createPresentationToolsExtension(options: {
         return toolText({
           file: file.path,
           revision: file.revision,
-          ...snapshotSummary(file.document.snapshot)
+          ...presentationSummary(file.document)
         })
       }
     })
@@ -294,10 +296,10 @@ export function createPresentationToolsExtension(options: {
     pi.registerTool({
       name: 'slides_write',
       label: '写入演示文稿',
-      description: '使用结构化页面替换演示文稿内容。revision 必须来自最近一次 slides_read。',
-      promptSnippet: 'Write structured slides with text, shapes, and embedded images.',
+      description: '使用结构化页面替换 PPTist 演示文稿内容。revision 必须来自最近一次 slides_read。',
+      promptSnippet: 'Write structured PPTist slides with text, shapes, and embedded images.',
       promptGuidelines: [
-        'Use a 960×540 coordinate system unless slides_read reports another page size.',
+        'Use a 1000×562.5 coordinate system unless slides_read reports another canvas size.',
         'Call slides_read immediately before slides_write and pass its revision.'
       ],
       parameters: Type.Object({
@@ -308,11 +310,7 @@ export function createPresentationToolsExtension(options: {
       }, { additionalProperties: false }),
       async execute(_toolCallId, params) {
         const current = await options.presentationService.read(options.projectPath, params.file)
-        const document = slidesToDocument(
-          current.document,
-          params.title,
-          params.slides as SlideInput[]
-        )
+        const document = slidesToDocument(current.document, params.title, params.slides as SlideInput[])
         const result = await options.presentationService.save(
           options.projectPath,
           options.projectHandle,
@@ -334,8 +332,8 @@ export function createPresentationToolsExtension(options: {
     pi.registerTool({
       name: 'slides_export',
       label: '导出 PowerPoint',
-      description: '把当前项目中的 .slides.json 演示文稿导出为可编辑的 .pptx 文件。',
-      promptSnippet: 'Export a SlideMind presentation to PowerPoint.',
+      description: '把当前项目中的 PPTist .slides.json 演示文稿导出为可编辑的 .pptx 文件。',
+      promptSnippet: 'Export a PPTist presentation to PowerPoint.',
       parameters: Type.Object({
         file: Type.String({ minLength: 1, maxLength: 4096 }),
         output: Type.Optional(Type.String({ minLength: 1, maxLength: 4096 }))

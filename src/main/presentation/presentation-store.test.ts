@@ -8,7 +8,7 @@ import {
 } from './presentation-store'
 
 describe('ProjectPresentationStore', () => {
-  it('creates and reads a versioned Univer Slides snapshot', async () => {
+  it('creates and reads a versioned PPTist document', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-presentations-'))
     const store = new ProjectPresentationStore()
 
@@ -23,20 +23,63 @@ describe('ProjectPresentationStore', () => {
       revision: created.revision,
       document: {
         format: 'slidemind.presentation',
-        version: 1,
-        snapshot: { title: '季度复盘', pageSize: { width: 960, height: 540 } }
+        version: 2,
+        presentation: {
+          title: '季度复盘',
+          viewportSize: 1000,
+          viewportRatio: 0.5625
+        }
       }
     })
-    expect(loaded.document.snapshot.body?.pageOrder).toHaveLength(1)
+    expect(loaded.document.presentation.slides).toHaveLength(1)
   })
 
-  it('saves atomically and reports external modification conflicts', async () => {
+  it('saves repeated PPTist edits without changing the document format', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-presentations-'))
+    const store = new ProjectPresentationStore()
+    const created = await store.create(projectPath, { path: 'deck.slides.json' })
+    const firstEdit = structuredClone(created.document)
+    firstEdit.presentation.title = '第一次修改'
+
+    const firstSave = await store.save(projectPath, {
+      path: created.path,
+      revision: created.revision,
+      document: firstEdit
+    })
+    if (!firstSave.ok) throw new Error('第一次保存冲突')
+
+    const secondEdit = structuredClone(firstEdit)
+    secondEdit.presentation.slides[0].elements.push({
+      id: 'text-1',
+      type: 'text',
+      left: 80,
+      top: -5,
+      width: 400,
+      height: 0,
+      rotate: 0,
+      content: '<p>第二次修改</p>',
+      defaultFontName: '',
+      defaultColor: '#333333'
+    })
+    const secondSave = await store.save(projectPath, {
+      path: created.path,
+      revision: firstSave.revision,
+      document: secondEdit
+    })
+
+    expect(secondSave).toMatchObject({ ok: true })
+    const loaded = await store.read(projectPath, created.path)
+    expect(loaded.document.presentation.title).toBe('第一次修改')
+    expect(loaded.document.presentation.slides[0].elements).toHaveLength(1)
+  })
+
+  it('reports external modification conflicts', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-presentations-'))
     const filePath = join(projectPath, 'deck.slides.json')
     const store = new ProjectPresentationStore()
     const created = await store.create(projectPath, { path: 'deck.slides.json' })
     const document = structuredClone(created.document)
-    document.snapshot.title = '应用内修改'
+    document.presentation.title = '应用内修改'
 
     await writeFile(filePath, `${JSON.stringify(createBlankPresentationDocument('外部修改'))}\n`)
     await expect(store.save(projectPath, {
@@ -44,8 +87,10 @@ describe('ProjectPresentationStore', () => {
       revision: created.revision,
       document
     })).resolves.toMatchObject({ ok: false, reason: 'conflict' })
-    expect((JSON.parse(await readFile(filePath, 'utf8')) as { snapshot: { title: string } })
-      .snapshot.title).toBe('外部修改')
+    const stored = JSON.parse(await readFile(filePath, 'utf8')) as {
+      presentation: { title: string }
+    }
+    expect(stored.presentation.title).toBe('外部修改')
   })
 
   it('rejects traversal, symbolic links, internal paths and unsupported extensions', async () => {
@@ -67,17 +112,24 @@ describe('ProjectPresentationStore', () => {
     )
   })
 
-  it('rejects malformed and unsafe snapshots', async () => {
+  it('rejects old, malformed and unsafe documents', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-presentations-'))
-    await writeFile(join(projectPath, 'bad.slides.json'), JSON.stringify({
+    await writeFile(join(projectPath, 'old.slides.json'), JSON.stringify({
       format: 'slidemind.presentation',
       version: 1,
-      snapshot: { id: 'bad', title: 'bad', pageSize: { width: 0, height: 540 } }
+      snapshot: {}
     }))
-    await writeFile(join(projectPath, 'unsafe.slides.json'), '{"format":"slidemind.presentation","version":1,"__proto__":{},"snapshot":{}}')
+    const bad = createBlankPresentationDocument('bad')
+    bad.presentation.viewportSize = 0
+    await writeFile(join(projectPath, 'bad.slides.json'), JSON.stringify(bad))
+    await writeFile(
+      join(projectPath, 'unsafe.slides.json'),
+      '{"format":"slidemind.presentation","version":2,"__proto__":{},"presentation":{}}'
+    )
     const store = new ProjectPresentationStore()
 
-    await expect(store.read(projectPath, 'bad.slides.json')).rejects.toThrow('宽度无效')
+    await expect(store.read(projectPath, 'old.slides.json')).rejects.toThrow('不支持')
+    await expect(store.read(projectPath, 'bad.slides.json')).rejects.toThrow('画布宽度无效')
     await expect(store.read(projectPath, 'unsafe.slides.json')).rejects.toThrow('不安全字段')
   })
 })

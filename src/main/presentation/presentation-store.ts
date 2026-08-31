@@ -1,26 +1,14 @@
 import { createHash, randomUUID } from 'node:crypto'
-import {
-  lstat,
-  readFile,
-  realpath,
-  rename,
-  unlink,
-  writeFile
-} from 'node:fs/promises'
-import {
-  dirname,
-  extname,
-  isAbsolute,
-  relative,
-  resolve,
-  sep
-} from 'node:path'
-import type { ISlideData, ISlidePage } from '@univerjs/slides'
+import { lstat, readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises'
+import { dirname, extname, isAbsolute, relative, resolve, sep } from 'node:path'
 import {
   PRESENTATION_FILE_SUFFIX,
   PRESENTATION_FORMAT,
   PRESENTATION_FORMAT_VERSION,
   type CreateProjectPresentationInput,
+  type PptistElement,
+  type PptistPresentation,
+  type PptistSlide,
   type PresentationDocument,
   type ProjectPresentationFile,
   type SaveProjectPresentationInput,
@@ -93,7 +81,7 @@ async function assertNoSymbolicLinks(projectPath: string, relativePath: string):
 async function resolveExistingPresentationFile(
   projectPathInput: unknown,
   relativePathInput: unknown
-): Promise<{ projectPath: string; relativePath: string; targetPath: string; size: number }> {
+): Promise<{ relativePath: string; targetPath: string; size: number }> {
   const projectPath = await realpath(validateString(projectPathInput, '项目路径'))
   const inputPath = validateString(relativePathInput, '文件路径')
   const relativePath = validateProjectRelativePath(projectPath, inputPath)
@@ -103,7 +91,7 @@ async function resolveExistingPresentationFile(
   if (!isInsideProject(projectPath, targetPath)) throw new Error('文件路径超出项目范围')
   const stats = await lstat(targetPath)
   if (!stats.isFile()) throw new Error('目标不是普通文件')
-  return { projectPath, relativePath, targetPath, size: stats.size }
+  return { relativePath, targetPath, size: stats.size }
 }
 
 async function resolveNewPresentationFile(
@@ -142,7 +130,7 @@ function assertSafeJson(value: unknown): void {
   }
 }
 
-function assertFiniteDimension(value: unknown, label: string, allowZero = false): void {
+function assertFiniteDimension(value: unknown, label: string, allowZero = false): asserts value is number {
   if (
     typeof value !== 'number' ||
     !Number.isFinite(value) ||
@@ -153,54 +141,81 @@ function assertFiniteDimension(value: unknown, label: string, allowZero = false)
   }
 }
 
-function assertSlidePage(value: unknown, expectedId: string): asserts value is ISlidePage {
-  if (!isRecord(value)) throw new Error('幻灯片页面格式无效')
-  if (value.id !== expectedId) throw new Error('幻灯片页面标识不一致')
-  validateString(value.title, '幻灯片标题', 10_000)
-  if (typeof value.description !== 'string' || value.description.length > 50_000) {
-    throw new Error('幻灯片描述无效')
+function assertFiniteCoordinate(value: unknown, label: string): asserts value is number {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    Math.abs(value) > 100_000
+  ) {
+    throw new Error(`${label}无效`)
   }
-  if (typeof value.pageType !== 'number' || !Number.isInteger(value.pageType)) {
-    throw new Error('幻灯片页面类型无效')
-  }
-  if (!isRecord(value.pageBackgroundFill)) throw new Error('幻灯片背景格式无效')
-  if (!isRecord(value.pageElements)) throw new Error('幻灯片元素格式无效')
+}
 
-  const elements = Object.entries(value.pageElements)
-  if (elements.length > MAX_ELEMENTS_PER_SLIDE) throw new Error('单页幻灯片元素过多')
-  for (const [elementId, element] of elements) {
-    if (!isRecord(element) || element.id !== elementId) throw new Error('幻灯片元素标识不一致')
-    if (typeof element.type !== 'number' || !Number.isInteger(element.type)) {
-      throw new Error('幻灯片元素类型无效')
-    }
-    for (const field of ['left', 'top', 'width', 'height'] as const) {
-      const dimension = element[field]
-      if (dimension !== undefined) assertFiniteDimension(dimension, `幻灯片元素 ${field}`, true)
+function assertPptistElement(value: unknown): asserts value is PptistElement {
+  if (!isRecord(value)) throw new Error('PPTist 元素格式无效')
+  validateString(value.id, 'PPTist 元素标识', 200)
+  validateString(value.type, 'PPTist 元素类型', 100)
+  assertFiniteCoordinate(value.left, 'PPTist 元素 left')
+  assertFiniteCoordinate(value.top, 'PPTist 元素 top')
+  assertFiniteDimension(value.width, 'PPTist 元素 width', value.type === 'line')
+  if (value.type !== 'line') {
+    assertFiniteDimension(value.height, 'PPTist 元素 height', true)
+    if (typeof value.rotate !== 'number' || !Number.isFinite(value.rotate)) {
+      throw new Error('PPTist 元素 rotate 无效')
     }
   }
 }
 
-function assertSlideSnapshot(value: unknown): asserts value is ISlideData {
-  if (!isRecord(value)) throw new Error('Univer 快照格式无效')
-  validateString(value.id, '演示文稿标识', 200)
-  validateString(value.title, '演示文稿标题', 10_000)
-  if (!isRecord(value.pageSize)) throw new Error('演示文稿页面尺寸无效')
-  assertFiniteDimension(value.pageSize.width, '演示文稿宽度')
-  assertFiniteDimension(value.pageSize.height, '演示文稿高度')
-  if (!isRecord(value.body) || !isRecord(value.body.pages) || !Array.isArray(value.body.pageOrder)) {
-    throw new Error('演示文稿页面数据无效')
+function assertPptistSlide(value: unknown): asserts value is PptistSlide {
+  if (!isRecord(value)) throw new Error('PPTist 幻灯片格式无效')
+  validateString(value.id, 'PPTist 幻灯片标识', 200)
+  if (!Array.isArray(value.elements)) throw new Error('PPTist 幻灯片元素无效')
+  if (value.elements.length > MAX_ELEMENTS_PER_SLIDE) throw new Error('单页幻灯片元素过多')
+  const elementIds = new Set<string>()
+  for (const element of value.elements) {
+    assertPptistElement(element)
+    if (elementIds.has(element.id)) throw new Error('PPTist 元素标识重复')
+    elementIds.add(element.id)
   }
+}
 
-  const pageOrder = value.body.pageOrder
-  if (pageOrder.length === 0 || pageOrder.length > MAX_SLIDES) {
+function assertPptistPresentation(value: unknown): asserts value is PptistPresentation {
+  if (!isRecord(value)) throw new Error('PPTist 演示文稿格式无效')
+  validateString(value.title, '演示文稿标题', 10_000)
+  assertFiniteDimension(value.viewportSize, '演示文稿画布宽度')
+  if (
+    typeof value.viewportRatio !== 'number' ||
+    !Number.isFinite(value.viewportRatio) ||
+    value.viewportRatio <= 0 ||
+    value.viewportRatio > 10
+  ) {
+    throw new Error('演示文稿画布比例无效')
+  }
+  if (!isRecord(value.theme)) throw new Error('PPTist 主题格式无效')
+  validateString(value.theme.backgroundColor, 'PPTist 主题背景色', 100)
+  validateString(value.theme.fontColor, 'PPTist 主题字体颜色', 100)
+  if (typeof value.theme.fontName !== 'string' || value.theme.fontName.length > 200) {
+    throw new Error('PPTist 主题字体无效')
+  }
+  if (
+    !Array.isArray(value.theme.themeColors) ||
+    value.theme.themeColors.length === 0 ||
+    value.theme.themeColors.length > 100 ||
+    value.theme.themeColors.some((color) => typeof color !== 'string' || color.length > 100)
+  ) {
+    throw new Error('PPTist 主题颜色无效')
+  }
+  if (!isRecord(value.theme.outline) || !isRecord(value.theme.shadow)) {
+    throw new Error('PPTist 主题样式无效')
+  }
+  if (!Array.isArray(value.slides) || value.slides.length === 0 || value.slides.length > MAX_SLIDES) {
     throw new Error('演示文稿页数无效')
   }
-  const pageIds = new Set<string>()
-  for (const pageId of pageOrder) {
-    const id = validateString(pageId, '幻灯片页面标识', 200)
-    if (pageIds.has(id)) throw new Error('幻灯片页面标识重复')
-    pageIds.add(id)
-    assertSlidePage(value.body.pages[id], id)
+  const slideIds = new Set<string>()
+  for (const slide of value.slides) {
+    assertPptistSlide(slide)
+    if (slideIds.has(slide.id)) throw new Error('PPTist 幻灯片标识重复')
+    slideIds.add(slide.id)
   }
 }
 
@@ -224,7 +239,7 @@ export function normalizePresentationDocument(value: unknown): PresentationDocum
   ) {
     throw new Error('不支持的 SlideMind 演示文稿版本')
   }
-  assertSlideSnapshot(normalized.snapshot)
+  assertPptistPresentation(normalized.presentation)
   return normalized as unknown as PresentationDocument
 }
 
@@ -237,29 +252,22 @@ export function createBlankPresentationDocument(titleInput?: unknown): Presentat
   const title = typeof titleInput === 'string' && titleInput.trim()
     ? validateString(titleInput.trim(), '演示文稿标题', 200)
     : '未命名演示文稿'
-  const unitId = randomUUID()
-  const pageId = randomUUID()
   return {
     format: PRESENTATION_FORMAT,
     version: PRESENTATION_FORMAT_VERSION,
-    snapshot: {
-      id: unitId,
+    presentation: {
       title,
-      pageSize: { width: 960, height: 540 },
-      body: {
-        pages: {
-          [pageId]: {
-            id: pageId,
-            pageType: 0,
-            zIndex: 1,
-            title: '第 1 页',
-            description: '',
-            pageBackgroundFill: { rgb: '#FFFFFF' },
-            pageElements: {}
-          }
-        },
-        pageOrder: [pageId]
-      }
+      viewportSize: 1000,
+      viewportRatio: 0.5625,
+      theme: {
+        themeColors: ['#5b9bd5', '#ed7d31', '#a5a5a5', '#ffc000', '#4472c4', '#70ad47'],
+        fontColor: '#333333',
+        fontName: '',
+        backgroundColor: '#ffffff',
+        shadow: { h: 3, v: 3, blur: 2, color: '#808080' },
+        outline: { width: 2, color: '#525252', style: 'solid' }
+      },
+      slides: [{ id: randomUUID(), elements: [] }]
     }
   }
 }
@@ -277,11 +285,7 @@ function validateSaveInput(value: unknown): SaveProjectPresentationInput {
   const path = validateString(value.path, '文件路径')
   const revision = validateString(value.revision, '文件修订号', 64)
   if (!/^[a-f0-9]{64}$/.test(revision)) throw new Error('文件修订号无效')
-  return {
-    path,
-    revision,
-    document: normalizePresentationDocument(value.document)
-  }
+  return { path, revision, document: normalizePresentationDocument(value.document) }
 }
 
 export class ProjectPresentationStore {
@@ -289,10 +293,7 @@ export class ProjectPresentationStore {
 
   async create(projectPathInput: unknown, inputValue: unknown): Promise<ProjectPresentationFile> {
     const input = validateCreateInput(inputValue)
-    const { relativePath, targetPath } = await resolveNewPresentationFile(
-      projectPathInput,
-      input.path
-    )
+    const { relativePath, targetPath } = await resolveNewPresentationFile(projectPathInput, input.path)
     const document = createBlankPresentationDocument(input.title)
     const bytes = serializePresentationDocument(document)
     try {
@@ -328,10 +329,7 @@ export class ProjectPresentationStore {
     }
   }
 
-  save(
-    projectPathInput: unknown,
-    inputValue: unknown
-  ): Promise<SaveProjectPresentationResult> {
+  save(projectPathInput: unknown, inputValue: unknown): Promise<SaveProjectPresentationResult> {
     const input = validateSaveInput(inputValue)
     const queueKey = `${String(projectPathInput)}\0${input.path}`
     const previousWrite = this.writeQueues.get(queueKey) ?? Promise.resolve()
@@ -374,9 +372,7 @@ export class ProjectPresentationStore {
 
 export function defaultPresentationOutputPath(path: string): string {
   const lowerPath = path.toLocaleLowerCase()
-  if (!lowerPath.endsWith(PRESENTATION_FILE_SUFFIX)) {
-    return `${path}.pptx`
-  }
+  if (!lowerPath.endsWith(PRESENTATION_FILE_SUFFIX)) return `${path}.pptx`
   return `${path.slice(0, -PRESENTATION_FILE_SUFFIX.length)}.pptx`
 }
 

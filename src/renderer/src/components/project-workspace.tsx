@@ -911,13 +911,16 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     })
   }
 
-  async function savePresentation(path: string): Promise<boolean> {
-    const presentation = openPresentations.find((candidate) => candidate.path === path)
+  async function savePresentation(
+    path: string,
+    documentOverride?: OpenPresentationDocument['document']
+  ): Promise<boolean> {
+    const presentation = openPresentationsRef.current.find((candidate) => candidate.path === path)
     if (!presentation || presentation.isSaving || presentation.conflict) return false
-    if (presentation.serializedDocument === presentation.savedSerializedDocument) return true
+    const document = documentOverride ?? presentation.document
+    const serializedDocument = JSON.stringify(document)
+    if (serializedDocument === presentation.savedSerializedDocument) return true
 
-    const document = presentation.document
-    const serializedDocument = presentation.serializedDocument
     setOpenPresentations((current) => current.map((candidate) =>
       candidate.path === path ? { ...candidate, isSaving: true, error: '' } : candidate
     ))
@@ -1549,7 +1552,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               document={activePresentation}
               onChange={(document) => updatePresentation(activePresentation.path, document)}
               onReload={() => void reloadPresentation(activePresentation.path)}
-              onSave={() => void savePresentation(activePresentation.path)}
+              onSave={(document) => void savePresentation(activePresentation.path, document)}
               onExport={() => void exportPresentation(activePresentation.path)}
             />
           </Suspense>

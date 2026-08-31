@@ -1,59 +1,59 @@
 import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { BasicShapes } from '@univerjs/slides'
 import { describe, expect, it } from 'vitest'
 import { createBlankPresentationDocument } from './presentation-store'
-import { exportPresentationToPptx } from './presentation-exporter'
+import {
+  exportPresentationToPptx,
+  pptistHtmlToPlainText
+} from './presentation-exporter'
 
 describe('exportPresentationToPptx', () => {
-  it('writes an OOXML PowerPoint with basic text and shapes', async () => {
+  it('writes an OOXML PowerPoint from PPTist text and shapes', async () => {
     const outputDirectory = await mkdtemp(join(tmpdir(), 'slidemind-pptx-'))
     const outputPath = join(outputDirectory, 'deck.pptx')
     const document = createBlankPresentationDocument('导出演示文稿')
-    const pageId = document.snapshot.body?.pageOrder[0]
-    if (!pageId || !document.snapshot.body) throw new Error('测试演示文稿缺少页面')
-    document.snapshot.body.pages[pageId].pageElements = {
-      title: {
+    document.presentation.slides[0].elements = [
+      {
         id: 'title',
-        zIndex: 1,
+        type: 'text',
         left: 80,
         top: 72,
         width: 800,
         height: 80,
-        title: '标题',
-        description: '',
-        type: 2,
-        richText: {
-          text: 'SlideMind 导出测试',
-          fs: 30,
-          bl: 1,
-          cl: { rgb: '#24488E' }
-        }
+        rotate: 0,
+        content: '<p><strong>SlideMind</strong><br>导出测试</p>',
+        defaultFontName: 'Arial',
+        defaultColor: '#24488E'
       },
-      accent: {
+      {
         id: 'accent',
-        zIndex: 2,
+        type: 'shape',
         left: 80,
         top: 180,
         width: 260,
         height: 120,
-        title: '强调块',
-        description: '',
-        type: 0,
-        shape: {
-          shapeType: BasicShapes.RoundRect,
-          text: '可编辑形状',
-          shapeProperties: {
-            shapeBackgroundFill: { rgb: '#DCE7FF' }
-          }
+        rotate: 0,
+        viewBox: [200, 200],
+        path: 'M 0 0 L 200 0 L 200 200 L 0 200 Z',
+        fixedRatio: false,
+        fill: '#DCE7FF',
+        text: {
+          content: '<p>可编辑形状</p>',
+          defaultFontName: '',
+          defaultColor: '#333333',
+          align: 'middle'
         }
       }
-    }
+    ]
 
-    await exportPresentationToPptx(document.snapshot, outputPath)
+    await exportPresentationToPptx(document.presentation, outputPath)
     const bytes = await readFile(outputPath)
     expect(bytes.subarray(0, 2).toString('ascii')).toBe('PK')
     expect(bytes.byteLength).toBeGreaterThan(5_000)
+  })
+
+  it('converts PPTist HTML into readable text', () => {
+    expect(pptistHtmlToPlainText('<p>A &amp; B<br>C</p>')).toBe('A & B\nC')
   })
 })

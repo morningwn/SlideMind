@@ -68,6 +68,13 @@ src/
 - 文本编辑限制为 2 MiB 的 UTF-8 文件，并保留 UTF-8 BOM 与原始换行风格。
 - 保存采用内容版本校验；文件被其他程序修改时停止写入并提示重新载入。
 
+## 演示文稿编辑
+
+- 演示文稿编辑器基于 [PPTist](https://github.com/pipipi-pikachu/PPTist)，使用独立 Vue 入口嵌入 React 工作区。
+- 编辑器实例在输入过程中保持常驻，PPTist 状态通过受限消息桥同步；只有显式保存才写入项目文件。
+- `.slides.json` 使用 SlideMind v2 的 PPTist 数据格式，不兼容早期的 v1 快照。
+- 支持通过 `Cmd/Ctrl + S` 保存，并可由主进程导出基础文本、形状、图片和线条为 PPTX。
+
 ## 自动版本与外部修改
 
 - 文本、演示文稿、导出文件以及 Agent 的 `write` / `edit` 在应用内成功写入后，会合并为自动版本。
@@ -89,3 +96,7 @@ src/
 ## 签名与发布
 
 本地和 CI 默认生成未签名安装包。正式分发前需要配置 Apple Developer ID、公证凭据以及 Windows 代码签名证书。仓库不会保存证书或密钥。
+
+## 许可证
+
+SlideMind 采用 GNU Affero General Public License v3.0（AGPL-3.0-only）。第三方组件信息见 `THIRD_PARTY_NOTICES.md`。

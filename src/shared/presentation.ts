@@ -1,13 +1,43 @@
-import type { ISlideData } from '@univerjs/slides'
-
 export const PRESENTATION_FILE_SUFFIX = '.slides.json'
 export const PRESENTATION_FORMAT = 'slidemind.presentation' as const
-export const PRESENTATION_FORMAT_VERSION = 1 as const
+export const PRESENTATION_FORMAT_VERSION = 2 as const
+
+export interface PptistElement extends Record<string, unknown> {
+  id: string
+  type: string
+  left: number
+  top: number
+  width: number
+  height?: number
+  rotate?: number
+}
+
+export interface PptistSlide extends Record<string, unknown> {
+  id: string
+  elements: PptistElement[]
+}
+
+export interface PptistTheme extends Record<string, unknown> {
+  backgroundColor: string
+  themeColors: string[]
+  fontColor: string
+  fontName: string
+  outline: Record<string, unknown>
+  shadow: Record<string, unknown>
+}
+
+export interface PptistPresentation extends Record<string, unknown> {
+  title: string
+  theme: PptistTheme
+  slides: PptistSlide[]
+  viewportSize: number
+  viewportRatio: number
+}
 
 export interface PresentationDocument {
   format: typeof PRESENTATION_FORMAT
   version: typeof PRESENTATION_FORMAT_VERSION
-  snapshot: ISlideData
+  presentation: PptistPresentation
 }
 
 export interface ProjectPresentationFile {

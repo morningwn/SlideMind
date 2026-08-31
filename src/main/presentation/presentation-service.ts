@@ -95,7 +95,7 @@ async function resolveOutputPath(
 }
 
 function runExportWorker(
-  snapshot: ProjectPresentationFile['document']['snapshot'],
+  presentation: ProjectPresentationFile['document']['presentation'],
   outputPath: string,
   signal?: AbortSignal
 ): Promise<void> {
@@ -132,7 +132,7 @@ function runExportWorker(
     worker.once('exit', (code) => {
       if (!settled && code !== 0) finish(new Error(`演示文稿导出 Worker 异常退出：${code}`))
     })
-    worker.postMessage({ snapshot, outputPath })
+    worker.postMessage({ presentation, outputPath })
   })
 }
 
@@ -203,7 +203,7 @@ export class PresentationService {
     const temporaryPath = `${output.outputPath}.${process.pid}-${randomUUID()}.slidemind-tmp.pptx`
     const operation = async (): Promise<ExportProjectPresentationResult> => {
       try {
-        await runExportWorker(presentation.document.snapshot, temporaryPath, signal)
+        await runExportWorker(presentation.document.presentation, temporaryPath, signal)
         await rename(temporaryPath, output.outputPath)
       } catch (error) {
         await unlink(temporaryPath).catch(() => undefined)
