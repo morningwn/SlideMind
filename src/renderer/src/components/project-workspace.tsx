@@ -894,11 +894,21 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   function updatePresentation(path: string, document: OpenPresentationDocument['document']): void {
     const serializedDocument = JSON.stringify(document)
-    setOpenPresentations((current) => current.map((presentation) =>
-      presentation.path === path
-        ? { ...presentation, document, serializedDocument, error: '', lastExportPath: undefined }
-        : presentation
-    ))
+    setOpenPresentations((current) => {
+      const presentationIndex = current.findIndex((presentation) => presentation.path === path)
+      const presentation = current[presentationIndex]
+      if (!presentation || presentation.serializedDocument === serializedDocument) return current
+
+      const next = [...current]
+      next[presentationIndex] = {
+        ...presentation,
+        document,
+        serializedDocument,
+        error: '',
+        lastExportPath: undefined
+      }
+      return next
+    })
   }
 
   async function savePresentation(path: string): Promise<boolean> {

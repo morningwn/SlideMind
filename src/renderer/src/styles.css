@@ -2020,6 +2020,78 @@ button.file-tree-item:not(.file-tree-directory) {
   height: 100%;
 }
 
+.presentation-univer-host > .presentation-text-editor {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 10000;
+  display: grid;
+  width: min(520px, calc(100% - 36px)) !important;
+  height: auto !important;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #b9c8df;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 97%);
+  box-shadow: 0 12px 32px rgb(32 48 76 / 24%);
+}
+
+.presentation-text-editor > label {
+  color: #27354a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.presentation-text-editor > textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid #c7d2e3;
+  border-radius: 7px;
+  outline: none;
+  color: #172033;
+  background: white;
+  font: 13px/1.5 inherit;
+}
+
+.presentation-text-editor > textarea:focus {
+  border-color: #4b78e6;
+  box-shadow: 0 0 0 2px rgb(75 120 230 / 16%);
+}
+
+.presentation-text-editor > div {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.presentation-text-editor > div > span {
+  margin-right: auto;
+  color: #7a879b;
+  font-size: 9px;
+}
+
+.presentation-text-editor button {
+  height: 27px;
+  padding: 0 12px;
+  border: 1px solid #c7d2e3;
+  border-radius: 6px;
+  color: #40506a;
+  background: white;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.presentation-text-editor button.primary {
+  border-color: #3766d8;
+  color: white;
+  background: #3766d8;
+}
+
 .document-error {
   display: flex;
   min-height: 38px;

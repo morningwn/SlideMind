@@ -5,9 +5,18 @@ import { UniverDocsPlugin } from '@univerjs/docs'
 import { UniverDocsUIPlugin } from '@univerjs/docs-ui'
 import DocsUIZhCN from '@univerjs/docs-ui/locale/zh-CN'
 import { UniverDrawingPlugin } from '@univerjs/drawing'
-import { UniverRenderEnginePlugin } from '@univerjs/engine-render'
+import {
+  ObjectType,
+  UniverRenderEnginePlugin,
+  type RichText
+} from '@univerjs/engine-render'
 import { SlideDataModel, UniverSlidesPlugin, type ISlideData } from '@univerjs/slides'
-import { UniverSlidesUIPlugin } from '@univerjs/slides-ui'
+import {
+  CanvasView,
+  ISlideEditorBridgeService,
+  UniverSlidesUIPlugin,
+  UpdateSlideElementOperation
+} from '@univerjs/slides-ui'
 import SlidesUIZhCN from '@univerjs/slides-ui/locale/zh-CN'
 import { UniverUIPlugin } from '@univerjs/ui'
 import UIZhCN from '@univerjs/ui/locale/zh-CN'
@@ -52,6 +61,7 @@ export function PresentationEditor({
   const hostRef = useRef<HTMLDivElement>(null)
   const onChangeRef = useRef(onChange)
   const onSaveRef = useRef(onSave)
+  const editSelectedTextRef = useRef<() => void>(() => undefined)
   const [setupError, setSetupError] = useState('')
   onChangeRef.current = onChange
   onSaveRef.current = onSave
@@ -61,8 +71,10 @@ export function PresentationEditor({
     if (!host) return
     let univer: Univer | undefined
     let changeTimer: number | undefined
+    let closeTextEditor: (() => void) | undefined
     let active = true
     let ready = false
+    let lastSerializedSnapshot = JSON.stringify(document.document.snapshot)
 
     try {
       setSetupError('')
@@ -83,8 +95,7 @@ export function PresentationEditor({
         header: true,
         headerMenu: false,
         footer: false,
-        toolbar: true,
-        disableAutoFocus: true
+        toolbar: true
       })
       univer.registerPlugin(UniverDocsPlugin)
       univer.registerPlugin(UniverDocsUIPlugin)
@@ -97,14 +108,167 @@ export function PresentationEditor({
         structuredClone(document.document.snapshot)
       )
       const univerApi = FUniver.newAPI(univer)
+      const injector = univer.__getInjector()
+      const editorBridge = injector.get(ISlideEditorBridgeService)
+      const canvasView = injector.get(CanvasView)
+      let lastTextEditorRect: ReturnType<typeof editorBridge.getEditorRect> | undefined
+      const openTextEditor = (
+        editorRect: ReturnType<typeof editorBridge.getEditorRect>,
+        hideNativeEditor?: () => void
+      ): void => {
+        if (!active || !editorRect) return
+        lastTextEditorRect = editorRect
+        closeTextEditor?.()
+        const richText = editorRect.richTextObj
+        richText.show()
+        hideNativeEditor?.()
+
+        const overlay = window.document.createElement('div')
+        overlay.className = 'presentation-text-editor'
+        overlay.style.setProperty('width', 'min(520px, calc(100% - 36px))', 'important')
+        overlay.style.setProperty('height', 'auto', 'important')
+        overlay.setAttribute('role', 'dialog')
+        overlay.setAttribute('aria-label', '编辑幻灯片文本')
+
+        const label = window.document.createElement('label')
+        label.textContent = '编辑文本'
+
+        const input = window.document.createElement('textarea')
+        input.value = richText.text
+        input.rows = 3
+        input.setAttribute('aria-label', '幻灯片文本')
+
+        const actions = window.document.createElement('div')
+        const hint = window.document.createElement('span')
+        hint.textContent = 'Ctrl/⌘ Enter 完成 · Esc 取消'
+        const cancelButton = window.document.createElement('button')
+        cancelButton.type = 'button'
+        cancelButton.textContent = '取消'
+        const applyButton = window.document.createElement('button')
+        applyButton.type = 'button'
+        applyButton.textContent = '完成'
+        applyButton.className = 'primary'
+        actions.append(hint, cancelButton, applyButton)
+        overlay.append(label, input, actions)
+        host.appendChild(overlay)
+
+        const close = (): void => {
+          if (closeTextEditor !== close) return
+          closeTextEditor = undefined
+          overlay.remove()
+          const transformer = editorRect.scene.getTransformer()
+          transformer?.clearControls()
+          transformer?.activeAnObject(richText)
+        }
+        closeTextEditor = close
+
+        const apply = async (): Promise<void> => {
+          if (!active) {
+            close()
+            return
+          }
+
+          const text = input.value
+          const snapshot = model.getSnapshot()
+          const page = snapshot.body?.pages[editorRect.pageId]
+          const element = page?.pageElements[richText.oKey]
+          if (!element || !('richText' in element) || !element.richText) {
+            setSetupError('无法定位当前文本对象，请重新打开演示文稿后再试')
+            close()
+            return
+          }
+
+          const body = richText.documentData.body
+          if (body) {
+            const textRun = body.textRuns?.[0]
+            body.dataStream = `${text}\r\n`
+            body.textRuns = [{ ...textRun, st: 0, ed: text.length }]
+            body.paragraphs = undefined
+            body.sectionBreaks = undefined
+            richText.refreshDocumentByDocData()
+            richText.resizeToContentSize()
+            richText.show()
+          }
+
+          const updated = await univerApi.executeCommand(UpdateSlideElementOperation.id, {
+            unitId: model.getUnitId(),
+            oKey: richText.oKey,
+            props: {
+              richText: {
+                ...element.richText,
+                text
+              }
+            }
+          })
+          if (!updated) setSetupError('文本修改失败，请重新打开演示文稿后再试')
+          close()
+        }
+
+        cancelButton.addEventListener('click', close)
+        applyButton.addEventListener('click', () => void apply())
+        input.addEventListener('keydown', (event: KeyboardEvent) => {
+          if (event.key === 'Escape') {
+            event.preventDefault()
+            close()
+          } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault()
+            void apply()
+          }
+        })
+        input.focus({ preventScroll: true })
+        input.setSelectionRange(input.value.length, input.value.length)
+      }
+      editSelectedTextRef.current = () => {
+        const activePage = model.getActivePage()
+        if (!activePage) {
+          setSetupError('当前没有可编辑的幻灯片')
+          return
+        }
+
+        const renderUnit = canvasView.getRenderUnitByPageId(activePage.id, model.getUnitId())
+        const selectedObject = renderUnit.scene
+          .getTransformer()
+          ?.getSelectedObjectMap()
+          .values()
+          .next().value
+        const previousEditorRect = lastTextEditorRect ?? editorBridge.getEditorRect()
+        const editorRect = selectedObject?.objectType === ObjectType.RICH_TEXT
+          ? {
+              ...renderUnit,
+              unitId: model.getUnitId(),
+              pageId: activePage.id,
+              richTextObj: selectedObject as RichText
+            }
+          : previousEditorRect?.pageId === activePage.id
+            ? previousEditorRect
+            : undefined
+        if (!editorRect) {
+          setSetupError('请先在幻灯片中选中一个文本框')
+          return
+        }
+
+        setSetupError('')
+        openTextEditor(editorRect)
+      }
+      const editorVisibilitySubscription = editorBridge.visible$.subscribe((visibility) => {
+        if (!active || !visibility.visible) return
+        const editorRect = editorBridge.getEditorRect()
+        if (!editorRect) return
+        openTextEditor(editorRect, () => {
+          editorBridge.changeVisible({ ...visibility, visible: false })
+        })
+      })
       const commandSubscription = univerApi.onCommandExecuted(() => {
         if (!ready || !active) return
         if (changeTimer !== undefined) window.clearTimeout(changeTimer)
         changeTimer = window.setTimeout(() => {
           if (!active) return
+          const serializedSnapshot = JSON.stringify(model.getSnapshot())
+          if (serializedSnapshot === lastSerializedSnapshot) return
+          lastSerializedSnapshot = serializedSnapshot
           onChangeRef.current({
             ...document.document,
-            snapshot: structuredClone(model.getSnapshot())
+            snapshot: JSON.parse(serializedSnapshot) as ISlideData
           })
         }, 120)
       })
@@ -114,8 +278,11 @@ export function PresentationEditor({
 
       return () => {
         active = false
+        editSelectedTextRef.current = () => undefined
         if (changeTimer !== undefined) window.clearTimeout(changeTimer)
+        closeTextEditor?.()
         commandSubscription.dispose()
+        editorVisibilitySubscription.unsubscribe()
         univerApi.dispose()
         univer?.dispose()
         host.replaceChildren()
@@ -151,6 +318,18 @@ export function PresentationEditor({
       <div className="presentation-statusbar">
         <span>{document.lastExportPath ? `已导出：${document.lastExportPath}` : 'Univer Slides · 960 × 540'}</span>
         <div>
+          <button
+            type="button"
+            onMouseDown={(event) => {
+              if (event.button !== 0) return
+              event.preventDefault()
+              editSelectedTextRef.current()
+            }}
+            onClick={(event) => {
+              if (event.detail === 0) editSelectedTextRef.current()
+            }}
+            disabled={document.conflict}
+          >编辑所选文本</button>
           <button
             type="button"
             onClick={onExport}
