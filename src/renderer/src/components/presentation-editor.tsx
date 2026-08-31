@@ -9,8 +9,8 @@ import { UniverRenderEnginePlugin } from '@univerjs/engine-render'
 import { SlideDataModel, UniverSlidesPlugin, type ISlideData } from '@univerjs/slides'
 import {
   ISlideEditorBridgeService,
-  UniverSlidesUIPlugin,
-  UpdateSlideElementOperation
+  UpdateSlideElementOperation,
+  UniverSlidesUIPlugin
 } from '@univerjs/slides-ui'
 import SlidesUIZhCN from '@univerjs/slides-ui/locale/zh-CN'
 import { UniverUIPlugin } from '@univerjs/ui'
@@ -156,6 +156,11 @@ export function PresentationEditor({
         if (!active || !editorRect) return
         closeTextEditor?.()
         const richText = editorRect.richTextObj
+        const transformer = richText.getScene()?.getTransformer()
+        if (!transformer) {
+          setSetupError('无法开始当前文本编辑，请重新打开演示文稿后再试')
+          return
+        }
         const input = window.document.createElement('textarea')
         input.className = 'presentation-inline-text-editor'
         input.value = richText.text
@@ -183,32 +188,37 @@ export function PresentationEditor({
         positionInlineEditor(input, editorRect)
         richText.hide()
 
-        let settled = false
+        let destroyed = false
         let positionFrame = 0
-        const close = (restoreSelection = false): void => {
-          if (closeTextEditor !== close) return
+        const cleanup = (): void => {
+          if (destroyed) return
+          destroyed = true
+          input.onblur = null
+          input.onkeydown = null
           closeTextEditor = undefined
-          settled = true
           window.cancelAnimationFrame(positionFrame)
-          hideNativeEditor?.()
           input.remove()
           richText.show()
-          if (restoreSelection) editorRect.scene.getTransformer()?.activeAnObject(richText)
         }
-        closeTextEditor = close
+        closeTextEditor = cleanup
 
-        const apply = async (): Promise<void> => {
-          if (settled) return
-          settled = true
-          if (!active) {
-            close()
-            return
-          }
-
+        const finish = async (commit: boolean, restoreSelection = false): Promise<void> => {
+          if (destroyed) return
           const text = input.value
+          const previousText = richText.text
+
+          // Model updates can move focus and dispatch blur again. Destroy the DOM editor
+          // before ending Univer's edit session to prevent a recursive submit path.
+          cleanup()
+          if (!active) return
+
+          // End Univer's hidden native session first. It otherwise remains focused and can
+          // intercept the next double-click or overwrite the custom editor's document data.
+          transformer.clearControls()
+          if (restoreSelection) transformer.activeAnObject(richText)
+          if (!commit || text === previousText) return
           if (!element || !('richText' in element) || !element.richText) {
             setSetupError('无法定位当前文本对象，请重新打开演示文稿后再试')
-            close()
             return
           }
 
@@ -233,26 +243,23 @@ export function PresentationEditor({
               }
             }
           })
-          if (!updated) setSetupError('文本修改失败，请重新打开演示文稿后再试')
-          close()
+          if (!updated && active) setSetupError('文本修改失败，请重新打开演示文稿后再试')
         }
 
-        input.addEventListener('blur', () => void apply())
-        input.addEventListener('keydown', (event: KeyboardEvent) => {
+        input.onblur = () => void finish(true)
+        input.onkeydown = (event: KeyboardEvent) => {
           if (event.key === 'Escape') {
             event.preventDefault()
-            close(true)
+            void finish(false, true)
           } else if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()
-            void apply()
+            void finish(true)
           }
-        })
-        input.focus({ preventScroll: true })
-        input.setSelectionRange(input.value.length, input.value.length)
+        }
 
         let positionAttempts = 0
         const syncPosition = (): void => {
-          if (settled || !active) return
+          if (destroyed || !active) return
           positionAttempts += 1
           const foundNativeEditor = positionInlineEditor(input, editorRect)
           if (!foundNativeEditor && positionAttempts < 4) {
@@ -261,7 +268,11 @@ export function PresentationEditor({
           }
           hideNativeEditor?.()
           richText.hide()
-          input.focus({ preventScroll: true })
+          positionFrame = window.requestAnimationFrame(() => {
+            if (destroyed || !active) return
+            input.focus({ preventScroll: true })
+            input.setSelectionRange(input.value.length, input.value.length)
+          })
         }
         positionFrame = window.requestAnimationFrame(syncPosition)
       }
