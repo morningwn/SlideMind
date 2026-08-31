@@ -1997,16 +1997,18 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     <section className="project-workspace" aria-label={`${project.name} 项目工作区`}>
       {titleBarActionSlot ? createPortal(
         <div className="title-bar-actions" aria-label="编辑操作">
-          <button
-            className={`workspace-history-button${isHistoryActive ? ' workspace-history-button-active' : ''}`}
-            type="button"
-            title="版本历史 (Ctrl/⌘ Shift H)"
-            aria-pressed={isHistoryActive}
-            onClick={openHistory}
-          >
-            <HistoryIcon />
-            <span>版本历史</span>
-          </button>
+          {activeFile || isHistoryActive ? (
+            <button
+              className={`workspace-history-button${isHistoryActive ? ' workspace-history-button-active' : ''}`}
+              type="button"
+              title="版本历史 (Ctrl/⌘ Shift H)"
+              aria-pressed={isHistoryActive}
+              onClick={openHistory}
+            >
+              <HistoryIcon />
+              <span>版本历史</span>
+            </button>
+          ) : null}
           {!isHistoryActive && activeDocument ? (
             <>
               {activeDocument.kind === 'markdown' ? (
