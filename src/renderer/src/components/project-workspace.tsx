@@ -1032,6 +1032,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     ))
     try {
       const result = await window.presentations.export(project.handle, { path })
+      if (!result) {
+        setOpenPresentations((current) => current.map((candidate) =>
+          candidate.path === path ? { ...candidate, isExporting: false } : candidate
+        ))
+        return
+      }
       setOpenPresentations((current) => current.map((candidate) =>
         candidate.path === path
           ? { ...candidate, isExporting: false, lastExportPath: result.outputPath }

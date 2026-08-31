@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { lstat, realpath, rename, unlink } from 'node:fs/promises'
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import type {
   ExportProjectPresentationInput,
@@ -55,32 +55,53 @@ function validateExportInput(value: unknown): ExportProjectPresentationInput {
   }
 }
 
-async function resolveOutputPath(
+export async function resolvePresentationOutputPath(
   projectPathInput: unknown,
-  relativePathInput: unknown
-): Promise<{ outputPath: string; relativePath: string }> {
+  pathInput: unknown,
+  allowExternalOutput = false
+): Promise<{
+  outputPath: string
+  projectRelativePath?: string
+  resultPath: string
+}> {
   const projectPath = await realpath(validateString(projectPathInput, '项目路径'))
-  const inputPath = validateString(relativePathInput, '导出路径')
-  if (isAbsolute(inputPath)) throw new Error('导出路径必须位于项目目录内')
-  const outputPath = resolve(projectPath, inputPath)
-  if (!isInsideProject(projectPath, outputPath)) throw new Error('导出路径超出项目范围')
-
-  const relativePath = relative(projectPath, outputPath)
-  if (
-    relativePath.split(sep).some((segment) => segment.toLocaleLowerCase() === INTERNAL_PROJECT_DIRECTORY)
-  ) {
-    throw new Error('不能导出到 SlideMind 内部目录')
+  const inputPath = validateString(pathInput, '导出路径')
+  const absoluteInput = isAbsolute(inputPath)
+  if (absoluteInput && !allowExternalOutput) {
+    throw new Error('导出路径必须位于项目目录内')
   }
-  if (!isPptxPath(relativePath)) throw new Error('导出文件必须使用 .pptx 扩展名')
+  const requestedOutputPath = absoluteInput ? resolve(inputPath) : resolve(projectPath, inputPath)
+  if (!absoluteInput && !isInsideProject(projectPath, requestedOutputPath)) {
+    throw new Error('导出路径超出项目范围')
+  }
+  if (!isPptxPath(requestedOutputPath)) throw new Error('导出文件必须使用 .pptx 扩展名')
 
-  const parentPath = await realpath(dirname(outputPath))
-  if (!isInsideProject(projectPath, parentPath)) throw new Error('导出路径超出项目范围')
-  const relativeParent = relative(projectPath, parentPath)
-  if (relativeParent) {
-    let currentPath = projectPath
-    for (const segment of relativeParent.split(sep)) {
-      currentPath = resolve(currentPath, segment)
-      if ((await lstat(currentPath)).isSymbolicLink()) throw new Error('导出路径不能包含符号链接')
+  const parentPath = await realpath(dirname(requestedOutputPath))
+  const outputPath = resolve(parentPath, basename(requestedOutputPath))
+  const projectRelativePath = isInsideProject(projectPath, outputPath)
+    ? relative(projectPath, outputPath)
+    : undefined
+  if (!absoluteInput && projectRelativePath === undefined) {
+    throw new Error('导出路径超出项目范围')
+  }
+
+  if (projectRelativePath !== undefined) {
+    if (
+      projectRelativePath
+        .split(sep)
+        .some((segment) => segment.toLocaleLowerCase() === INTERNAL_PROJECT_DIRECTORY)
+    ) {
+      throw new Error('不能导出到 SlideMind 内部目录')
+    }
+    const relativeParent = relative(projectPath, parentPath)
+    if (relativeParent) {
+      let currentPath = projectPath
+      for (const segment of relativeParent.split(sep)) {
+        currentPath = resolve(currentPath, segment)
+        if ((await lstat(currentPath)).isSymbolicLink()) {
+          throw new Error('导出路径不能包含符号链接')
+        }
+      }
     }
   }
   try {
@@ -91,7 +112,11 @@ async function resolveOutputPath(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
   }
-  return { outputPath, relativePath }
+  return {
+    outputPath,
+    ...(projectRelativePath === undefined ? {} : { projectRelativePath }),
+    resultPath: absoluteInput ? requestedOutputPath : projectRelativePath!
+  }
 }
 
 function runExportWorker(
@@ -196,10 +221,41 @@ export class PresentationService {
     signal?: AbortSignal,
     source: ProjectMutationSource = 'presentation-editor'
   ): Promise<ExportProjectPresentationResult> {
+    return this.exportToPath(projectPath, projectHandle, inputValue, signal, source, false)
+  }
+
+  async exportToSelectedPath(
+    projectPath: string,
+    projectHandle: string,
+    inputValue: unknown,
+    signal?: AbortSignal
+  ): Promise<ExportProjectPresentationResult> {
+    return this.exportToPath(
+      projectPath,
+      projectHandle,
+      inputValue,
+      signal,
+      'presentation-editor',
+      true
+    )
+  }
+
+  private async exportToPath(
+    projectPath: string,
+    projectHandle: string,
+    inputValue: unknown,
+    signal: AbortSignal | undefined,
+    source: ProjectMutationSource,
+    allowExternalOutput: boolean
+  ): Promise<ExportProjectPresentationResult> {
     const input = validateExportInput(inputValue)
     const presentation = await this.store.read(projectPath, input.path)
     const requestedOutputPath = input.outputPath ?? defaultPresentationOutputPath(presentation.path)
-    const output = await resolveOutputPath(projectPath, requestedOutputPath)
+    const output = await resolvePresentationOutputPath(
+      projectPath,
+      requestedOutputPath,
+      allowExternalOutput
+    )
     const temporaryPath = `${output.outputPath}.${process.pid}-${randomUUID()}.slidemind-tmp.pptx`
     const operation = async (): Promise<ExportProjectPresentationResult> => {
       try {
@@ -209,11 +265,11 @@ export class PresentationService {
         await unlink(temporaryPath).catch(() => undefined)
         throw error
       }
-      return { outputPath: output.relativePath }
+      return { outputPath: output.resultPath }
     }
-    return this.mutations
+    return this.mutations && output.projectRelativePath !== undefined
       ? this.mutations.run(
-          { projectPath, projectHandle, paths: [output.relativePath], source },
+          { projectPath, projectHandle, paths: [output.projectRelativePath], source },
           operation
         )
       : operation()

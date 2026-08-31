@@ -88,7 +88,7 @@ export interface PresentationApi {
   export(
     projectHandle: string,
     input: ExportProjectPresentationInput
-  ): Promise<ExportProjectPresentationResult>
+  ): Promise<ExportProjectPresentationResult | null>
   onChanged(listener: (event: PresentationChangedEvent) => void): () => void
 }
 
