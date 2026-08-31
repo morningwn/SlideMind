@@ -42,6 +42,8 @@ src/
 - 模型配置入口位于启动台右上角，不会阻塞项目选择；后续可从这里再次进入。
 - API Key 通过 Electron 系统安全存储加密，并写入应用的 `userData/agent-config.json`。渲染进程只能读取非敏感配置状态，无法读取已保存的 Key。
 - preload 已暴露受限的 `window.agent.prompt(input)` 接口，供后续编辑器功能调用基础 agent。
+- 应用内置演示策略、页面文案、视觉设计、数据表达和成稿审查 Skill；开发态从 `skills/` 加载，打包后作为只读资源注入 Pi Agent。
+- 当前项目仍可通过 `.pi/skills/` 增加或覆盖同名 Skill，用户级 Skill 位于应用 `userData/pi-agent/skills/`。
 
 ## 项目启动台
 

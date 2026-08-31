@@ -168,6 +168,7 @@ export class BaseAgentService {
     private readonly configStore: AgentConfigStore,
     private readonly projectRoots: ProjectRootRegistry,
     private readonly agentDirectory: string,
+    private readonly bundledSkillsDirectory: string,
     private readonly presentationService: PresentationService,
     private readonly mutations: ProjectMutationService
   ) {}
@@ -297,6 +298,7 @@ export class BaseAgentService {
       cwd: projectPath,
       agentDir: this.agentDirectory,
       additionalExtensionPaths: [permissionSystem.extensionPath, TODO_EXTENSION_PATH],
+      additionalSkillPaths: [this.bundledSkillsDirectory],
       extensionFactories: [
         {
           name: 'slidemind-presentations',
@@ -435,7 +437,7 @@ export class BaseAgentService {
     return loadSkills({
       cwd: projectPath,
       agentDir: this.agentDirectory,
-      skillPaths: [],
+      skillPaths: [this.bundledSkillsDirectory],
       includeDefaults: true
     }).skills
   }
@@ -483,7 +485,10 @@ export class BaseAgentService {
   }
 
   private getPermissionSystem(): Promise<PermissionSystemSetup> {
-    this.permissionSystemPromise ??= preparePermissionSystem(this.agentDirectory)
+    this.permissionSystemPromise ??= preparePermissionSystem(
+      this.agentDirectory,
+      [this.bundledSkillsDirectory]
+    )
     return this.permissionSystemPromise
   }
 }

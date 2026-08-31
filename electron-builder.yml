@@ -10,6 +10,12 @@ files:
   - out/**
   - package.json
 
+extraResources:
+  - from: skills
+    to: skills
+    filter:
+      - '**/*'
+
 asar: true
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 

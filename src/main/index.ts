@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import { join } from 'node:path'
 import { BaseAgentService } from './agent/base-agent'
+import { resolveBundledSkillsDirectory } from './agent/bundled-skills'
 import { AgentConfigStore } from './agent/config-store'
 import { registerAgentIpc } from './agent/ipc'
 import { ProjectConversationStore } from './project/conversation-store'
@@ -206,6 +207,11 @@ app.whenReady().then(() => {
     configStore,
     projectRoots,
     join(app.getPath('userData'), 'pi-agent'),
+    resolveBundledSkillsDirectory({
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath
+    }),
     presentationService,
     mutationService
   )

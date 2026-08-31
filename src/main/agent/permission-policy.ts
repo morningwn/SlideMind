@@ -17,8 +17,22 @@ function normalizePermissionPath(path: string): string {
   return path.replaceAll('\\', '/')
 }
 
-export function createManagedPermissionPolicy(agentDirectory: string): Record<string, unknown> {
+export function createManagedPermissionPolicy(
+  agentDirectory: string,
+  readOnlyDirectories: readonly string[] = []
+): Record<string, unknown> {
   const skillsDirectory = normalizePermissionPath(join(agentDirectory, 'skills'))
+  const protectedDirectories = [skillsDirectory, ...readOnlyDirectories.map(normalizePermissionPath)]
+  const fileToolRules = Object.fromEntries(protectedDirectories.flatMap((directory) => [
+    [`write:${directory}`, 'deny'],
+    [`write:${directory}/*`, 'deny'],
+    [`edit:${directory}`, 'deny'],
+    [`edit:${directory}/*`, 'deny']
+  ]))
+  const externalDirectoryRules = Object.fromEntries(protectedDirectories.flatMap((directory) => [
+    [`external_directory:${directory}`, 'allow'],
+    [`external_directory:${directory}/*`, 'allow']
+  ]))
 
   return {
     defaultPolicy: {
@@ -41,10 +55,7 @@ export function createManagedPermissionPolicy(agentDirectory: string): Record<st
       slides_read: 'allow',
       slides_write: 'allow',
       slides_export: 'allow',
-      [`write:${skillsDirectory}`]: 'deny',
-      [`write:${skillsDirectory}/*`]: 'deny',
-      [`edit:${skillsDirectory}`]: 'deny',
-      [`edit:${skillsDirectory}/*`]: 'deny'
+      ...fileToolRules
     },
     bash: {
       '*': 'deny'
@@ -58,14 +69,14 @@ export function createManagedPermissionPolicy(agentDirectory: string): Record<st
     special: {
       '*': 'deny',
       external_directory: 'deny',
-      [`external_directory:${skillsDirectory}`]: 'allow',
-      [`external_directory:${skillsDirectory}/*`]: 'allow'
+      ...externalDirectoryRules
     }
   }
 }
 
 export async function preparePermissionSystem(
-  agentDirectory: string
+  agentDirectory: string,
+  readOnlyDirectories: readonly string[] = []
 ): Promise<PermissionSystemSetup> {
   const permissionDirectory = join(agentDirectory, PERMISSION_SYSTEM_DIRECTORY)
   const policyPath = join(permissionDirectory, PERMISSION_POLICY_FILE)
@@ -76,7 +87,7 @@ export async function preparePermissionSystem(
   await Promise.all([
     writeFile(
       policyPath,
-      `${JSON.stringify(createManagedPermissionPolicy(agentDirectory), null, 2)}\n`,
+      `${JSON.stringify(createManagedPermissionPolicy(agentDirectory, readOnlyDirectories), null, 2)}\n`,
       { encoding: 'utf8', mode: 0o600 }
     ),
     writeFile(

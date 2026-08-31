@@ -39,7 +39,8 @@ describe('createManagedPermissionPolicy', () => {
   it('allows reading the managed skills directory but denies mutations there', () => {
     const agentDirectory = '/tmp/slidemind-agent'
     const skillsDirectory = join(agentDirectory, 'skills')
-    const policy = createManagedPermissionPolicy(agentDirectory) as {
+    const bundledSkillsDirectory = '/app/resources/skills'
+    const policy = createManagedPermissionPolicy(agentDirectory, [bundledSkillsDirectory]) as {
       tools: Record<string, string>
       skills: Record<string, string>
       special: Record<string, string>
@@ -50,6 +51,9 @@ describe('createManagedPermissionPolicy', () => {
     expect(policy.special[`external_directory:${skillsDirectory}/*`]).toBe('allow')
     expect(policy.tools[`write:${skillsDirectory}/*`]).toBe('deny')
     expect(policy.tools[`edit:${skillsDirectory}/*`]).toBe('deny')
+    expect(policy.special[`external_directory:${bundledSkillsDirectory}/*`]).toBe('allow')
+    expect(policy.tools[`write:${bundledSkillsDirectory}/*`]).toBe('deny')
+    expect(policy.tools[`edit:${bundledSkillsDirectory}/*`]).toBe('deny')
   })
 })
 
