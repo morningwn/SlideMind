@@ -148,19 +148,7 @@ export class ProjectTextFileStore {
     projectPathInput: unknown,
     relativePathInput: unknown
   ): Promise<ProjectImageFile> {
-    const imageFile = await resolveRegularProjectFile(projectPathInput, relativePathInput)
-    const mimeType = imageMimeType(imageFile.relativePath)
-    if (imageFile.size > MAX_IMAGE_FILE_BYTES) throw new Error('图片超过 20 MiB，无法预览')
-
-    const bytes = await readFile(imageFile.targetPath)
-    if (bytes.byteLength > MAX_IMAGE_FILE_BYTES) throw new Error('图片超过 20 MiB，无法预览')
-    return {
-      path: imageFile.relativePath,
-      mimeType,
-      dataUrl: `data:${mimeType};base64,${bytes.toString('base64')}`,
-      size: bytes.byteLength,
-      revision: fileRevision(bytes)
-    }
+    return readProjectImageFile(projectPathInput, relativePathInput)
   }
 
   async readPreviewAsset(
@@ -244,5 +232,24 @@ export class ProjectTextFileStore {
     }
 
     return { ok: true, revision: fileRevision(nextBytes) }
+  }
+}
+
+export async function readProjectImageFile(
+  projectPathInput: unknown,
+  relativePathInput: unknown
+): Promise<ProjectImageFile> {
+  const imageFile = await resolveRegularProjectFile(projectPathInput, relativePathInput)
+  const mimeType = imageMimeType(imageFile.relativePath)
+  if (imageFile.size > MAX_IMAGE_FILE_BYTES) throw new Error('图片超过 20 MiB，无法预览')
+
+  const bytes = await readFile(imageFile.targetPath)
+  if (bytes.byteLength > MAX_IMAGE_FILE_BYTES) throw new Error('图片超过 20 MiB，无法预览')
+  return {
+    path: imageFile.relativePath,
+    mimeType,
+    dataUrl: `data:${mimeType};base64,${bytes.toString('base64')}`,
+    size: bytes.byteLength,
+    revision: fileRevision(bytes)
   }
 }

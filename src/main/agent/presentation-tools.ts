@@ -5,6 +5,7 @@ import {
   type PresentationDocument
 } from '../../shared/presentation'
 import type { PresentationService } from '../presentation/presentation-service'
+import { readProjectImageFile } from '../project/project-text-files'
 
 type SlideInput = {
   title: string
@@ -205,6 +206,18 @@ function slidesToDocument(
   }
 }
 
+async function embedProjectImages(projectPath: string, slides: SlideInput[]): Promise<SlideInput[]> {
+  return Promise.all(slides.map(async (slide) => ({
+    ...slide,
+    elements: await Promise.all(slide.elements.map(async (element) => {
+      if (element.type !== 'image' || element.source.startsWith('data:image/')) return element
+
+      const image = await readProjectImageFile(projectPath, element.source)
+      return { ...element, source: image.dataUrl }
+    }))
+  })))
+}
+
 function plainText(value: unknown): string {
   return typeof value === 'string'
     ? value.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '').trim()
@@ -332,7 +345,10 @@ export function createPresentationToolsExtension(options: {
     const imageElementSchema = Type.Object({
       type: Type.Literal('image'),
       ...elementBase,
-      source: Type.String({ maxLength: 40_000_000 }),
+      source: Type.String({
+        maxLength: 40_000_000,
+        description: '项目内图片的相对路径，或 data:image/... URL'
+      }),
       alt: Type.Optional(Type.String({ maxLength: 2_000 }))
     }, { additionalProperties: false })
     const slideSchema = Type.Object({
@@ -398,7 +414,8 @@ export function createPresentationToolsExtension(options: {
       promptSnippet: 'Write structured PPTist slides with text, shapes, lines, and embedded images.',
       promptGuidelines: [
         'Use a 1000×562.5 coordinate system unless slides_read reports another canvas size.',
-        'Call slides_read immediately before slides_write and pass its revision.'
+        'Call slides_read immediately before slides_write and pass its revision.',
+        'For a local image in the project, set image source to its project-relative path; do not encode it yourself.'
       ],
       parameters: Type.Object({
         file: Type.String({ minLength: 1, maxLength: 4096 }),
@@ -408,7 +425,8 @@ export function createPresentationToolsExtension(options: {
       }, { additionalProperties: false }),
       async execute(_toolCallId, params) {
         const current = await options.presentationService.read(options.projectPath, params.file)
-        const document = slidesToDocument(current.document, params.title, params.slides as SlideInput[])
+        const slides = await embedProjectImages(options.projectPath, params.slides as SlideInput[])
+        const document = slidesToDocument(current.document, params.title, slides)
         const result = await options.presentationService.save(
           options.projectPath,
           options.projectHandle,
