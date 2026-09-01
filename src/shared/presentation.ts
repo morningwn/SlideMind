@@ -51,6 +51,11 @@ export interface CreateProjectPresentationInput {
   title?: string
 }
 
+export interface ImportProjectPresentationInput {
+  path: string
+  document: PresentationDocument
+}
+
 export interface SaveProjectPresentationInput {
   path: string
   document: PresentationDocument
@@ -79,6 +84,10 @@ export interface PresentationApi {
   create(
     projectHandle: string,
     input: CreateProjectPresentationInput
+  ): Promise<ProjectPresentationFile>
+  import(
+    projectHandle: string,
+    input: ImportProjectPresentationInput
   ): Promise<ProjectPresentationFile>
   read(projectHandle: string, relativePath: string): Promise<ProjectPresentationFile>
   save(

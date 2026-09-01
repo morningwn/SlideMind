@@ -34,6 +34,39 @@ describe('ProjectPresentationStore', () => {
     expect(loaded.document.presentation.slides).toHaveLength(1)
   })
 
+  it('imports a complete PPTist document without creating an intermediate blank version', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-presentations-import-'))
+    const store = new ProjectPresentationStore()
+    const document = createBlankPresentationDocument('外部演示')
+    document.presentation.slides[0].remark = '演讲者备注'
+    document.presentation.slides[0].elements.push({
+      id: 'imported-text',
+      type: 'text',
+      left: 40,
+      top: 40,
+      width: 300,
+      height: 80,
+      rotate: 0,
+      content: '<p>导入内容</p>'
+    })
+
+    const imported = await store.import(projectPath, {
+      path: 'external.slides.json',
+      document
+    })
+    const loaded = await store.read(projectPath, imported.path)
+
+    expect(loaded.revision).toBe(imported.revision)
+    expect(loaded.document.presentation).toMatchObject({
+      title: '外部演示',
+      slides: [{ remark: '演讲者备注', elements: [{ id: 'imported-text' }] }]
+    })
+    await expect(store.import(projectPath, {
+      path: 'external.slides.json',
+      document
+    })).rejects.toThrow('不能覆盖')
+  })
+
   it('saves repeated PPTist edits without changing the document format', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-presentations-'))
     const store = new ProjectPresentationStore()

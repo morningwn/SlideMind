@@ -32,6 +32,11 @@ export function registerPresentationIpc(
     return service.create(project.projectPath, project.projectHandle, input)
   })
 
+  ipcMain.handle('presentation:import', (_event, projectHandle: unknown, input: unknown) => {
+    const project = resolveProject(projectRoots, projectHandle)
+    return service.import(project.projectPath, project.projectHandle, input)
+  })
+
   ipcMain.handle('presentation:read', (_event, projectHandle: unknown, path: unknown) => {
     const project = resolveProject(projectRoots, projectHandle)
     return service.read(project.projectPath, path)

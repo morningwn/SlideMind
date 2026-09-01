@@ -2409,6 +2409,22 @@ button.file-tree-item:not(.file-tree-directory) {
   background: white;
 }
 
+.pptx-import-frame {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.pptx-import-frame iframe {
+  width: 1px;
+  height: 1px;
+  border: 0;
+}
+
 .document-error {
   display: flex;
   min-height: 38px;

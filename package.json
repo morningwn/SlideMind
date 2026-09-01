@@ -46,6 +46,7 @@
     "pi-web-access": "0.27.0",
     "pinia": "^3.0.2",
     "pptist": "https://github.com/pipipi-pikachu/PPTist/archive/e4912589ffdbec389fcc1bf25a85852dfe3040a8.tar.gz",
+    "pptxtojson": "2.1.0",
     "pptxgenjs": "4.0.1",
     "prosemirror-view": "^1.33.9",
     "react": "19.2.8",

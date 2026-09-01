@@ -5,6 +5,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
   type KeyboardEvent
 } from 'react'
@@ -53,6 +54,10 @@ import {
 import { reportDiagnosticEvent } from '../lib/logger'
 import { contextUsageTone, formatTokenCount } from '../lib/agent-usage'
 import { serializePresentationDocumentState } from '../lib/presentation-document-state'
+import {
+  PptxImportFrame,
+  type PptxImportRequest
+} from './pptx-import-frame'
 
 const PresentationEditor = lazy(async () => {
   const module = await import('./presentation-editor')
@@ -60,6 +65,7 @@ const PresentationEditor = lazy(async () => {
 })
 
 const THINKING_LEVEL_STORAGE_KEY = 'slidemind:agent-thinking-level'
+const MAX_PPTX_IMPORT_BYTES = 30 * 1024 * 1024
 
 function loadThinkingLevel(): AgentThinkingLevel {
   try {
@@ -607,6 +613,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set(['']))
   const [fileError, setFileError] = useState('')
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
+  const [pendingPresentationImport, setPendingPresentationImport] =
+    useState<PptxImportRequest | null>(null)
   const [renameRequestedPath, setRenameRequestedPath] = useState<string | null>(null)
   const [openDocuments, setOpenDocuments] = useState<OpenTextDocument[]>([])
   const [openPresentations, setOpenPresentations] = useState<OpenPresentationDocument[]>([])
@@ -619,6 +627,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const messageEndRef = useRef<HTMLDivElement>(null)
   const composerTextareaRef = useRef<HTMLTextAreaElement>(null)
   const createMenuRef = useRef<HTMLDivElement>(null)
+  const pptxImportInputRef = useRef<HTMLInputElement>(null)
   const lastSavedConversationSnapshotRef = useRef('')
   const latestConversationStateRef = useRef<ProjectConversationState>(
     toPersistedState(conversations, selectedConversationId)
@@ -1651,6 +1660,86 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }
 
+  function choosePptxImport(): void {
+    setIsCreateMenuOpen(false)
+    setFileError('')
+    pptxImportInputRef.current?.click()
+  }
+
+  async function preparePptxImport(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file || pendingPresentationImport) return
+    if (!file.name.toLocaleLowerCase().endsWith('.pptx')) {
+      setFileError('请选择 .pptx 格式的 PowerPoint 文件')
+      return
+    }
+    if (file.size === 0 || file.size > MAX_PPTX_IMPORT_BYTES) {
+      setFileError('PPTX 文件必须大于 0 且不超过 30 MiB')
+      return
+    }
+
+    setFileError('')
+    try {
+      const rootEntries = await window.projects.listDirectory(project.handle, '')
+      setEntriesByDirectory((current) => ({ ...current, '': rootEntries }))
+      const rawStem = file.name.replace(/\.pptx$/i, '').normalize('NFC').trim()
+      const safeStem = rawStem
+        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-')
+        .replace(/[. ]+$/g, '')
+        .slice(0, 120) || 'presentation'
+      const path = nextAvailableEntryName(rootEntries, safeStem, PRESENTATION_FILE_SUFFIX)
+      setPendingPresentationImport({
+        id: crypto.randomUUID(),
+        bytes: await file.arrayBuffer(),
+        fileName: file.name,
+        path,
+        title: safeStem
+      })
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : '无法读取 PPTX 文件')
+    }
+  }
+
+  async function completePptxImport(
+    requestId: string,
+    document: OpenPresentationDocument['document']
+  ): Promise<void> {
+    const request = pendingPresentationImport
+    if (!request || request.id !== requestId) return
+    try {
+      const file = await window.presentations.import(project.handle, {
+        path: request.path,
+        document
+      })
+      const serializedDocument = serializePresentationDocumentState(file.document)
+      setOpenPresentations((current) => [...current, {
+        ...file,
+        name: request.path,
+        serializedDocument,
+        savedSerializedDocument: serializedDocument,
+        reloadKey: crypto.randomUUID(),
+        isSaving: false,
+        isExporting: false,
+        conflict: false,
+        error: ''
+      }])
+      setIsHistoryActive(false)
+      setActiveDocumentPath(file.path)
+      setSelectedFilePath(file.path)
+      await refreshDirectory('')
+    } catch (error) {
+      setFileError(error instanceof Error ? error.message : '无法保存导入的演示文稿')
+    } finally {
+      setPendingPresentationImport((current) => current?.id === requestId ? null : current)
+    }
+  }
+
+  function failPptxImport(requestId: string, message: string): void {
+    setPendingPresentationImport((current) => current?.id === requestId ? null : current)
+    setFileError(`无法导入 PPTX：${message}`)
+  }
+
   async function createDirectory(): Promise<void> {
     setIsCreateMenuOpen(false)
     setFileError('')
@@ -2190,6 +2279,13 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   return (
     <section className="project-workspace" aria-label={`${project.name} 项目工作区`}>
+      {pendingPresentationImport ? (
+        <PptxImportFrame
+          request={pendingPresentationImport}
+          onImported={(requestId, document) => void completePptxImport(requestId, document)}
+          onError={failPptxImport}
+        />
+      ) : null}
       {titleBarActionSlot ? createPortal(
         <div className="title-bar-actions" aria-label="编辑操作">
           {activeFile || isHistoryActive ? (
@@ -2296,6 +2392,15 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               <h2 id="project-files-title">文件</h2>
             </div>
             <div className="file-create-control" ref={createMenuRef}>
+              <input
+                ref={pptxImportInputRef}
+                className="sr-only"
+                type="file"
+                accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                tabIndex={-1}
+                aria-hidden="true"
+                onChange={(event) => void preparePptxImport(event)}
+              />
               <button
                 className="file-create-trigger"
                 type="button"
@@ -2313,6 +2418,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                   <button
                     type="button"
                     role="menuitem"
+                    disabled={Boolean(pendingPresentationImport)}
+                    onClick={choosePptxImport}
+                  >从 PowerPoint (.pptx) 导入</button>
+                  <button
+                    type="button"
+                    role="menuitem"
                     onClick={() => void createPresentation()}
                   >PPT 原始数据 (.slides.json)</button>
                   <button
@@ -2325,6 +2436,11 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             </div>
           </header>
           <div className="file-tree-scroll">
+            {pendingPresentationImport ? (
+              <p className="sidebar-loading" aria-live="polite">
+                正在导入 {pendingPresentationImport.fileName}…
+              </p>
+            ) : null}
             {fileError ? <p className="sidebar-error" role="alert">{fileError}</p> : null}
             {loadingPaths.has('') ? (
               <p className="sidebar-loading">正在读取文件…</p>

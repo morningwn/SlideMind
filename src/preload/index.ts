@@ -21,6 +21,7 @@ import type {
 import type {
   CreateProjectPresentationInput,
   ExportProjectPresentationInput,
+  ImportProjectPresentationInput,
   PresentationApi,
   PresentationChangedEvent,
   SaveProjectPresentationInput
@@ -162,6 +163,8 @@ contextBridge.exposeInMainWorld('projectVersions', projectVersionApi)
 const presentationApi: Readonly<PresentationApi> = Object.freeze({
   create: (projectHandle: string, input: CreateProjectPresentationInput) =>
     ipcRenderer.invoke('presentation:create', projectHandle, input),
+  import: (projectHandle: string, input: ImportProjectPresentationInput) =>
+    ipcRenderer.invoke('presentation:import', projectHandle, input),
   read: (projectHandle: string, relativePath: string) =>
     ipcRenderer.invoke('presentation:read', projectHandle, relativePath),
   save: (projectHandle: string, input: SaveProjectPresentationInput) =>

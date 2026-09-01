@@ -6,6 +6,7 @@ import {
   PRESENTATION_FORMAT,
   PRESENTATION_FORMAT_VERSION,
   type CreateProjectPresentationInput,
+  type ImportProjectPresentationInput,
   type PptistElement,
   type PptistPresentation,
   type PptistSlide,
@@ -280,6 +281,14 @@ function validateCreateInput(value: unknown): CreateProjectPresentationInput {
   }
 }
 
+function validateImportInput(value: unknown): ImportProjectPresentationInput {
+  if (!isRecord(value)) throw new Error('导入演示文稿参数无效')
+  return {
+    path: validateString(value.path, '文件路径'),
+    document: normalizePresentationDocument(value.document)
+  }
+}
+
 function validateSaveInput(value: unknown): SaveProjectPresentationInput {
   if (!isRecord(value)) throw new Error('演示文稿保存参数无效')
   const path = validateString(value.path, '文件路径')
@@ -305,6 +314,25 @@ export class ProjectPresentationStore {
       throw error
     }
     return { path: relativePath, document, revision: presentationRevision(bytes) }
+  }
+
+  async import(projectPathInput: unknown, inputValue: unknown): Promise<ProjectPresentationFile> {
+    const input = validateImportInput(inputValue)
+    const { relativePath, targetPath } = await resolveNewPresentationFile(projectPathInput, input.path)
+    const bytes = serializePresentationDocument(input.document)
+    try {
+      await writeFile(targetPath, bytes, { flag: 'wx', mode: 0o600 })
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+        throw new Error('演示文稿已存在，不能覆盖')
+      }
+      throw error
+    }
+    return {
+      path: relativePath,
+      document: input.document,
+      revision: presentationRevision(bytes)
+    }
   }
 
   async read(projectPathInput: unknown, relativePathInput: unknown): Promise<ProjectPresentationFile> {

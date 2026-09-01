@@ -1,4 +1,8 @@
+import { mkdtemp, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
+import { createBlankPresentationDocument } from '../presentation/presentation-store'
 import {
   BaseAgentService,
   normalizeAgentConversationInput,
@@ -193,5 +197,40 @@ describe('BaseAgentService.stop', () => {
       projectHandle: 'project-handle-1'
     })).resolves.toEqual({ stopped: false })
     expect(abort).toHaveBeenCalledOnce()
+  })
+})
+
+describe('BaseAgentService prompt references', () => {
+  it('routes SlideMind presentations through slides_read instead of the text read tool', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-agent-presentation-'))
+    await writeFile(
+      join(projectPath, 'brief.slides.json'),
+      JSON.stringify(createBlankPresentationDocument('Brief'))
+    )
+    const service = new BaseAgentService(
+      {} as never,
+      {} as never,
+      '/agent',
+      '/skills',
+      {} as never,
+      {} as never
+    )
+    const internal = service as unknown as {
+      injectPromptReferences(input: ReturnType<typeof normalizeAgentPromptInput>, path: string):
+        Promise<string>
+    }
+    const prompt = normalizeAgentPromptInput({
+      requestId: 'request-1',
+      conversationId: 'conversation-1',
+      projectHandle: 'project-1',
+      input: '总结这份演示',
+      references: [{ type: 'file', path: 'brief.slides.json' }]
+    })
+
+    const injected = await internal.injectPromptReferences(prompt, projectPath)
+
+    expect(injected).toContain('使用 slides_read 工具')
+    expect(injected).toContain('brief.slides.json')
+    expect(injected).not.toContain('使用 read 工具读取')
   })
 })

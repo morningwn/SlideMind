@@ -66,6 +66,8 @@ type SlideInput = {
   >
 }
 
+const MAX_SLIDES_PER_READ = 50
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -224,15 +226,60 @@ function plainText(value: unknown): string {
     : ''
 }
 
-function presentationSummary(document: PresentationDocument): Record<string, unknown> {
+function tableRows(value: unknown): string[][] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.map((row) => Array.isArray(row)
+    ? row.map((cell) => {
+        if (typeof cell === 'string') return plainText(cell)
+        if (!cell || typeof cell !== 'object') return ''
+        return plainText((cell as Record<string, unknown>).text)
+      })
+    : []
+  )
+}
+
+function chartData(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const data = value as Record<string, unknown>
+  return {
+    labels: Array.isArray(data.labels) ? data.labels : [],
+    legends: Array.isArray(data.legends) ? data.legends : [],
+    series: Array.isArray(data.series) ? data.series : []
+  }
+}
+
+function presentationSummary(
+  document: PresentationDocument,
+  startSlideInput = 1,
+  endSlideInput?: number
+): Record<string, unknown> {
   const presentation = document.presentation
+  const totalSlideCount = presentation.slides.length
+  if (startSlideInput > totalSlideCount) {
+    throw new Error(`起始页超出演示文稿页数（共 ${totalSlideCount} 页）`)
+  }
+  const startSlide = Math.max(1, startSlideInput)
+  const endSlide = Math.min(
+    totalSlideCount,
+    endSlideInput ?? startSlide + MAX_SLIDES_PER_READ - 1
+  )
+  if (endSlide < startSlide) throw new Error('结束页不能早于起始页')
+  if (endSlide - startSlide + 1 > MAX_SLIDES_PER_READ) {
+    throw new Error(`单次最多读取 ${MAX_SLIDES_PER_READ} 页幻灯片`)
+  }
   return {
     title: presentation.title,
     viewportSize: presentation.viewportSize,
     viewportRatio: presentation.viewportRatio,
-    slides: presentation.slides.map((slide, index) => ({
+    totalSlideCount,
+    startSlide,
+    endSlide,
+    truncated: startSlide > 1 || endSlide < totalSlideCount,
+    slides: presentation.slides.slice(startSlide - 1, endSlide).map((slide, index) => ({
+      number: startSlide + index,
       id: slide.id,
-      title: typeof slide.name === 'string' ? slide.name : `第 ${index + 1} 页`,
+      title: typeof slide.name === 'string' ? slide.name : `第 ${startSlide + index} 页`,
+      notes: plainText(slide.remark),
       background: typeof slide.background === 'object' ? slide.background : undefined,
       elements: slide.elements.map((element) => {
         if (element.type === 'line') {
@@ -267,8 +314,18 @@ function presentationSummary(document: PresentationDocument): Record<string, unk
               ? plainText((element.text as Record<string, unknown>).content)
               : ''
           ),
+          table: element.type === 'table' ? tableRows(element.data) : undefined,
+          chart: element.type === 'chart'
+            ? {
+                chartType: element.chartType,
+                data: chartData(element.data)
+              }
+            : undefined,
+          formula: element.type === 'latex' ? element.latex : undefined,
           fill: element.fill,
-          image: element.type === 'image' ? '[embedded image]' : undefined
+          image: element.type === 'image'
+            ? { embedded: true, alt: typeof element.name === 'string' ? element.name : '' }
+            : undefined
         }
       })
     }))
@@ -395,14 +452,16 @@ export function createPresentationToolsExtension(options: {
       description: '读取 PPTist 演示文稿结构和当前修订号。写入前必须先读取并使用返回的 revision。',
       promptSnippet: 'Inspect an editable PPTist presentation.',
       parameters: Type.Object({
-        file: Type.String({ minLength: 1, maxLength: 4096 })
+        file: Type.String({ minLength: 1, maxLength: 4096 }),
+        startSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+        endSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 }))
       }, { additionalProperties: false }),
       async execute(_toolCallId, params) {
         const file = await options.presentationService.read(options.projectPath, params.file)
         return toolText({
           file: file.path,
           revision: file.revision,
-          ...presentationSummary(file.document)
+          ...presentationSummary(file.document, params.startSlide, params.endSlide)
         })
       }
     })

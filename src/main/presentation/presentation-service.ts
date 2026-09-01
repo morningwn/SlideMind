@@ -195,6 +195,20 @@ export class PresentationService {
     return created
   }
 
+  async import(
+    projectPath: string,
+    projectHandle: string,
+    input: unknown
+  ): Promise<ProjectPresentationFile> {
+    const path = isRecord(input) && typeof input.path === 'string' ? input.path : undefined
+    const operation = () => this.store.import(projectPath, input)
+    const imported = this.mutations && path
+      ? await this.mutations.run({ projectPath, projectHandle, paths: [path], source: 'import' }, operation)
+      : await operation()
+    this.emitChanged({ projectHandle, path: imported.path })
+    return imported
+  }
+
   async save(
     projectPath: string,
     projectHandle: string,

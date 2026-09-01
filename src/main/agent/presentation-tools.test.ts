@@ -190,4 +190,90 @@ describe('createPresentationToolsExtension', () => {
       }]
     })
   })
+
+  it('reports imported notes, table cells, chart data and paginates large decks', async () => {
+    const revision = 'a'.repeat(64)
+    const document = createBlankPresentationDocument('导入材料')
+    document.presentation.slides = Array.from({ length: 51 }, (_, index) => ({
+      id: `slide-${index + 1}`,
+      name: `页面 ${index + 1}`,
+      remark: index === 50 ? '<p>最后一页备注</p>' : '',
+      elements: index === 50 ? [
+        {
+          id: 'table-1',
+          type: 'table',
+          left: 20,
+          top: 20,
+          width: 400,
+          height: 200,
+          rotate: 0,
+          data: [[{ text: '<p>季度</p>' }, { text: '<p>收入</p>' }]]
+        },
+        {
+          id: 'chart-1',
+          type: 'chart',
+          left: 450,
+          top: 20,
+          width: 400,
+          height: 240,
+          rotate: 0,
+          chartType: 'bar',
+          data: { labels: ['Q1'], legends: ['收入'], series: [[120]] }
+        }
+      ] : []
+    }))
+    const presentationService = {
+      async read() {
+        return { path: 'imported.slides.json', revision, document: structuredClone(document) }
+      }
+    } as unknown as PresentationService
+    const registeredTools = new Map<string, RegisteredTool>()
+    const extension = createPresentationToolsExtension({
+      presentationService,
+      projectHandle: 'project-handle',
+      projectPath: '/project'
+    })
+    await extension({
+      registerTool: (tool: RegisteredTool) => registeredTools.set(tool.name, tool)
+    } as unknown as ExtensionAPI)
+
+    const firstRead = await registeredTools.get('slides_read')!.execute('read-call', {
+      file: 'imported.slides.json'
+    })
+    expect(firstRead.details).toMatchObject({
+      totalSlideCount: 51,
+      startSlide: 1,
+      endSlide: 50,
+      truncated: true
+    })
+
+    const lastRead = await registeredTools.get('slides_read')!.execute('read-call', {
+      file: 'imported.slides.json',
+      startSlide: 51,
+      endSlide: 51
+    })
+    expect(lastRead.details).toMatchObject({
+      startSlide: 51,
+      endSlide: 51,
+      slides: [{
+        number: 51,
+        notes: '最后一页备注',
+        elements: [
+          { type: 'table', table: [['季度', '收入']] },
+          {
+            type: 'chart',
+            chart: {
+              chartType: 'bar',
+              data: { labels: ['Q1'], legends: ['收入'], series: [[120]] }
+            }
+          }
+        ]
+      }]
+    })
+
+    await expect(registeredTools.get('slides_read')!.execute('read-call', {
+      file: 'imported.slides.json',
+      startSlide: 52
+    })).rejects.toThrow('起始页超出演示文稿页数（共 51 页）')
+  })
 })
