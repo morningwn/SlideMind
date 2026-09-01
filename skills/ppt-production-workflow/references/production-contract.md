@@ -1,6 +1,6 @@
 # PPT 生产契约
 
-本 reference 用于完整创建、重写或导出任务。它定义阶段输入、产物、用户确认门禁和失败处理。完整任务必须把状态和阶段产物写入统一产物目录，不能只依赖会话上下文。
+本 reference 用于完整创建、重写或导出任务。它定义阶段输入、产物、推进模式、确认门禁和失败处理。完整任务必须把状态和阶段产物写入统一产物目录，不能只依赖会话上下文。
 
 ## 状态机
 
@@ -8,7 +8,12 @@
 
 `exported` 是可选终态。用户只要求未经质量验收的可编辑草稿时，`draft-ready` 即完成；用户要求已验收的可编辑稿时，以 `qa-ready` 为终态。
 
-每轮最多产出一个新阶段结果。阶段产物生成后先进入 `awaiting-review`；用户确认后，下一轮才能执行后续转换：
+工作流支持两种推进模式：
+
+- `continuous`：用户要求完成整份演示且未要求逐阶段确认。阶段通过自检后标记为 `completed` 并继续，直到达到目标交付物或触发停止条件。
+- `review`：用户要求逐阶段审阅，或存在必须由用户决定的关键选择。阶段产物生成后进入 `awaiting-review`，用户确认后标记为 `approved` 并继续。
+
+两种模式使用同一阶段转换：
 
 - `evidence-ready`：确定目录和任务边界，完成证据底稿。
 - `evidence-ready → strategy-ready`：生成 Markdown 大纲。
@@ -23,12 +28,15 @@
 完整任务必须维护 `<artifact-directory>/workflow-status.md`，至少包含：
 
 - 主题、统一产物目录和目标交付物；
-- 当前阶段与状态：`in-progress`、`awaiting-review`、`approved`、`needs-revision`、`stale` 或 `exported`；
+- 执行模式：`continuous` 或 `review`；
+- 当前阶段与状态：`in-progress`、`completed`、`awaiting-review`、`approved`、`needs-revision`、`stale` 或 `exported`；
 - 阶段清单、每阶段产物路径和完成时间；
 - 已采用假设、待确认问题和用户反馈；
 - 下一阶段及其进入条件。
 
-开始一轮工作时先读取状态文件。完成当前阶段后更新为 `awaiting-review` 并停止；不能在同一轮把它改为 `approved` 后继续下一阶段。用户确认时把当前阶段改为 `approved`，再执行一个后续阶段。上游变化会使结论、文案、布局或草稿失效时，把所有受影响的下游阶段标为 `stale`。
+开始工作时先读取状态文件。连续模式下，完成当前阶段并通过自检后更新为 `completed`，可在同一轮进入下一阶段；审阅模式下更新为 `awaiting-review` 并停止，用户确认时改为 `approved`。不得把模型自检记为用户 `approved`。上游变化会使结论、文案、布局或草稿失效时，把所有受影响的下游阶段标为 `stale`。
+
+只有前置阶段为 `completed` 或 `approved` 且不存在 `stale`、`needs-revision` 或关键待确认项时，才能进入下一阶段。无论采用哪种模式，都不得扩大用户请求的交付范围。
 
 ## 阶段产物
 
@@ -84,11 +92,11 @@
 
 ### Slide content Markdown
 
-`<topic>-slide-content.md` 保存逐页观众文案、数据结论、流程节点、来源呈现和仍未解决的文案问题。它不包含坐标、模板页索引或 `slides_write` JSON。用户批准前不得进入设计阶段。
+`<topic>-slide-content.md` 保存逐页观众文案、数据结论、流程节点、来源呈现和仍未解决的文案问题。它不包含坐标、模板页索引或 `slides_write` JSON。审阅模式下用户批准前不得进入设计阶段；连续模式下自检通过且没有关键待确认项时可以进入。
 
 ### Design contract
 
-`<topic>-design-spec.md` 记录画布、视觉路线、页边距、网格、字号层级、字体、颜色职责、图片策略和重复元素位置。选择内置模板时，在本阶段完成 PPTist 页面角色映射，并记录模板 ID、页面索引和节点容量；禁止把这些实现字段回写成上游大纲的必填项，也禁止混用两套模板视觉语言。用户批准前不得创建 `.slides.json`。
+`<topic>-design-spec.md` 记录画布、视觉路线、页边距、网格、字号层级、字体、颜色职责、图片策略和重复元素位置。选择内置模板时，在本阶段完成 PPTist 页面角色映射，并记录模板 ID、页面索引和节点容量；禁止把这些实现字段回写成上游大纲的必填项，也禁止混用两套模板视觉语言。只有本阶段为 `completed` 或 `approved` 时才能创建 `.slides.json`。
 
 ### QA ledger
 
@@ -101,24 +109,24 @@
 
 前三类未处理完不得声称成稿通过。第四类必须在交付说明中保留，除非已经通过真实渲染逐页检查。
 
-质量审查结果写入 `<topic>-quality-report.md`。第一次发现问题后停止并等待用户继续；下一轮才执行修复与复审。审查通过后仍要等待用户确认，不能在同一轮导出 PPTX。
+质量审查结果写入 `<topic>-quality-report.md`。审阅模式下第一次发现问题后停止并等待用户继续；审查通过后仍要等待用户确认，不能在同一轮导出 PPTX。连续模式下可以修复明确且安全的问题并复审，最多两轮；两轮后仍有阻塞项时停止。连续模式审查通过且用户已要求 PPTX 时可以继续导出。
 
 ## 工具调用序列
 
 ### 可编辑草稿阶段
 
 1. 读取 `workflow-status.md` 以及已批准的大纲、逐页文案和设计规范
-2. 确认三个上游阶段均为 `approved`、不存在 `stale` 状态，且统一产物目录已经存在
+2. 确认三个上游阶段均为 `completed` 或 `approved`、不存在 `stale` 或关键待确认项，且统一产物目录已经存在
 3. 新建演示时在同一目录调用 `slides_create`
 4. `slides_read`
 5. `slides_write`，使用刚读取的 revision 和全部页面
 6. `slides_read`，完成结构回读；本阶段不执行质量审查
 7. 必要时只修复阻止草稿正确落盘的结构错误，并重复“读取 → 修复写入 → 回读”
-8. 更新 `workflow-status.md` 为草稿 `awaiting-review` 并停止
+8. 根据执行模式更新为 `completed` 并继续质量审查，或更新为 `awaiting-review` 并停止
 
 ### PPTX 导出阶段
 
-1. 读取 `workflow-status.md`，确认质量阶段已由用户批准
+1. 读取 `workflow-status.md`，确认质量阶段为 `completed` 或 `approved`，用户已要求 PPTX；审阅模式还要确认质量阶段已由用户批准
 2. 以统一目录中的显式 output 调用 `slides_export`
 3. 可选 `pptx_read` 回读导出内容，验证语义而非渲染
 4. 更新状态为 `exported`
@@ -130,7 +138,7 @@
 3. 合并保留页与修改页
 4. 紧邻写入前再次 `slides_read` 获取 revision
 5. 单次 `slides_write` 替换全部页面
-6. 回读结构，更新草稿阶段为 `awaiting-review` 并停止；质量审查只能在用户确认后的下一阶段执行
+6. 回读结构，根据执行模式更新草稿阶段并继续质量审查或停止等待确认
 
 如果任一页面包含当前工具无法保真的内容，停止整份写入并给出最小人工修改方案。
 

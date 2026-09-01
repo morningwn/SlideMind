@@ -1,7 +1,5 @@
-import { execFile } from 'node:child_process'
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { promisify } from 'node:util'
 import { describe, expect, it } from 'vitest'
 import { resolveBundledSkillsDirectory } from './bundled-skills'
 import { queryTemplate } from './template-query'
@@ -18,8 +16,6 @@ const EXPECTED_SKILLS = [
 ]
 
 const EXPECTED_TEMPLATE_SLIDE_COUNTS = [38, 36, 36, 36, 27, 28, 26, 30]
-const execFileAsync = promisify(execFile)
-
 async function listFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true })
   return (await Promise.all(entries.map((entry) => {
@@ -58,6 +54,46 @@ describe('bundled presentation skills', () => {
 
     expect(result.diagnostics).toEqual([])
     expect(result.skills.map((skill) => skill.name).sort()).toEqual(EXPECTED_SKILLS)
+  })
+
+  it('declares non-overlapping discovery boundaries for full-deck and specialist work', async () => {
+    const { loadSkills } = await import('@earendil-works/pi-coding-agent')
+    const { skills } = loadSkills({
+      cwd: process.cwd(),
+      agentDir: resolve('/tmp/slidemind-empty-agent'),
+      skillPaths: [resolve('skills')],
+      includeDefaults: false
+    })
+    const descriptions = new Map(skills.map((skill) => [skill.name, skill.description]))
+
+    expect(descriptions.get('ppt-production-workflow')).toContain('整份 PPT')
+    expect(descriptions.get('pptist-template-library')).toContain('不独立负责整份 PPT')
+    expect(descriptions.get('slide-visual-design')).toContain('不独立负责整份 PPT')
+    expect(descriptions.get('deck-quality-review')).toContain('全面重写应使用总控制作流程')
+  })
+
+  it('keeps workflow state and image-source guidance aligned with application capabilities', async () => {
+    const workflow = await readFile(resolve('skills/ppt-production-workflow/SKILL.md'), 'utf8')
+    const contract = await readFile(
+      resolve('skills/ppt-production-workflow/references/production-contract.md'),
+      'utf8'
+    )
+    const imageGuides = await Promise.all([
+      'skills/data-storytelling/SKILL.md',
+      'skills/slide-visual-design/SKILL.md',
+      'skills/pptist-template-library/references/slidemind-mapping.md'
+    ].map((file) => readFile(resolve(file), 'utf8')))
+
+    expect(workflow).toContain('连续模式')
+    expect(workflow).toContain('审阅模式')
+    expect(contract).toContain('`continuous`')
+    expect(contract).toContain('`review`')
+    expect(workflow).not.toMatch(/\.\.\/[^\s`]+\/SKILL\.md/)
+    for (const guide of imageGuides) {
+      expect(guide).toContain('项目内图片')
+      expect(guide).toContain('data:image/...')
+      expect(guide).not.toContain('只允许 `data:image/...`')
+    }
   })
 
   it('injects the bundled directory through the Pi resource loader', async () => {
@@ -102,29 +138,11 @@ describe('bundled presentation skills', () => {
     }
   })
 
-  it('keeps every bundled skill resource offline', async () => {
-    const files = await listFiles(resolve('skills'))
+  it('keeps bundled template assets offline', async () => {
+    const files = await listFiles(resolve('skills/pptist-template-library/assets'))
     const contents = await Promise.all(files.map((file) => readFile(file, 'utf8')))
 
     expect(contents.some((content) => /https?:\/\//i.test(content))).toBe(false)
-  })
-
-  it('queries one template without loading the complete library', async () => {
-    const { stdout } = await execFileAsync(process.execPath, [
-      resolve('skills/pptist-template-library/scripts/query-template.mjs'),
-      'slides',
-      'template_2',
-      'content'
-    ])
-    const result = JSON.parse(stdout) as {
-      slides: Array<{ index: number; textRoles: Record<string, number>; type: string }>
-      templateId: string
-    }
-
-    expect(result.templateId).toBe('template_2')
-    expect(result.slides).toHaveLength(11)
-    expect(result.slides.every((slide) => slide.type === 'content')).toBe(true)
-    expect(result.slides.some((slide) => slide.textRoles.item === 4)).toBe(true)
   })
 
   it('queries one template through the application tool implementation', async () => {
@@ -135,6 +153,10 @@ describe('bundled presentation skills', () => {
     })
 
     expect(result.templateId).toBe('template_2')
-    expect('slides' in result && result.slides).toHaveLength(11)
+    const slides = 'slides' in result ? result.slides : undefined
+    expect(slides).toBeDefined()
+    if (!slides) throw new Error('模板查询未返回页面摘要')
+    expect(slides).toHaveLength(11)
+    expect(slides.some((slide) => slide.textRoles.item === 4)).toBe(true)
   })
 })

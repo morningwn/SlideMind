@@ -1,6 +1,6 @@
 ---
 name: pptist-template-library
-description: 使用 SlideMind 内置的 8 套 PPTist 主题和页面模板创建或重设计演示。适用于用户要求选择、套用或参考内置模板；不用于导入外部 PPTX 或管理用户自定义模板。
+description: 为单独的模板选择任务或完整制作流程的设计阶段查询、选择并映射 SlideMind 内置的 8 套 PPTist 模板。适用于选择、套用或参考内置模板；不独立负责整份 PPT 的内容生产，也不用于导入外部 PPTX 或管理用户自定义模板。
 ---
 
 # PPTist 内置模板库
@@ -9,7 +9,7 @@ description: 使用 SlideMind 内置的 8 套 PPTist 主题和页面模板创建
 
 本 Skill 负责把上游 Markdown 大纲中的语义页面映射为 PPTist 页面角色、模板容量和具体候选页。先读取用户指定或 `deck-strategy` 生成的 `.md`；大纲没有提供 PPTist 角色不是缺失，不得要求上游补写模板实现细节。
 
-由 `ppt-production-workflow` 调用且 `workflow-status.md` 的当前阶段为视觉与模板设计时，本 Skill 只完成该阶段：把模板 ID、页面角色、候选页索引、节点容量和素材需求写入统一目录中的 `<topic>-design-spec.md`，更新状态为 `awaiting-review` 后停止。此阶段不得调用 `slides_create`、`slides_write` 或 `slides_export`；进入已批准的可编辑草稿阶段后，才可读取映射规则并参与页面写入。
+由 `ppt-production-workflow` 调用且 `workflow-status.md` 的当前阶段为视觉与模板设计时，本 Skill 只完成该阶段：把模板 ID、页面角色、候选页索引、节点容量和素材需求写入统一目录中的 `<topic>-design-spec.md`，并更新状态。审阅模式标记为 `awaiting-review` 后停止；连续模式通过自检后标记为 `completed` 并交还总控。此阶段不得调用 `slides_create`、`slides_write` 或 `slides_export`；进入上游设计稳定的可编辑草稿阶段后，才可读取映射规则并参与页面写入。
 
 PPTist 模板是带有页面类型和节点类型标记的普通幻灯片。选定模板后，读取 [references/template-semantics.md](references/template-semantics.md)，按内容职责和项目数量匹配页面，不把模板当作不可变的整套成品。
 

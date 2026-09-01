@@ -7,7 +7,7 @@ description: 将演示材料改写为结论式页面标题、精炼正文、标�
 
 文案服务于现场理解，不把报告正文原样搬到页面。
 
-由 `ppt-production-workflow` 调用时，本 Skill 只完成逐页文案阶段：把观众可见标题、正文、数据结论、流程文案和来源呈现写入统一目录中的 `<topic>-slide-content.md`，更新 `workflow-status.md` 为 `awaiting-review` 后停止。此阶段不得选择模板、调用 `slides_write` 或生成 `.slides.json`；只有工作流已进入获批的可编辑草稿阶段时，才允许把已批准文案转换为演示元素。
+由 `ppt-production-workflow` 调用时，本 Skill 只完成逐页文案阶段：把观众可见标题、正文、数据结论、流程文案和来源呈现写入统一目录中的 `<topic>-slide-content.md`，并更新 `workflow-status.md`。审阅模式标记为 `awaiting-review` 后停止；连续模式通过自检后标记为 `completed` 并交还总控。此阶段不得选择模板、调用 `slides_write` 或生成 `.slides.json`；只有工作流进入上游内容稳定的可编辑草稿阶段时，才允许转换为演示元素。
 
 ## 写作规则
 
