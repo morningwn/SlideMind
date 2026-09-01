@@ -474,7 +474,8 @@ export class BaseAgentService {
           factory: createPresentationToolsExtension({
             presentationService: this.presentationService,
             projectHandle,
-            projectPath
+            projectPath,
+            supportsVision: model.input.includes('image')
           })
         },
         {
@@ -523,6 +524,8 @@ export class BaseAgentService {
         'pptx_read',
         'slides_create',
         'slides_read',
+        'slides_render',
+        'slides_review',
         'slides_write',
         'slides_export',
         'template_query',

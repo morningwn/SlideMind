@@ -5,7 +5,9 @@ import {
   type PresentationDocument
 } from '../../shared/presentation'
 import type { PresentationService } from '../presentation/presentation-service'
+import type { renderPresentationSlides } from '../presentation/presentation-renderer'
 import { readProjectImageFile } from '../project/project-text-files'
+import { reviewPresentationDocument } from './deck-review'
 import { readProjectPptx } from './pptx-reader'
 
 type SlideInput = {
@@ -68,6 +70,7 @@ type SlideInput = {
 }
 
 const MAX_SLIDES_PER_READ = 50
+const MAX_SLIDES_PER_RENDER = 4
 
 function escapeHtml(value: string): string {
   return value
@@ -345,6 +348,8 @@ export function createPresentationToolsExtension(options: {
   projectHandle: string
   projectPath: string
   readPptx?: typeof readProjectPptx
+  renderSlides?: typeof renderPresentationSlides
+  supportsVision?: boolean
 }): ExtensionFactory {
   return async (pi) => {
     const { Type } = await import('@earendil-works/pi-ai')
@@ -465,6 +470,107 @@ export function createPresentationToolsExtension(options: {
           revision: file.revision,
           ...presentationSummary(file.document, params.startSlide, params.endSlide)
         })
+      }
+    })
+
+    pi.registerTool({
+      name: 'slides_review',
+      label: '审查演示文稿',
+      description: '对当前 PPTist 演示文稿执行只读自动预检，检查占位内容、越界、潜在文字溢出、内容重叠、图层遮挡、字号和图片体积。结果不替代真实渲染与人工语义审查。',
+      promptSnippet: 'Run deterministic preflight checks on an editable PPTist presentation.',
+      promptGuidelines: [
+        'Run after generating or editing slides, before claiming the deck is ready.',
+        'Treat pass as automated-structure pass only; report the returned manualChecks separately.',
+        'Use slides_read for narrative, factual, and wording review because slides_review only reports deterministic heuristics.'
+      ],
+      parameters: Type.Object({
+        file: Type.String({ minLength: 1, maxLength: 4096 })
+      }, { additionalProperties: false }),
+      async execute(_toolCallId, params) {
+        const file = await options.presentationService.read(options.projectPath, params.file)
+        return toolText({
+          file: file.path,
+          revision: file.revision,
+          ...reviewPresentationDocument(file.document)
+        })
+      }
+    })
+
+    pi.registerTool({
+      name: 'slides_render',
+      label: '渲染幻灯片',
+      description: '使用真实 PPTist 渲染器把最多 4 页可编辑演示渲染为 PNG，并把图片返回给当前视觉模型。用于视觉层次、对比、留白、分组、阅读顺序和跨页一致性审查；非视觉模型不可用。',
+      promptSnippet: 'Render editable PPTist slides as images for visual inspection.',
+      promptGuidelines: [
+        'Use only when visual inspection is required and the current model supports image input.',
+        'Inspect every returned image; cite the slide number and visible evidence for each visual finding.',
+        'Use slides_review separately for deterministic geometry and text checks.'
+      ],
+      parameters: Type.Object({
+        file: Type.String({ minLength: 1, maxLength: 4096 }),
+        startSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+        endSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 }))
+      }, { additionalProperties: false }),
+      async execute(_toolCallId, params, signal) {
+        if (!options.supportsVision) {
+          throw new Error('当前模型不支持图片理解，请切换到支持 image 输入的视觉模型后重试')
+        }
+        const file = await options.presentationService.read(options.projectPath, params.file)
+        const totalSlideCount = file.document.presentation.slides.length
+        const startSlide = params.startSlide ?? 1
+        if (startSlide > totalSlideCount) {
+          throw new Error(`起始页超出演示文稿页数（共 ${totalSlideCount} 页）`)
+        }
+        const endSlide = Math.min(
+          totalSlideCount,
+          params.endSlide ?? startSlide + MAX_SLIDES_PER_RENDER - 1
+        )
+        if (endSlide < startSlide) throw new Error('结束页不能早于起始页')
+        if (endSlide - startSlide + 1 > MAX_SLIDES_PER_RENDER) {
+          throw new Error(`单次最多渲染 ${MAX_SLIDES_PER_RENDER} 页幻灯片`)
+        }
+        const renderSlides = options.renderSlides ?? (
+          await import('../presentation/presentation-renderer')
+        ).renderPresentationSlides
+        const rendered = await renderSlides(
+          file.document.presentation,
+          startSlide,
+          endSlide,
+          signal
+        )
+        const details = {
+          file: file.path,
+          revision: file.revision,
+          totalSlideCount,
+          startSlide,
+          endSlide,
+          truncated: startSlide > 1 || endSlide < totalSlideCount,
+          renderedSlides: rendered.map((slide) => ({
+            number: slide.number,
+            width: slide.width,
+            height: slide.height
+          }))
+        }
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(details, null, 2)
+            },
+            ...rendered.flatMap((slide) => [
+              {
+                type: 'text' as const,
+                text: `第 ${slide.number} 页渲染图（${slide.width}×${slide.height}）`
+              },
+              {
+                type: 'image' as const,
+                data: slide.png.toString('base64'),
+                mimeType: 'image/png'
+              }
+            ])
+          ],
+          details
+        }
       }
     })
 

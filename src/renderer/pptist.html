@@ -16,6 +16,31 @@
         margin: 0;
         overflow: hidden;
       }
+
+      body.slidemind-render-mode .layout-content-left,
+      body.slidemind-render-mode .layout-content-right,
+      body.slidemind-render-mode .center-top,
+      body.slidemind-render-mode .center-bottom {
+        display: none !important;
+      }
+
+      body.slidemind-render-mode .layout-content-center,
+      body.slidemind-render-mode .center-body {
+        width: 100% !important;
+        height: 100% !important;
+      }
+
+      body.slidemind-render-mode .viewport-wrapper {
+        box-shadow: none !important;
+      }
+
+      body.slidemind-render-mode *,
+      body.slidemind-render-mode *::before,
+      body.slidemind-render-mode *::after {
+        animation: none !important;
+        caret-color: transparent !important;
+        transition: none !important;
+      }
     </style>
   </head>
   <body>

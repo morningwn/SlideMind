@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { parse } from 'pptxtojson'
 import Editor from './pptist-editor.vue'
 import Directive from '@/directive'
-import { useSlidesStore, useSnapshotStore } from '@/store'
+import { useMainStore, useSlidesStore, useSnapshotStore } from '@/store'
 import useImport from '@/hooks/useImport'
 
 import 'prosemirror-view/style/prosemirror.css'
@@ -33,7 +33,14 @@ type ImportHostMessage = {
   presentation: PresentationState
 }
 
-type HostMessage = LoadHostMessage | ImportHostMessage
+type RenderHostMessage = {
+  type: 'slidemind:pptist:render'
+  requestId: string
+  presentation?: PresentationState
+  slideNumber: number
+}
+
+type HostMessage = LoadHostMessage | ImportHostMessage | RenderHostMessage
 
 const MAX_IMPORT_BYTES = 30 * 1024 * 1024
 const IMPORT_TIMEOUT_MS = 120_000
@@ -61,6 +68,7 @@ app.use(pinia)
 
 const slidesStore = useSlidesStore(pinia)
 const snapshotStore = useSnapshotStore(pinia)
+const mainStore = useMainStore(pinia)
 const { exporting: importing, importPPTXFile } = useImport()
 let initialized = false
 let changeTimer: number | undefined
@@ -167,8 +175,84 @@ async function importPresentation(message: ImportHostMessage): Promise<void> {
   }
 }
 
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => window.requestAnimationFrame(() => resolve()))
+}
+
+async function waitForSlideImages(): Promise<void> {
+  const images = [...document.querySelectorAll<HTMLImageElement>('.viewport img')]
+  await Promise.all(images.map((image) => {
+    if (image.complete) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const finish = (): void => resolve()
+      image.addEventListener('load', finish, { once: true })
+      image.addEventListener('error', finish, { once: true })
+      window.setTimeout(finish, 3_000)
+    })
+  }))
+}
+
+async function renderPresentation(message: RenderHostMessage): Promise<void> {
+  const presentation = message.presentation
+  const presentationValid = presentation === undefined || isPresentationState(presentation)
+  const slideCount = presentationValid
+    ? presentation?.slides.length ?? slidesStore.slides.length
+    : 0
+  if (
+    typeof message.requestId !== 'string' ||
+    !message.requestId ||
+    !presentationValid ||
+    slideCount === 0 ||
+    !Number.isInteger(message.slideNumber) ||
+    message.slideNumber < 1 ||
+    message.slideNumber > slideCount
+  ) {
+    post({
+      type: 'slidemind:pptist:render-error',
+      requestId: typeof message.requestId === 'string' ? message.requestId : 'unknown',
+      message: '幻灯片渲染请求无效'
+    })
+    return
+  }
+
+  try {
+    document.body.classList.add('slidemind-render-mode')
+    if (presentation) await loadPresentation(presentation)
+    mainStore.setCanvasPercentage(100)
+    slidesStore.updateSlideIndex(message.slideNumber - 1)
+    await nextTick()
+    await document.fonts.ready
+    await waitForSlideImages()
+    await nextFrame()
+    await nextFrame()
+    const viewport = document.querySelector<HTMLElement>('.viewport-wrapper')
+    if (!viewport) throw new Error('找不到幻灯片渲染区域')
+    const rect = viewport.getBoundingClientRect()
+    post({
+      type: 'slidemind:pptist:render-ready',
+      requestId: message.requestId,
+      rect: {
+        height: rect.height,
+        left: rect.left,
+        top: rect.top,
+        width: rect.width
+      }
+    })
+  } catch (error) {
+    post({
+      type: 'slidemind:pptist:render-error',
+      requestId: message.requestId,
+      message: error instanceof Error ? error.message : String(error)
+    })
+  }
+}
+
 window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
   if (event.source !== window.parent) return
+  if (event.data?.type === 'slidemind:pptist:render') {
+    void renderPresentation(event.data)
+    return
+  }
   if (event.data?.type === 'slidemind:pptist:import') {
     void importPresentation(event.data)
     return

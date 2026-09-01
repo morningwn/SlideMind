@@ -13,10 +13,105 @@ interface RegisteredTool {
   execute(
     toolCallId: string,
     params: Record<string, unknown>
-  ): Promise<{ details: unknown }>
+  ): Promise<{
+    content: Array<{ data?: string; mimeType?: string; text?: string; type: string }>
+    details: unknown
+  }>
 }
 
 describe('createPresentationToolsExtension', () => {
+  it('registers slides_review and returns a read-only preflight result', async () => {
+    const revision = 'a'.repeat(64)
+    const document = createBlankPresentationDocument('待审查')
+    const presentationService = {
+      async read() {
+        return { path: 'deck.slides.json', revision, document: structuredClone(document) }
+      }
+    } as unknown as PresentationService
+    const registeredTools = new Map<string, RegisteredTool>()
+    const extension = createPresentationToolsExtension({
+      presentationService,
+      projectHandle: 'project-handle',
+      projectPath: '/project'
+    })
+    await extension({
+      registerTool: (tool: RegisteredTool) => registeredTools.set(tool.name, tool)
+    } as unknown as ExtensionAPI)
+
+    const result = await registeredTools.get('slides_review')!.execute('review-call', {
+      file: 'deck.slides.json'
+    })
+
+    expect(result.details).toMatchObject({
+      file: 'deck.slides.json',
+      revision,
+      status: 'fail',
+      summary: { blocker: 1 },
+      issues: [{ code: 'empty-slide', slideNumber: 1 }]
+    })
+  })
+
+  it('renders slides as image tool results for a vision model', async () => {
+    const revision = 'a'.repeat(64)
+    const document = createBlankPresentationDocument('视觉审查')
+    const presentationService = {
+      async read() {
+        return { path: 'deck.slides.json', revision, document: structuredClone(document) }
+      }
+    } as unknown as PresentationService
+    const registeredTools = new Map<string, RegisteredTool>()
+    const extension = createPresentationToolsExtension({
+      presentationService,
+      projectHandle: 'project-handle',
+      projectPath: '/project',
+      supportsVision: true,
+      async renderSlides(_presentation, startSlide, endSlide) {
+        expect([startSlide, endSlide]).toEqual([1, 1])
+        return [{
+          number: 1,
+          width: 1280,
+          height: 720,
+          png: Buffer.from([0x89, 0x50, 0x4e, 0x47])
+        }]
+      }
+    })
+    await extension({
+      registerTool: (tool: RegisteredTool) => registeredTools.set(tool.name, tool)
+    } as unknown as ExtensionAPI)
+
+    const result = await registeredTools.get('slides_render')!.execute('render-call', {
+      file: 'deck.slides.json'
+    })
+
+    expect(result.details).toMatchObject({
+      file: 'deck.slides.json',
+      revision,
+      renderedSlides: [{ number: 1, width: 1280, height: 720 }]
+    })
+    expect(result.content).toContainEqual({
+      type: 'image',
+      data: 'iVBORw==',
+      mimeType: 'image/png'
+    })
+  })
+
+  it('rejects visual rendering when the active model has no image input', async () => {
+    const registeredTools = new Map<string, RegisteredTool>()
+    const extension = createPresentationToolsExtension({
+      presentationService: {} as PresentationService,
+      projectHandle: 'project-handle',
+      projectPath: '/project',
+      supportsVision: false
+    })
+    await extension({
+      registerTool: (tool: RegisteredTool) => registeredTools.set(tool.name, tool)
+    } as unknown as ExtensionAPI)
+
+    await expect(registeredTools.get('slides_render')!.execute('render-call', {
+      file: 'deck.slides.json'
+    })).rejects.toThrow('当前模型不支持图片理解')
+  })
+
   it('registers pptx_read and returns the direct PowerPoint summary', async () => {
     const readPptx = async () => ({
       file: 'brief.pptx',

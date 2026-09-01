@@ -55,6 +55,8 @@ export function createManagedPermissionPolicy(
       pptx_read: 'allow',
       slides_create: 'allow',
       slides_read: 'allow',
+      slides_render: 'allow',
+      slides_review: 'allow',
       slides_write: 'allow',
       slides_export: 'allow',
       template_query: 'allow',
