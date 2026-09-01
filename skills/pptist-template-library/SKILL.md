@@ -7,6 +7,8 @@ description: 使用 SlideMind 内置的 8 套 PPTist 主题和页面模板创建
 
 先读取 [references/catalog.md](references/catalog.md)，根据受众、内容和语气选择一套模板。不要默认选择第一套，也不要混用多套模板的视觉语言。
 
+本 Skill 负责把上游 Markdown 大纲中的语义页面映射为 PPTist 页面角色、模板容量和具体候选页。先读取用户指定或 `deck-strategy` 生成的 `.md`；大纲没有提供 PPTist 角色不是缺失，不得要求上游补写模板实现细节。
+
 PPTist 模板是带有页面类型和节点类型标记的普通幻灯片。选定模板后，读取 [references/template-semantics.md](references/template-semantics.md)，按内容职责和项目数量匹配页面，不把模板当作不可变的整套成品。
 
 优先使用 `template_query` 缩小上下文：`slides` 操作列出候选页的节点容量，`get` 操作只返回选中页面及其主题。该工具直接读取内置模板，不需要 shell 或外部 Node.js 环境。只有工具不可用时才直接读取对应的 `assets/template_N.json`。
@@ -16,7 +18,9 @@ PPTist 模板是带有页面类型和节点类型标记的普通幻灯片。选�
 ## 转换到 SlideMind
 
 - 保持所选模板的主色、背景、字号层级、页边距和跨页重复位置一致。
-- 先完成内容结构，再匹配封面、目录、过渡、内容和结束页面。不要为使用模板而保留无内容的页面。
+- 根据 Markdown 中的页面职责，在本阶段分配 `cover`、`contents`、`transition`、`content`、`end`；目录页和过渡页不推动叙事时应省略。
+- 根据预计条目数量、文字密度和图片需求查询候选页容量，再选择具体模板页面；不要为使用模板而保留无内容的页面。
+- 模板容量不足时拆页或换候选页，不删除必要证据、不合并独立结论，也不缩小字号硬塞。
 - 写入前调用 `slides_read` 获取最新 revision。编辑已有演示时，如果当前工具无法保留其复杂元素，不得整体覆盖。
 
 原始模板资产来自项目固定版本的 PPTist，随 SlideMind 一起按 AGPL-3.0 使用和分发。执行该 Skill 不依赖外部文档、图片服务或网络请求。

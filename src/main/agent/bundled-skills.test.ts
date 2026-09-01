@@ -10,6 +10,7 @@ const EXPECTED_SKILLS = [
   'data-storytelling',
   'deck-quality-review',
   'deck-strategy',
+  'ppt-production-workflow',
   'pptist-template-library',
   'slide-copywriting',
   'slide-flowchart',
