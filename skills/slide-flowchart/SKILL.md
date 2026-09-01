@@ -7,6 +7,8 @@ description: 把步骤、决策、分支、回路或多角色协作转换为可�
 
 先建立正确的图结构，再排版。交付结果应是由 `slides_write` 形状、文本和线条构成的可编辑页面，不是 Mermaid 代码块、ASCII 图或一张不可编辑的截图。
 
+由 `ppt-production-workflow` 在逐页文案或设计阶段调用时，只把节点、边、条件、阅读方向和布局约束写入对应的 `<topic>-slide-content.md` 或 `<topic>-design-spec.md`，不得调用 `slides_write`。只有工作流进入获批的可编辑草稿阶段时，才按下方规则写入演示。
+
 ## 建模
 
 在写入前整理一份简短的中间模型：

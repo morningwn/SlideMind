@@ -7,6 +7,8 @@ description: 把可信数据转化为演示中的比较、趋势、构成、分�
 
 先确认问题和数据口径，再选择图形。图表的目标是支持一个可验证的结论，而不是展示所有字段。
 
+由 `ppt-production-workflow` 调用时，本 Skill 在逐页文案阶段只把数据口径、结论、图形选择和来源呈现写入 `<topic>-slide-content.md`；在视觉设计阶段只把图表布局和编码要求写入 `<topic>-design-spec.md`。每个阶段更新 `workflow-status.md` 后停止，不得越级调用 `slides_write`。
+
 ## 数据检查
 
 - 确认指标定义、单位、时间范围、样本、缺失值和来源；

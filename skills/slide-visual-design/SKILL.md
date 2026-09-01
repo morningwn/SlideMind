@@ -7,6 +7,8 @@ description: 为演示文稿建立版式、层级、字体、配色、留白和�
 
 先从内容语义选择视觉结构，再设置装饰。模板不能替代信息层级。
 
+由 `ppt-production-workflow` 调用且 `workflow-status.md` 的当前阶段为视觉设计时，本 Skill 只完成该阶段：把画布、网格、字体、颜色、间距、图片策略和逐页布局写入统一目录中的 `<topic>-design-spec.md`，更新状态为 `awaiting-review` 后停止。此阶段不得调用 `slides_create`、`slides_write` 或 `slides_export`；进入已批准的可编辑草稿阶段后，才可依据设计规范参与页面写入。
+
 ## 设计系统
 
 在制作页面前确定一个小型系统：

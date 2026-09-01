@@ -7,6 +7,8 @@ description: 审查现有演示的叙事完整性、事实边界、文案一致�
 
 默认先报告问题，不自动改写。只有用户明确要求修复时才写入文件。
 
+由 `ppt-production-workflow` 调用时，把审查结果写入统一目录中的 `<topic>-quality-report.md`，更新 `workflow-status.md` 为 `awaiting-review` 后停止。发现问题时不得在同一轮自动修复；审查通过时也不得在同一轮调用 `slides_export`。
+
 ## 审查流程
 
 1. 对可编辑的 `.slides.json` 调用 `slides_review`。它是只读预检，返回当前 revision、严重度、页面、元素 ID、证据和最小修复建议。

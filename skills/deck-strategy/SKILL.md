@@ -9,6 +9,8 @@ description: 为汇报、提案、路演、教学或复盘演示生成 Markdown 
 
 本 Skill 的默认交付物是项目内 Markdown 文档，不是演示文件。除非用户明确要求只在聊天中讨论或不要创建文件，否则使用 `write` 新建 `.md`，或使用 `read` 后再以 `edit` 更新用户指定的现有 Markdown 文件。不得调用 `slides_create`、`slides_write` 或 `slides_export`，不得生成 `.slides.json` 或 `.pptx`。
 
+由 `ppt-production-workflow` 调用时，本 Skill 只完成 Markdown 大纲阶段：写入大纲、更新 `workflow-status.md` 为 `awaiting-review`、报告结果并停止。不得在同一轮读取文案、模板或视觉 Skill。
+
 ## 输入判断
 
 读取用户引用的材料，提取：

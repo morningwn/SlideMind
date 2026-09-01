@@ -1,21 +1,34 @@
 # PPT 生产契约
 
-本 reference 用于完整创建、重写或导出任务。它定义阶段输入、产物、门禁和失败处理；中间记录默认保留在会话中，只有用户要求或材料复杂到需要跨轮复用时才写入项目文件。
+本 reference 用于完整创建、重写或导出任务。它定义阶段输入、产物、用户确认门禁和失败处理。完整任务必须把状态和阶段产物写入统一产物目录，不能只依赖会话上下文。
 
 ## 状态机
 
-`intake → evidence-ready → strategy-documented → design-ready → written → structure-verified → exported`
+`evidence-ready → strategy-ready → content-ready → design-ready → draft-ready → qa-ready → exported`
 
-`exported` 是可选终态。用户只要求可编辑稿时，`structure-verified` 即完成。
+`exported` 是可选终态。用户只要求未经质量验收的可编辑草稿时，`draft-ready` 即完成；用户要求已验收的可编辑稿时，以 `qa-ready` 为终态。
 
-不得跳过以下转换：
+每轮最多产出一个新阶段结果。阶段产物生成后先进入 `awaiting-review`；用户确认后，下一轮才能执行后续转换：
 
-- `intake → evidence-ready`：先确定统一产物目录，读取引用材料并区分事实、推论、建议和待确认项。
-- `evidence-ready → strategy-documented`：先验证核心承诺和标题序列，再把任务、证据边界和逐页地图写入独立 Markdown 文档。
-- `strategy-documented → design-ready`：模板阶段根据语义页面职责和内容规模分配 PPTist 页面角色，再选择容量匹配的模板页或自定义布局。
-- `design-ready → written`：写入前必须取得最新 revision，并证明整份替换不会丢失内容。
-- `written → structure-verified`：写入后必须回读，不以工具成功返回代替复核。
-- `structure-verified → exported`：只在用户要求 PPTX 且阻塞项已清零时导出。
+- `evidence-ready`：确定目录和任务边界，完成证据底稿。
+- `evidence-ready → strategy-ready`：生成 Markdown 大纲。
+- `strategy-ready → content-ready`：生成逐页观众文案和数据、流程内容。
+- `content-ready → design-ready`：分配视觉系统、PPTist 页面角色和模板或布局。
+- `design-ready → draft-ready`：使用最新 revision 原子写入完整 `.slides.json` 并回读。
+- `draft-ready → qa-ready`：完成结构检测、真实渲染审查和质量报告；阻塞项必须清零。
+- `qa-ready → exported`：只在用户要求 PPTX 且已确认审查结果后导出。
+
+## 工作流状态文件
+
+完整任务必须维护 `<artifact-directory>/workflow-status.md`，至少包含：
+
+- 主题、统一产物目录和目标交付物；
+- 当前阶段与状态：`in-progress`、`awaiting-review`、`approved`、`needs-revision`、`stale` 或 `exported`；
+- 阶段清单、每阶段产物路径和完成时间；
+- 已采用假设、待确认问题和用户反馈；
+- 下一阶段及其进入条件。
+
+开始一轮工作时先读取状态文件。完成当前阶段后更新为 `awaiting-review` 并停止；不能在同一轮把它改为 `approved` 后继续下一阶段。用户确认时把当前阶段改为 `approved`，再执行一个后续阶段。上游变化会使结论、文案、布局或草稿失效时，把所有受影响的下游阶段标为 `stale`。
 
 ## 阶段产物
 
@@ -35,8 +48,12 @@
 
 ```text
 <artifact-directory>/
+├── workflow-status.md
 ├── <topic>-deck-strategy.md
+├── <topic>-slide-content.md
+├── <topic>-design-spec.md
 ├── <topic>.slides.json
+├── <topic>-quality-report.md
 ├── <topic>.pptx
 ├── source-notes.md
 ├── assets/
@@ -65,9 +82,13 @@
 
 逐页地图为每页记录：顺序、页面职责、结论式标题、证据、视觉形式、内容规模、来源呈现位置、待确认项。它不记录 PPTist 页面角色、模板 ID、候选页索引或节点类型。标题序列是最小可审查叙事；正文不是页面地图的替代品。后续页面制作读取该 Markdown 作为规划输入，但不能把其中的说明文字直接复制到观众可见页面。
 
+### Slide content Markdown
+
+`<topic>-slide-content.md` 保存逐页观众文案、数据结论、流程节点、来源呈现和仍未解决的文案问题。它不包含坐标、模板页索引或 `slides_write` JSON。用户批准前不得进入设计阶段。
+
 ### Design contract
 
-记录画布、视觉路线、页边距、网格、字号层级、字体、颜色职责、图片策略和重复元素位置。选择内置模板时，在本阶段完成 PPTist 页面角色映射，并记录模板 ID、页面索引和节点容量；禁止把这些实现字段回写成上游大纲的必填项，也禁止混用两套模板视觉语言。
+`<topic>-design-spec.md` 记录画布、视觉路线、页边距、网格、字号层级、字体、颜色职责、图片策略和重复元素位置。选择内置模板时，在本阶段完成 PPTist 页面角色映射，并记录模板 ID、页面索引和节点容量；禁止把这些实现字段回写成上游大纲的必填项，也禁止混用两套模板视觉语言。用户批准前不得创建 `.slides.json`。
 
 ### QA ledger
 
@@ -80,18 +101,27 @@
 
 前三类未处理完不得声称成稿通过。第四类必须在交付说明中保留，除非已经通过真实渲染逐页检查。
 
+质量审查结果写入 `<topic>-quality-report.md`。第一次发现问题后停止并等待用户继续；下一轮才执行修复与复审。审查通过后仍要等待用户确认，不能在同一轮导出 PPTX。
+
 ## 工具调用序列
 
-### 新建可编辑稿
+### 可编辑草稿阶段
 
-1. 使用 `write` 把策略 Markdown 写入统一产物目录，由此确保父目录存在
-2. 在同一目录调用 `slides_create`
-3. `slides_read`
-4. `slides_write`，使用刚读取的 revision 和全部页面
-5. `slides_read`，完成结构复核
-6. 必要时重复“读取 → 修复写入 → 回读”
-7. 用户要求 PPTX 时，以同一目录中的显式 output 调用 `slides_export`
-8. 可选 `pptx_read` 回读导出内容，验证语义而非渲染
+1. 读取 `workflow-status.md` 以及已批准的大纲、逐页文案和设计规范
+2. 确认三个上游阶段均为 `approved`、不存在 `stale` 状态，且统一产物目录已经存在
+3. 新建演示时在同一目录调用 `slides_create`
+4. `slides_read`
+5. `slides_write`，使用刚读取的 revision 和全部页面
+6. `slides_read`，完成结构回读；本阶段不执行质量审查
+7. 必要时只修复阻止草稿正确落盘的结构错误，并重复“读取 → 修复写入 → 回读”
+8. 更新 `workflow-status.md` 为草稿 `awaiting-review` 并停止
+
+### PPTX 导出阶段
+
+1. 读取 `workflow-status.md`，确认质量阶段已由用户批准
+2. 以统一目录中的显式 output 调用 `slides_export`
+3. 可选 `pptx_read` 回读导出内容，验证语义而非渲染
+4. 更新状态为 `exported`
 
 ### 修改已有可编辑稿
 
@@ -100,7 +130,7 @@
 3. 合并保留页与修改页
 4. 紧邻写入前再次 `slides_read` 获取 revision
 5. 单次 `slides_write` 替换全部页面
-6. 回读并执行质量审查
+6. 回读结构，更新草稿阶段为 `awaiting-review` 并停止；质量审查只能在用户确认后的下一阶段执行
 
 如果任一页面包含当前工具无法保真的内容，停止整份写入并给出最小人工修改方案。
 

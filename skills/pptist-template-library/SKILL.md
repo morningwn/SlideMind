@@ -9,6 +9,8 @@ description: 使用 SlideMind 内置的 8 套 PPTist 主题和页面模板创建
 
 本 Skill 负责把上游 Markdown 大纲中的语义页面映射为 PPTist 页面角色、模板容量和具体候选页。先读取用户指定或 `deck-strategy` 生成的 `.md`；大纲没有提供 PPTist 角色不是缺失，不得要求上游补写模板实现细节。
 
+由 `ppt-production-workflow` 调用且 `workflow-status.md` 的当前阶段为视觉与模板设计时，本 Skill 只完成该阶段：把模板 ID、页面角色、候选页索引、节点容量和素材需求写入统一目录中的 `<topic>-design-spec.md`，更新状态为 `awaiting-review` 后停止。此阶段不得调用 `slides_create`、`slides_write` 或 `slides_export`；进入已批准的可编辑草稿阶段后，才可读取映射规则并参与页面写入。
+
 PPTist 模板是带有页面类型和节点类型标记的普通幻灯片。选定模板后，读取 [references/template-semantics.md](references/template-semantics.md)，按内容职责和项目数量匹配页面，不把模板当作不可变的整套成品。
 
 优先使用 `template_query` 缩小上下文：`slides` 操作列出候选页的节点容量，`get` 操作只返回选中页面及其主题。该工具直接读取内置模板，不需要 shell 或外部 Node.js 环境。只有工具不可用时才直接读取对应的 `assets/template_N.json`。
