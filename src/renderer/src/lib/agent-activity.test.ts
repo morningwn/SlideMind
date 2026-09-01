@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentActivityEvent } from '../../../shared/agent'
-import { applyAgentActivityEvent } from './agent-activity'
+import { applyAgentActivityEvent, stopRunningAgentActivities } from './agent-activity'
 
 const context = {
   requestId: 'request-1',
@@ -63,5 +63,17 @@ describe('applyAgentActivityEvent', () => {
       status: 'error',
       detail: '{"path":"missing.md"}\n\n错误：file not found'
     })
+  })
+})
+
+describe('stopRunningAgentActivities', () => {
+  it('marks only unfinished activities as stopped', () => {
+    expect(stopRunningAgentActivities([
+      { id: 'thinking-1', kind: 'thinking', name: '模型思考', status: 'running' },
+      { id: 'tool-1', kind: 'tool', name: 'read', status: 'completed' }
+    ])).toEqual([
+      { id: 'thinking-1', kind: 'thinking', name: '模型思考', status: 'stopped' },
+      { id: 'tool-1', kind: 'tool', name: 'read', status: 'completed' }
+    ])
   })
 })

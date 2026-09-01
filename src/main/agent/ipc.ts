@@ -57,4 +57,9 @@ export function registerAgentIpc(configStore: AgentConfigStore, agentService: Ba
       }
     )
   })
+
+  ipcMain.handle('agent:stop', (event, input: unknown) => {
+    assertTrustedRenderer(event)
+    return agentService.stop(input)
+  })
 }

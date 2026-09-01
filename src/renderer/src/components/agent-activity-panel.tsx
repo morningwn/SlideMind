@@ -34,6 +34,7 @@ function activityKindLabel(activity: AgentActivity): string {
 
 function activityStatusLabel(activity: AgentActivity): string {
   if (activity.status === 'running') return '执行中'
+  if (activity.status === 'stopped') return '已终止'
   if (activity.status === 'error') return '失败'
   return '完成'
 }

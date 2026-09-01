@@ -1,5 +1,10 @@
-import { describe, expect, it } from 'vitest'
-import { normalizeAgentConversationInput, normalizeAgentPromptInput } from './base-agent'
+import { describe, expect, it, vi } from 'vitest'
+import {
+  BaseAgentService,
+  normalizeAgentConversationInput,
+  normalizeAgentPromptInput,
+  normalizeAgentStopInput
+} from './base-agent'
 
 describe('normalizeAgentConversationInput', () => {
   it('normalizes a project conversation reference', () => {
@@ -128,4 +133,65 @@ describe('normalizeAgentPromptInput', () => {
     })).toThrow('Agent 引用格式无效')
   })
 
+})
+
+describe('normalizeAgentStopInput', () => {
+  it('normalizes the exact request to stop', () => {
+    expect(normalizeAgentStopInput({
+      requestId: ' request-1 ',
+      conversationId: ' conversation-1 ',
+      projectHandle: ' project-handle-1 '
+    })).toEqual({
+      requestId: 'request-1',
+      conversationId: 'conversation-1',
+      projectHandle: 'project-handle-1'
+    })
+  })
+
+  it('rejects an invalid request identifier', () => {
+    expect(() => normalizeAgentStopInput({
+      requestId: ' ',
+      conversationId: 'conversation-1',
+      projectHandle: 'project-handle-1'
+    })).toThrow('Agent 请求标识无效')
+  })
+})
+
+describe('BaseAgentService.stop', () => {
+  it('aborts only the matching active request', async () => {
+    const abort = vi.fn(async () => {})
+    const service = new BaseAgentService(
+      {} as never,
+      { resolve: vi.fn(() => '/project') } as never,
+      '/agent',
+      '/skills',
+      {} as never,
+      {} as never
+    )
+    const session = {
+      agent: { abort },
+      activeRequestId: 'request-1',
+      lastUsedAt: Date.now(),
+      queue: Promise.resolve(),
+      requestIds: new Set(['request-1']),
+      stoppedRequestIds: new Set<string>()
+    }
+    const internal = service as unknown as { sessions: Map<string, unknown> }
+    internal.sessions.set('project-handle-1\0conversation-1', session)
+
+    await expect(service.stop({
+      requestId: 'request-1',
+      conversationId: 'conversation-1',
+      projectHandle: 'project-handle-1'
+    })).resolves.toEqual({ stopped: true })
+    expect(abort).toHaveBeenCalledOnce()
+    expect(session.stoppedRequestIds).toContain('request-1')
+
+    await expect(service.stop({
+      requestId: 'request-2',
+      conversationId: 'conversation-1',
+      projectHandle: 'project-handle-1'
+    })).resolves.toEqual({ stopped: false })
+    expect(abort).toHaveBeenCalledOnce()
+  })
 })

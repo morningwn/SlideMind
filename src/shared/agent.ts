@@ -103,6 +103,14 @@ export interface AgentConversationInput {
   projectHandle: string
 }
 
+export interface AgentStopInput extends AgentConversationInput {
+  requestId: string
+}
+
+export interface AgentStopResult {
+  stopped: boolean
+}
+
 export type AgentTodoStatus = 'pending' | 'in_progress' | 'completed'
 
 export interface AgentTodo {
@@ -126,7 +134,7 @@ export interface AgentTodosEvent {
 }
 
 export type AgentActivityKind = 'thinking' | 'skill' | 'tool'
-export type AgentActivityStatus = 'running' | 'completed' | 'error'
+export type AgentActivityStatus = 'running' | 'completed' | 'stopped' | 'error'
 
 export interface AgentActivity {
   id: string
@@ -152,6 +160,7 @@ export interface AgentApi {
   listSkills(projectHandle: string): Promise<AgentSkillOption[]>
   getTodos(input: AgentConversationInput): Promise<AgentTodo[]>
   prompt(input: AgentPromptInput): Promise<AgentPromptResult>
+  stop(input: AgentStopInput): Promise<AgentStopResult>
   onStream(listener: (event: AgentStreamEvent) => void): () => void
   onTodos(listener: (event: AgentTodosEvent) => void): () => void
   onActivity(listener: (event: AgentActivityEvent) => void): () => void

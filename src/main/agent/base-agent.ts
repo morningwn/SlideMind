@@ -13,6 +13,8 @@ import {
   type AgentPromptInput,
   type AgentPromptResult,
   type AgentSkillOption,
+  type AgentStopInput,
+  type AgentStopResult,
   type AgentThinkingLevel,
   type AgentTodo,
   isAgentThinkingLevel
@@ -55,9 +57,19 @@ const logger = getLogger('agent')
 
 interface AgentSessionRecord {
   agent?: PiAgentSession
+  activeRequestId?: string
   lastUsedAt: number
   queue: Promise<void>
+  requestIds: Set<string>
+  stoppedRequestIds: Set<string>
   todos?: AgentTodo[]
+}
+
+class AgentRequestStoppedError extends Error {
+  constructor() {
+    super('对话已终止')
+    this.name = 'AgentRequestStoppedError'
+  }
 }
 
 interface PiRuntime {
@@ -143,6 +155,20 @@ export function normalizeAgentPromptInput(input: unknown): AgentPromptInput {
   }
 
   return { requestId, conversationId, projectHandle, input: prompt, references, thinkingLevel }
+}
+
+export function normalizeAgentStopInput(input: unknown): AgentStopInput {
+  if (!input || typeof input !== 'object') {
+    throw new Error('Agent 终止请求格式无效')
+  }
+
+  const candidate = input as Record<string, unknown>
+  const requestId = typeof candidate.requestId === 'string' ? candidate.requestId.trim() : ''
+  const { conversationId, projectHandle } = normalizeAgentConversationInput(candidate)
+  if (!requestId || requestId.length > 200) {
+    throw new Error('Agent 请求标识无效')
+  }
+  return { requestId, conversationId, projectHandle }
 }
 
 function normalizePromptReferences(value: unknown): AgentPromptReference[] {
@@ -238,6 +264,20 @@ export class BaseAgentService {
     return todosFromSessionEntries(sessionManager.getBranch())
   }
 
+  async stop(input: unknown): Promise<AgentStopResult> {
+    const request = normalizeAgentStopInput(input)
+    this.projectRoots.resolve(request.projectHandle)
+    const session = this.sessions.get(this.sessionKey(request))
+    if (!session?.requestIds.has(request.requestId)) return { stopped: false }
+
+    session.stoppedRequestIds.add(request.requestId)
+    if (session.activeRequestId === request.requestId && session.agent) {
+      await session.agent.abort()
+    }
+    await session.queue
+    return { stopped: true }
+  }
+
   prompt(
     input: unknown,
     onDelta?: (input: AgentPromptInput, delta: string) => void,
@@ -262,12 +302,22 @@ export class BaseAgentService {
     let session = this.sessions.get(sessionKey)
     if (!session) {
       this.evictOldestSession()
-      session = { lastUsedAt: Date.now(), queue: Promise.resolve() }
+      session = {
+        lastUsedAt: Date.now(),
+        queue: Promise.resolve(),
+        requestIds: new Set(),
+        stoppedRequestIds: new Set()
+      }
       this.sessions.set(sessionKey, session)
     }
+    if (session.requestIds.has(prompt.requestId)) {
+      return Promise.reject(new Error('Agent 请求标识重复'))
+    }
+    session.requestIds.add(prompt.requestId)
 
     const operationId = diagnosticId(prompt.requestId)
     const run = session.queue.then(async () => {
+      session.activeRequestId = prompt.requestId
       const startedAt = Date.now()
       logger.info('agent.request_started', {
         operationId,
@@ -277,6 +327,7 @@ export class BaseAgentService {
         }
       })
       try {
+        this.throwIfStopped(session, prompt.requestId)
         const result = await this.runPrompt(
           session,
           prompt,
@@ -292,14 +343,25 @@ export class BaseAgentService {
         })
         return result
       } catch (error) {
-        logger.error('agent.request_failed', {
-          operationId,
-          durationMs: Date.now() - startedAt,
-          context: {
-            errorName: error instanceof Error ? error.name : 'NonError'
-          }
-        })
+        if (error instanceof AgentRequestStoppedError) {
+          logger.info('agent.request_stopped', {
+            operationId,
+            durationMs: Date.now() - startedAt
+          })
+        } else {
+          logger.error('agent.request_failed', {
+            operationId,
+            durationMs: Date.now() - startedAt,
+            context: {
+              errorName: error instanceof Error ? error.name : 'NonError'
+            }
+          })
+        }
         throw error
+      } finally {
+        if (session.activeRequestId === prompt.requestId) session.activeRequestId = undefined
+        session.requestIds.delete(prompt.requestId)
+        session.stoppedRequestIds.delete(prompt.requestId)
       }
     })
     const queue = run.then(
@@ -434,6 +496,7 @@ export class BaseAgentService {
     onTodos?: (input: AgentPromptInput, todos: AgentTodo[]) => void,
     onActivity?: (event: AgentActivityEvent) => void
   ): Promise<AgentPromptResult> {
+    this.throwIfStopped(session, input.requestId)
     const config = await this.configStore.load()
     if (!config) {
       throw new Error('请先配置 DeepSeek 模型与 API Key')
@@ -442,6 +505,7 @@ export class BaseAgentService {
     if (!modelOption?.thinkingLevels.some((level) => level === input.thinkingLevel)) {
       throw new Error('当前模型不支持所选思考深度')
     }
+    this.throwIfStopped(session, input.requestId)
 
     if (!session.agent) {
       const created = await this.createAgent(
@@ -455,6 +519,7 @@ export class BaseAgentService {
       session.todos = created.todos
       onTodos?.(input, structuredClone(created.todos))
     }
+    this.throwIfStopped(session, input.requestId)
     session.agent.setThinkingLevel(input.thinkingLevel)
     session.lastUsedAt = Date.now()
     let thinkingSequence = 0
@@ -542,10 +607,14 @@ export class BaseAgentService {
     })
 
     try {
-      await session.agent.prompt(await this.injectPromptReferences(input, projectPath))
+      const prompt = await this.injectPromptReferences(input, projectPath)
+      this.throwIfStopped(session, input.requestId)
+      await session.agent.prompt(prompt)
     } finally {
       unsubscribe()
     }
+
+    this.throwIfStopped(session, input.requestId)
 
     if (session.agent.state.errorMessage) {
       throw new Error(session.agent.state.errorMessage)
@@ -563,6 +632,10 @@ export class BaseAgentService {
       .trim()
 
     return { text, modelId: config.modelId }
+  }
+
+  private throwIfStopped(session: AgentSessionRecord, requestId: string): void {
+    if (session.stoppedRequestIds.has(requestId)) throw new AgentRequestStoppedError()
   }
 
   private evictOldestSession(): void {

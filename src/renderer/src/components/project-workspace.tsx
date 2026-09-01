@@ -27,7 +27,7 @@ import type {
 import { AgentModelSelect } from './agent-model-select'
 import { AgentMarkdown } from './agent-markdown'
 import { AgentActivityPanel } from './agent-activity-panel'
-import { applyAgentActivityEvent } from '../lib/agent-activity'
+import { applyAgentActivityEvent, stopRunningAgentActivities } from '../lib/agent-activity'
 import {
   isOpenableProjectFile,
   projectFileDisplayKind,
@@ -74,6 +74,11 @@ interface Conversation {
   id: string
   title: string
   messages: ChatMessage[]
+}
+
+interface ActiveAgentRequest {
+  requestId: string
+  conversationId: string
 }
 
 interface ProjectWorkspaceProps {
@@ -522,7 +527,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [activeReferenceIndex, setActiveReferenceIndex] = useState(0)
   const [isReferenceOptionsLoading, setIsReferenceOptionsLoading] = useState(true)
   const [referenceOptionsError, setReferenceOptionsError] = useState('')
-  const [isSending, setIsSending] = useState(false)
+  const [activeAgentRequest, setActiveAgentRequest] = useState<ActiveAgentRequest | null>(null)
+  const [isStopping, setIsStopping] = useState(false)
   const [chatError, setChatError] = useState('')
   const [conversationError, setConversationError] = useState('')
   const [isConversationLoading, setIsConversationLoading] = useState(true)
@@ -556,6 +562,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const openPresentationsRef = useRef<OpenPresentationDocument[]>([])
   const openImagesRef = useRef<OpenImageDocument[]>([])
   const confirmedRestorePathsRef = useRef<Set<string>>(new Set())
+  const stoppedRequestIdsRef = useRef<Set<string>>(new Set())
+
+  const isSending = activeAgentRequest !== null
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
@@ -1872,7 +1881,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setPromptReferences([])
     setReferenceTrigger(null)
     setChatError('')
-    setIsSending(true)
+    setActiveAgentRequest({ requestId, conversationId })
     setConversations((current) => current.map((conversation) =>
       conversation.id === conversationId
         ? {
@@ -1892,19 +1901,28 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         references: promptReferences,
         thinkingLevel
       })
+      const wasStopped = stoppedRequestIdsRef.current.has(requestId)
       setConversations((current) => current.map((conversation) =>
         conversation.id === conversationId
           ? {
               ...conversation,
               messages: conversation.messages.map((message) =>
                 message.id === requestId
-                  ? { ...message, text: result.text, isStreaming: false }
+                  ? {
+                      ...message,
+                      text: result.text,
+                      isStreaming: false,
+                      activities: wasStopped
+                        ? stopRunningAgentActivities(message.activities ?? [])
+                        : message.activities
+                    }
                   : message
               )
             }
           : conversation
       ))
     } catch (error) {
+      const wasStopped = stoppedRequestIdsRef.current.has(requestId)
       setConversations((current) => current.map((conversation) =>
         conversation.id === conversationId
           ? {
@@ -1915,19 +1933,46 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 return [{
                   ...message,
                   isStreaming: false,
-                  activities: message.activities?.map((activity) => (
-                    activity.status === 'running'
-                      ? { ...activity, status: 'error' as const }
-                      : activity
-                  ))
+                  activities: wasStopped
+                    ? stopRunningAgentActivities(message.activities ?? [])
+                    : message.activities?.map((activity) => (
+                        activity.status === 'running'
+                          ? { ...activity, status: 'error' as const }
+                          : activity
+                      ))
                 }]
               })
             }
           : conversation
       ))
-      setChatError(error instanceof Error ? error.message : '暂时无法获取回复')
+      if (!wasStopped) {
+        setChatError(error instanceof Error ? error.message : '暂时无法获取回复')
+      }
     } finally {
-      setIsSending(false)
+      stoppedRequestIdsRef.current.delete(requestId)
+      setActiveAgentRequest((current) => current?.requestId === requestId ? null : current)
+      setIsStopping(false)
+    }
+  }
+
+  async function stopMessage(): Promise<void> {
+    if (!activeAgentRequest || isStopping) return
+    const request = activeAgentRequest
+    stoppedRequestIdsRef.current.add(request.requestId)
+    setIsStopping(true)
+    setChatError('')
+
+    try {
+      const result = await window.agent.stop({
+        requestId: request.requestId,
+        conversationId: request.conversationId,
+        projectHandle: project.handle
+      })
+      if (!result.stopped) stoppedRequestIdsRef.current.delete(request.requestId)
+    } catch (error) {
+      stoppedRequestIdsRef.current.delete(request.requestId)
+      setChatError(error instanceof Error ? error.message : '无法终止当前回复')
+      setIsStopping(false)
     }
   }
 
@@ -2527,14 +2572,35 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     }
                   />
                   <div className="composer-footer">
-                    <span>@ 文件 · / Skill · Enter 发送</span>
+                    <span aria-live="polite">
+                      {isStopping
+                        ? '正在终止 Pi Agent…'
+                        : isSending
+                          ? 'Pi Agent 进行中 · 点击终止'
+                          : '@ 文件 · / Skill · Enter 发送'}
+                    </span>
                     <div className="composer-actions">
                       <AgentModelSelect
                         disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
                         thinkingLevel={thinkingLevel}
                         onThinkingLevelChange={setThinkingLevel}
                       />
-                      <button className="composer-send" type="submit" disabled={(!draft.trim() && promptReferences.length === 0) || isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)} aria-label="发送消息">↑</button>
+                      <button
+                        className={`composer-send${isSending ? ' is-running' : ''}${isStopping ? ' is-stopping' : ''}`}
+                        type={isSending ? 'button' : 'submit'}
+                        disabled={isSending
+                          ? isStopping
+                          : (!draft.trim() && promptReferences.length === 0) ||
+                            isConversationLoading ||
+                            loadingConversationIds.has(selectedConversation.id)}
+                        aria-label={isStopping ? '正在终止回复' : isSending ? '终止当前回复' : '发送消息'}
+                        title={isStopping ? '正在终止回复' : isSending ? '终止当前回复' : '发送消息'}
+                        onClick={isSending ? () => void stopMessage() : undefined}
+                      >
+                        {isSending ? (
+                          <span className="composer-send-progress" aria-hidden="true"><i /></span>
+                        ) : <span aria-hidden="true">↑</span>}
+                      </button>
                     </div>
                   </div>
                 </div>

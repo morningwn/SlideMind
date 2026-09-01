@@ -42,3 +42,11 @@ export function applyAgentActivityEvent(
     }
   })
 }
+
+export function stopRunningAgentActivities(
+  activities: readonly AgentActivity[]
+): AgentActivity[] {
+  return activities.map((activity) => (
+    activity.status === 'running' ? { ...activity, status: 'stopped' } : activity
+  ))
+}

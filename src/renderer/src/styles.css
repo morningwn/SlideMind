@@ -3053,6 +3053,7 @@ button.file-tree-item:not(.file-tree-directory) {
 }
 
 .agent-activity-item.is-running summary::before { background: var(--blue); }
+.agent-activity-item.is-stopped summary::before { background: #9a7b52; }
 .agent-activity-item.is-error summary::before { background: #c45555; }
 
 .agent-activity-kind {
@@ -3097,6 +3098,7 @@ button.file-tree-item:not(.file-tree-directory) {
 }
 
 .agent-activity-item.is-error summary small { color: #ae4b4b; }
+.agent-activity-item.is-stopped summary small { color: #8d704a; }
 
 .agent-activity-item-chevron {
   width: 6px;
@@ -3726,11 +3728,62 @@ button.file-tree-item:not(.file-tree-directory) {
   background: var(--blue);
   cursor: pointer;
   font-size: 17px;
+  transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.composer-send:not(:disabled):hover {
+  background: #2855cf;
+  transform: translateY(-1px);
+}
+
+.composer-send:focus-visible {
+  outline: 2px solid rgb(47 97 233 / 32%);
+  outline-offset: 2px;
 }
 
 .composer-send:disabled {
   cursor: default;
   opacity: 0.35;
+}
+
+.composer-send.is-running {
+  background: #315fcb;
+  box-shadow: 0 0 0 3px rgb(47 97 233 / 10%);
+}
+
+.composer-send.is-running:not(:disabled):hover {
+  background: #d65d58;
+  box-shadow: 0 0 0 3px rgb(214 93 88 / 12%);
+}
+
+.composer-send.is-running:disabled {
+  cursor: wait;
+  opacity: 1;
+}
+
+.composer-send-progress {
+  position: relative;
+  width: 17px;
+  height: 17px;
+  border: 1.5px solid rgb(255 255 255 / 38%);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: composer-send-spin 850ms linear infinite;
+}
+
+.composer-send-progress i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 1.5px;
+  background: white;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes composer-send-spin {
+  to { transform: rotate(360deg); }
 }
 
 .composer-model-select {

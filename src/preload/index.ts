@@ -4,6 +4,7 @@ import type {
   AgentApi,
   AgentConversationInput,
   AgentPromptInput,
+  AgentStopInput,
   AgentStreamEvent,
   AgentTodosEvent,
   SaveAgentConfigInput
@@ -64,6 +65,7 @@ const agentApi: Readonly<AgentApi> = Object.freeze({
   listSkills: (projectHandle: string) => ipcRenderer.invoke('agent:list-skills', projectHandle),
   getTodos: (input: AgentConversationInput) => ipcRenderer.invoke('agent:get-todos', input),
   prompt: (input: AgentPromptInput) => ipcRenderer.invoke('agent:prompt', input),
+  stop: (input: AgentStopInput) => ipcRenderer.invoke('agent:stop', input),
   onStream: (listener: (event: AgentStreamEvent) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, streamEvent: AgentStreamEvent): void => {
       listener(streamEvent)
