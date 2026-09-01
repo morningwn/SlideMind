@@ -52,6 +52,7 @@ import {
 } from '../lib/composer-references'
 import { reportDiagnosticEvent } from '../lib/logger'
 import { contextUsageTone, formatTokenCount } from '../lib/agent-usage'
+import { serializePresentationDocumentState } from '../lib/presentation-document-state'
 
 const PresentationEditor = lazy(async () => {
   const module = await import('./presentation-editor')
@@ -791,7 +792,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             error: '演示文稿已被 Agent 或其他进程修改。重新载入会放弃当前未保存内容。'
           }
         }
-        const serializedDocument = JSON.stringify(file.document)
+        const serializedDocument = serializePresentationDocumentState(file.document)
         return {
           ...presentation,
           document: file.document,
@@ -1226,7 +1227,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     if (presentation) {
       try {
         const file = await window.presentations.read(project.handle, event.path)
-        const serializedDocument = JSON.stringify(file.document)
+        const serializedDocument = serializePresentationDocumentState(file.document)
         setOpenPresentations((current) => current.map((candidate) => {
           if (candidate.path !== event.path || candidate.revision === file.revision) return candidate
           if (!confirmedRestore && candidate.serializedDocument !== candidate.savedSerializedDocument) {
@@ -1347,7 +1348,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     try {
       if (isPresentationPath(entry.path)) {
         const file = await window.presentations.read(project.handle, entry.path)
-        const serializedDocument = JSON.stringify(file.document)
+        const serializedDocument = serializePresentationDocumentState(file.document)
         const presentation: OpenPresentationDocument = {
           ...file,
           name: entry.name,
@@ -1627,7 +1628,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       const path = fileName
       const title = '未命名演示文稿'
       const file = await window.presentations.create(project.handle, { path, title })
-      const serializedDocument = JSON.stringify(file.document)
+      const serializedDocument = serializePresentationDocumentState(file.document)
       const presentation: OpenPresentationDocument = {
         ...file,
         name: fileName,
@@ -1685,7 +1686,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   }
 
   function updatePresentation(path: string, document: OpenPresentationDocument['document']): void {
-    const serializedDocument = JSON.stringify(document)
+    const serializedDocument = serializePresentationDocumentState(document)
     setOpenPresentations((current) => {
       const presentationIndex = current.findIndex((presentation) => presentation.path === path)
       const presentation = current[presentationIndex]
@@ -1710,7 +1711,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     const presentation = openPresentationsRef.current.find((candidate) => candidate.path === path)
     if (!presentation || presentation.isSaving || presentation.conflict) return false
     const document = documentOverride ?? presentation.document
-    const serializedDocument = JSON.stringify(document)
+    const serializedDocument = serializePresentationDocumentState(document)
     if (serializedDocument === presentation.savedSerializedDocument) return true
 
     setOpenPresentations((current) => current.map((candidate) =>
@@ -1772,7 +1773,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
     try {
       const file = await window.presentations.read(project.handle, path)
-      const serializedDocument = JSON.stringify(file.document)
+      const serializedDocument = serializePresentationDocumentState(file.document)
       setOpenPresentations((current) => current.map((candidate) =>
         candidate.path === path
           ? {
