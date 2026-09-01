@@ -10,18 +10,25 @@ export interface AgentConfigController {
   error: string
   isLoading: boolean
   isSaving: boolean
-  save: () => Promise<boolean>
+  save: () => Promise<AgentConfigStatus | null>
 }
 
-export function useAgentConfig(): AgentConfigController {
-  const [config, setConfig] = useState<AgentConfigStatus | null>(null)
-  const [modelId, setModelId] = useState('')
+export function useAgentConfig(initialConfig: AgentConfigStatus | null = null): AgentConfigController {
+  const [config, setConfig] = useState<AgentConfigStatus | null>(initialConfig)
+  const [modelId, setModelId] = useState(initialConfig?.modelId ?? '')
   const [apiKey, setApiKey] = useState('')
   const [error, setError] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(initialConfig === null)
   const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
+    if (initialConfig) {
+      setConfig(initialConfig)
+      setModelId(initialConfig.modelId)
+      setIsLoading(false)
+      return
+    }
+
     let active = true
     void window.agent.getConfig()
       .then((status) => {
@@ -39,9 +46,9 @@ export function useAgentConfig(): AgentConfigController {
     return () => {
       active = false
     }
-  }, [])
+  }, [initialConfig])
 
-  async function save(): Promise<boolean> {
+  async function save(): Promise<AgentConfigStatus | null> {
     setIsSaving(true)
     setError('')
     try {
@@ -49,11 +56,11 @@ export function useAgentConfig(): AgentConfigController {
       setConfig(status)
       setModelId(status.modelId)
       setApiKey('')
-      return true
+      return status
     } catch (reason) {
       const message = reason instanceof Error ? reason.message : 'Pi Agent 配置保存失败'
       setError(message)
-      return false
+      return null
     } finally {
       setIsSaving(false)
     }

@@ -5,10 +5,12 @@ import {
   useState,
   type CSSProperties
 } from 'react'
+import type { AgentConfigStatus } from '../../shared/agent'
 import type { OpenedProject, ProjectInfo } from '../../shared/project'
 import { AppTitleBar } from './components/app-title-bar'
 import { ProjectWorkspace } from './components/project-workspace'
 import { SettingsPage } from './components/settings-page'
+import { resolveAgentConfigGate } from './lib/agent-config-gate'
 import { resolveCloseBehavior } from './lib/close-behavior'
 
 const projectColors = ['#6f7cff', '#d59a32', '#48ad87', '#bd62c9', '#31a6bc', '#d8628c']
@@ -82,8 +84,34 @@ function App(): React.JSX.Element {
   const [openingProject, setOpeningProject] = useState<string | null>(null)
   const [projectError, setProjectError] = useState('')
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [agentConfig, setAgentConfig] = useState<AgentConfigStatus | null>(null)
+  const [isAgentConfigChecked, setIsAgentConfigChecked] = useState(false)
   const [hasUnsavedDocuments, setHasUnsavedDocuments] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+  const agentConfigGate = resolveAgentConfigGate(isAgentConfigChecked, agentConfig)
+  const requiresAgentSetup = agentConfigGate === 'required'
+  const isSettingsVisible = isSettingsOpen || requiresAgentSetup
+
+  useEffect(() => {
+    let active = true
+
+    void window.agent.getConfig()
+      .then((status) => {
+        if (active) setAgentConfig(status)
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setProjectError(error instanceof Error ? error.message : '无法检查 DeepSeek 模型配置')
+        }
+      })
+      .finally(() => {
+        if (active) setIsAgentConfigChecked(true)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -131,24 +159,24 @@ function App(): React.JSX.Element {
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent): void {
       const shortcutModifier = window.desktop.platform === 'darwin' ? event.metaKey : event.ctrlKey
-      if (shortcutModifier && event.key.toLowerCase() === 'o' && !isSettingsOpen) {
+      if (shortcutModifier && event.key.toLowerCase() === 'o' && !isSettingsVisible) {
         event.preventDefault()
         if (!activeProject && !openingProject) void chooseProject()
       }
 
-      if (shortcutModifier && event.key.toLowerCase() === 'k' && !activeProject && !isSettingsOpen) {
+      if (shortcutModifier && event.key.toLowerCase() === 'k' && !activeProject && !isSettingsVisible) {
         event.preventDefault()
         searchRef.current?.focus()
       }
 
-      if (event.key === 'Escape' && isSettingsOpen) {
+      if (event.key === 'Escape' && isSettingsOpen && !requiresAgentSetup) {
         setIsSettingsOpen(false)
       }
     }
 
     window.addEventListener('keydown', handleShortcut)
     return () => window.removeEventListener('keydown', handleShortcut)
-  }, [activeProject, isSettingsOpen, openingProject])
+  }, [activeProject, isSettingsOpen, isSettingsVisible, openingProject, requiresAgentSetup])
 
   const filteredProjects = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase()
@@ -220,6 +248,10 @@ function App(): React.JSX.Element {
     ].slice(0, 20))
   }
 
+  function handleAgentConfigured(config: AgentConfigStatus): void {
+    setAgentConfig(config)
+  }
+
   return (
     <main className={`app-shell app-shell-${window.desktop.platform}`}>
       <AppTitleBar
@@ -231,14 +263,29 @@ function App(): React.JSX.Element {
         recentProjects={recentProjects}
       />
       <div className="app-content">
-        {activeProject ? (
+        {agentConfigGate === 'checking' ? (
+          <div className="startup-config-check" role="status">
+            <i aria-hidden="true" />
+            <span>正在检查模型配置…</span>
+          </div>
+        ) : requiresAgentSetup ? (
+          <SettingsPage
+            initialConfig={agentConfig}
+            onConfigured={handleAgentConfigured}
+            requiresConfiguration
+          />
+        ) : activeProject ? (
           <ProjectWorkspace
             key={activeProject.path}
             project={activeProject}
             onDirtyChange={setHasUnsavedDocuments}
           />
         ) : isSettingsOpen ? (
-          <SettingsPage onBack={() => setIsSettingsOpen(false)} />
+          <SettingsPage
+            initialConfig={agentConfig}
+            onBack={() => setIsSettingsOpen(false)}
+            onConfigured={handleAgentConfigured}
+          />
         ) : (
           <section className="home" aria-labelledby="recent-title">
             <div className="home-toolbar">

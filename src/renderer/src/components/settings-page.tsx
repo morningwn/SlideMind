@@ -1,8 +1,12 @@
 import { useState, type FormEvent } from 'react'
+import type { AgentConfigStatus } from '../../../shared/agent'
 import { useAgentConfig } from '../hooks/use-agent-config'
 
 interface SettingsPageProps {
-  onBack: () => void
+  initialConfig?: AgentConfigStatus | null
+  onBack?: () => void
+  onConfigured?: (config: AgentConfigStatus) => void
+  requiresConfiguration?: boolean
 }
 
 function BackIcon(): React.JSX.Element {
@@ -88,7 +92,12 @@ function actionError(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
 }
 
-export function SettingsPage({ onBack }: SettingsPageProps): React.JSX.Element {
+export function SettingsPage({
+  initialConfig = null,
+  onBack,
+  onConfigured,
+  requiresConfiguration = false
+}: SettingsPageProps): React.JSX.Element {
   const {
     config,
     modelId,
@@ -99,7 +108,7 @@ export function SettingsPage({ onBack }: SettingsPageProps): React.JSX.Element {
     isLoading,
     isSaving,
     save
-  } = useAgentConfig()
+  } = useAgentConfig(initialConfig)
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('model')
   const [saved, setSaved] = useState(false)
   const [diagnosticAction, setDiagnosticAction] = useState<DiagnosticAction>(null)
@@ -109,7 +118,9 @@ export function SettingsPage({ onBack }: SettingsPageProps): React.JSX.Element {
   async function saveSettings(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
     setSaved(false)
-    setSaved(await save())
+    const status = await save()
+    setSaved(status !== null)
+    if (status?.configured) onConfigured?.(status)
   }
 
   async function openLogDirectory(): Promise<void> {
@@ -171,10 +182,14 @@ export function SettingsPage({ onBack }: SettingsPageProps): React.JSX.Element {
   return (
     <section className="settings-page" aria-labelledby="settings-title">
       <header className="settings-toolbar">
-        <button className="settings-back" type="button" onClick={onBack}>
-          <BackIcon />
-          最近项目
-        </button>
+        {onBack ? (
+          <button className="settings-back" type="button" onClick={onBack}>
+            <BackIcon />
+            最近项目
+          </button>
+        ) : (
+          <span className="settings-required-label"><ShieldIcon />完成模型设置后继续</span>
+        )}
         <span>SlideMind 设置</span>
       </header>
 
@@ -206,6 +221,7 @@ export function SettingsPage({ onBack }: SettingsPageProps): React.JSX.Element {
               type="button"
               aria-current={activeCategory === 'diagnostics' ? 'page' : undefined}
               onClick={() => setActiveCategory('diagnostics')}
+              disabled={requiresConfiguration}
             >
               <DiagnosticIcon />
               <span>
@@ -227,6 +243,16 @@ export function SettingsPage({ onBack }: SettingsPageProps): React.JSX.Element {
                   : '管理保存在本机的运行日志、崩溃报告和诊断数据。'}
               </p>
             </header>
+
+            {requiresConfiguration ? (
+              <div className="settings-required-notice" role="status">
+                <ShieldIcon />
+                <div>
+                  <strong>开始前请先完成模型设置</strong>
+                  <span>选择 DeepSeek 模型并填写 API Key，保存后即可进入工作区。</span>
+                </div>
+              </div>
+            ) : null}
 
             {activeCategory === 'model' ? (
               <form className="provider-settings-card" onSubmit={(event) => void saveSettings(event)}>
