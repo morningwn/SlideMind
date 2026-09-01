@@ -104,3 +104,7 @@ export interface PresentationApi {
 export function isPresentationPath(path: string): boolean {
   return path.toLocaleLowerCase().endsWith(PRESENTATION_FILE_SUFFIX)
 }
+
+export function isPptxPath(path: string): boolean {
+  return path.toLocaleLowerCase().endsWith('.pptx')
+}

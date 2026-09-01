@@ -12,14 +12,15 @@ const pptistPublic = resolve('node_modules/pptist/public')
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ['chokidar', 'pptxgenjs'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['chokidar', 'pptxgenjs', 'pptxtojson'] })],
     build: {
       rollupOptions: {
         input: {
           index: resolve('src/main/index.ts'),
           'presentation-export-worker': resolve(
             'src/main/presentation/presentation-export-worker.ts'
-          )
+          ),
+          'pptx-read-worker': resolve('src/main/agent/pptx-read-worker.ts')
         }
       }
     }

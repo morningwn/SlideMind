@@ -201,6 +201,36 @@ describe('BaseAgentService.stop', () => {
 })
 
 describe('BaseAgentService prompt references', () => {
+  it('routes raw PowerPoint files through pptx_read instead of the binary read tool', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-agent-pptx-'))
+    await writeFile(join(projectPath, 'brief.pptx'), Buffer.from([1, 2, 3]))
+    const service = new BaseAgentService(
+      {} as never,
+      {} as never,
+      '/agent',
+      '/skills',
+      {} as never,
+      {} as never
+    )
+    const internal = service as unknown as {
+      injectPromptReferences(input: ReturnType<typeof normalizeAgentPromptInput>, path: string):
+        Promise<string>
+    }
+    const prompt = normalizeAgentPromptInput({
+      requestId: 'request-1',
+      conversationId: 'conversation-1',
+      projectHandle: 'project-1',
+      input: '总结这份 PowerPoint',
+      references: [{ type: 'file', path: 'brief.pptx' }]
+    })
+
+    const injected = await internal.injectPromptReferences(prompt, projectPath)
+
+    expect(injected).toContain('使用 pptx_read 工具')
+    expect(injected).toContain('brief.pptx')
+    expect(injected).not.toContain('使用 read 工具读取')
+  })
+
   it('routes SlideMind presentations through slides_read instead of the text read tool', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-agent-presentation-'))
     await writeFile(

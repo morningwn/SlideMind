@@ -17,6 +17,40 @@ interface RegisteredTool {
 }
 
 describe('createPresentationToolsExtension', () => {
+  it('registers pptx_read and returns the direct PowerPoint summary', async () => {
+    const readPptx = async () => ({
+      file: 'brief.pptx',
+      totalSlideCount: 1,
+      startSlide: 1,
+      endSlide: 1,
+      truncated: false,
+      contentTruncated: false,
+      size: { width: 10, height: 5.625 },
+      usedFonts: ['Aptos'],
+      slides: [{ number: 1, notes: '备注', texts: ['产品路线图'] }]
+    })
+    const registeredTools = new Map<string, RegisteredTool>()
+    const extension = createPresentationToolsExtension({
+      presentationService: {} as PresentationService,
+      projectHandle: 'project-handle',
+      projectPath: '/project',
+      readPptx
+    })
+    await extension({
+      registerTool: (tool: RegisteredTool) => registeredTools.set(tool.name, tool)
+    } as unknown as ExtensionAPI)
+
+    const result = await registeredTools.get('pptx_read')!.execute('read-call', {
+      file: 'brief.pptx'
+    })
+
+    expect(result.details).toMatchObject({
+      file: 'brief.pptx',
+      totalSlideCount: 1,
+      slides: [{ notes: '备注', texts: ['产品路线图'] }]
+    })
+  })
+
   it('embeds a safe project-relative image path before saving slides', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-slide-image-'))
     await mkdir(join(projectPath, 'assets'))

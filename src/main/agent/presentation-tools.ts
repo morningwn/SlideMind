@@ -6,6 +6,7 @@ import {
 } from '../../shared/presentation'
 import type { PresentationService } from '../presentation/presentation-service'
 import { readProjectImageFile } from '../project/project-text-files'
+import { readProjectPptx } from './pptx-reader'
 
 type SlideInput = {
   title: string
@@ -343,6 +344,7 @@ export function createPresentationToolsExtension(options: {
   presentationService: PresentationService
   projectHandle: string
   projectPath: string
+  readPptx?: typeof readProjectPptx
 }): ExtensionFactory {
   return async (pi) => {
     const { Type } = await import('@earendil-works/pi-ai')
@@ -463,6 +465,28 @@ export function createPresentationToolsExtension(options: {
           revision: file.revision,
           ...presentationSummary(file.document, params.startSlide, params.endSlide)
         })
+      }
+    })
+
+    pi.registerTool({
+      name: 'pptx_read',
+      label: '读取 PowerPoint',
+      description: '直接读取项目内原始 .pptx 文件的文字、备注、表格、图表、公式和媒体数量。不会修改或导入文件。',
+      promptSnippet: 'Read content from a project-local PowerPoint file.',
+      parameters: Type.Object({
+        file: Type.String({ minLength: 1, maxLength: 4096 }),
+        startSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+        endSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 }))
+      }, { additionalProperties: false }),
+      async execute(_toolCallId, params, signal) {
+        const readPptx = options.readPptx ?? readProjectPptx
+        return toolText(await readPptx(
+          options.projectPath,
+          params.file,
+          params.startSlide,
+          params.endSlide,
+          signal
+        ))
       }
     })
 
