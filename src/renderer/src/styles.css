@@ -664,22 +664,19 @@ button:disabled {
   stroke-width: 1.8;
 }
 
-.settings-layout {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.72fr) minmax(440px, 1.28fr);
-  gap: clamp(42px, 7vw, 94px);
-  align-items: start;
-  width: min(980px, 100%);
-  margin: clamp(58px, 9vh, 96px) auto 0;
+.settings-frame {
+  width: min(1040px, 100%);
+  margin: clamp(30px, 5vh, 48px) auto 0;
 }
 
 .settings-intro {
-  padding-top: 16px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
 }
 
 .settings-kicker {
   display: block;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   color: var(--blue);
   font-size: 10px;
   font-weight: 780;
@@ -687,57 +684,177 @@ button:disabled {
 }
 
 .settings-intro h1 {
-  max-width: 350px;
-  margin: 0 0 16px;
+  margin: 0 0 8px;
   color: #1c2b46;
   font-family: "Iowan Old Style", "Songti SC", Georgia, serif;
-  font-size: clamp(30px, 3.4vw, 43px);
+  font-size: clamp(32px, 3.6vw, 44px);
   font-weight: 590;
   letter-spacing: -0.045em;
-  line-height: 1.13;
+  line-height: 1.08;
 }
 
 .settings-intro > p {
-  max-width: 330px;
   margin: 0;
   color: var(--muted);
   font-size: 13px;
-  line-height: 1.75;
+  line-height: 1.65;
 }
 
-.settings-signal {
+.settings-layout {
   display: grid;
-  grid-template-columns: auto minmax(12px, 1fr) auto minmax(12px, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  width: min(310px, 100%);
-  margin-top: 40px;
-  color: #718097;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: clamp(40px, 6vw, 76px);
+  align-items: start;
+  padding-top: 24px;
+}
+
+.settings-navigation {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 7px;
+}
+
+.settings-navigation-label {
+  margin: 0 0 5px 12px;
+  color: var(--quiet);
   font-size: 9px;
-  letter-spacing: 0.03em;
+  font-weight: 730;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
 }
 
-.settings-signal i {
+.settings-navigation > button {
   position: relative;
-  height: 1px;
-  background: #c9d5e8;
-}
-
-.settings-signal i::after {
-  position: absolute;
-  top: -2px;
-  right: 0;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--blue);
-  content: "";
-}
-
-.settings-cards {
   display: grid;
-  gap: 18px;
+  grid-template-columns: 32px minmax(0, 1fr) 5px;
+  gap: 11px;
+  align-items: center;
+  width: 100%;
+  min-height: 62px;
+  padding: 9px 12px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  color: #68758b;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+
+.settings-navigation > button:hover {
+  color: #33415a;
+  background: rgb(255 255 255 / 58%);
+}
+
+.settings-navigation > button.is-active {
+  border-color: #d7e0f0;
+  color: #23324d;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 10px 30px rgb(38 55 88 / 7%);
+}
+
+.settings-navigation button > svg {
+  width: 32px;
+  height: 32px;
+  padding: 7px;
+  border-radius: 9px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.55;
+}
+
+.settings-navigation button.is-active > svg {
+  color: white;
+  background: var(--blue);
+  box-shadow: 4px 4px 0 rgb(47 97 233 / 12%);
+}
+
+.settings-navigation button > span,
+.settings-navigation button strong,
+.settings-navigation button small {
+  display: block;
+  min-width: 0;
+}
+
+.settings-navigation button strong {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.settings-navigation button small {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--quiet);
+  font-size: 8px;
+  font-weight: 480;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-navigation button > i {
+  width: 5px;
+  height: 18px;
+  border-radius: 5px;
+  background: transparent;
+}
+
+.settings-navigation button.is-active > i {
+  background: var(--blue);
+}
+
+.settings-local-note {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  margin: 17px 12px 0;
+  color: var(--quiet);
+  font-size: 8px;
+  line-height: 1.55;
+}
+
+.settings-local-note svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: #5d78b7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.settings-content {
+  min-width: 0;
+}
+
+.settings-section-heading {
+  margin-bottom: 20px;
+}
+
+.settings-section-heading > span {
+  color: var(--blue);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.settings-section-heading h2 {
+  margin: 7px 0 7px;
+  color: #22314b;
+  font-size: 22px;
+  letter-spacing: -0.025em;
+}
+
+.settings-section-heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .provider-settings-card {
@@ -764,7 +881,7 @@ button:disabled {
   letter-spacing: 0.13em;
 }
 
-.provider-settings-card h2 {
+.provider-settings-card h3 {
   margin: 4px 0 0;
   color: #26344e;
   font-size: 19px;
@@ -958,7 +1075,7 @@ button:disabled {
   letter-spacing: 0.13em;
 }
 
-.diagnostic-settings-card h2 {
+.diagnostic-settings-card h3 {
   margin: 4px 0 0;
   color: #26344e;
   font-size: 17px;
@@ -4101,23 +4218,36 @@ button.file-tree-item:not(.file-tree-directory) {
     display: none;
   }
 
-  .settings-layout {
-    grid-template-columns: 1fr;
-    gap: 34px;
-    margin-top: 36px;
+  .settings-frame {
+    margin-top: 30px;
   }
 
   .settings-intro {
-    padding-top: 0;
+    padding-bottom: 22px;
+  }
+
+  .settings-layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding-top: 22px;
   }
 
   .settings-intro h1 {
-    max-width: 310px;
     font-size: 32px;
   }
 
-  .settings-signal {
-    margin-top: 25px;
+  .settings-navigation {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-navigation-label,
+  .settings-local-note {
+    grid-column: 1 / -1;
+  }
+
+  .settings-local-note {
+    margin-top: 8px;
   }
 
   .provider-settings-card {
@@ -4131,10 +4261,34 @@ button.file-tree-item:not(.file-tree-directory) {
   .diagnostic-actions {
     grid-template-columns: 1fr;
   }
-
 }
 
 @media (max-width: 560px) {
+  .settings-navigation > button {
+    grid-template-columns: 28px minmax(0, 1fr) 4px;
+    gap: 8px;
+    min-height: 56px;
+    padding: 8px;
+  }
+
+  .settings-navigation button > svg {
+    width: 28px;
+    height: 28px;
+    padding: 6px;
+  }
+
+  .settings-navigation button small {
+    display: none;
+  }
+
+  .diagnostic-recorder {
+    gap: 9px;
+  }
+
+  .diagnostic-recorder code {
+    display: none;
+  }
+
   .title-bar-identity {
     display: none;
   }
