@@ -12,6 +12,7 @@ import { createPortal } from 'react-dom'
 import {
   DEFAULT_AGENT_THINKING_LEVEL,
   isAgentThinkingLevel,
+  type AgentConversationUsage,
   type AgentPromptReference,
   type AgentSkillOption,
   type AgentThinkingLevel,
@@ -50,6 +51,7 @@ import {
   type ComposerReferenceTrigger
 } from '../lib/composer-references'
 import { reportDiagnosticEvent } from '../lib/logger'
+import { contextUsageTone, formatTokenCount } from '../lib/agent-usage'
 
 const PresentationEditor = lazy(async () => {
   const module = await import('./presentation-editor')
@@ -341,6 +343,61 @@ function TodoProgress({ todos }: { todos: AgentTodo[] }): React.JSX.Element | nu
   )
 }
 
+function ConversationUsageBar({
+  isLoading,
+  isUpdating,
+  usage
+}: {
+  isLoading: boolean
+  isUpdating: boolean
+  usage?: AgentConversationUsage
+}): React.JSX.Element {
+  const tone = contextUsageTone(usage?.contextPercent ?? null)
+  const percent = usage?.contextPercent === null || usage?.contextPercent === undefined
+    ? null
+    : Math.max(0, usage.contextPercent)
+  const meterWidth = percent === null ? 0 : Math.min(100, percent)
+  const contextLabel = usage?.contextTokens !== null && usage?.contextTokens !== undefined &&
+    usage.contextWindow
+    ? `${formatTokenCount(usage.contextTokens)} / ${formatTokenCount(usage.contextWindow)}`
+    : '等待下一次回复'
+
+  return (
+    <section
+      className={`conversation-usage-bar is-${tone}`}
+      aria-label="当前对话用量"
+      aria-live="polite"
+    >
+      <div
+        className="conversation-usage-total"
+        title="当前对话累计 Token，包含模型输入、输出、缓存和带用量的工具调用"
+      >
+        <span>累计 Token</span>
+        <strong>{usage ? formatTokenCount(usage.totalTokens) : '—'}</strong>
+      </div>
+      <div
+        className="conversation-context-usage"
+        title="当前上下文占模型上下文窗口的估算用量"
+      >
+        <span>上下文</span>
+        <strong>{isLoading && !usage ? '正在读取…' : contextLabel}</strong>
+        <div
+          className="conversation-context-meter"
+          role={percent === null ? undefined : 'progressbar'}
+          aria-label={percent === null ? undefined : '上下文使用比例'}
+          aria-valuemin={percent === null ? undefined : 0}
+          aria-valuemax={percent === null ? undefined : 100}
+          aria-valuenow={percent === null ? undefined : Math.min(100, Math.round(percent))}
+        >
+          <i style={{ width: `${meterWidth}%` }} />
+        </div>
+        <small>{percent === null ? '—' : `${Math.round(percent)}%`}</small>
+      </div>
+      {isUpdating ? <span className="conversation-usage-updating"><i />回复后更新</span> : null}
+    </section>
+  )
+}
+
 function FileTreeLevel({
   directoryPath,
   depth,
@@ -537,6 +594,13 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [loadedConversationIds, setLoadedConversationIds] = useState<Set<string>>(new Set())
   const [loadingConversationIds, setLoadingConversationIds] = useState<Set<string>>(new Set())
   const [todosByConversation, setTodosByConversation] = useState<Record<string, AgentTodo[]>>({})
+  const [usageByConversation, setUsageByConversation] = useState<
+    Record<string, AgentConversationUsage>
+  >({})
+  const [loadingUsageIds, setLoadingUsageIds] = useState<Set<string>>(new Set())
+  const [usageRevisionByConversation, setUsageRevisionByConversation] = useState<
+    Record<string, number>
+  >({})
   const [entriesByDirectory, setEntriesByDirectory] = useState<Record<string, ProjectFileEntry[]>>({})
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set(['']))
@@ -578,6 +642,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const activeImage = openImages.find((image) => image.path === activeDocumentPath)
   const activeFile = activeDocument ?? activePresentation ?? activeImage
   const selectedTodos = todosByConversation[selectedConversation.id] ?? []
+  const selectedUsage = usageByConversation[selectedConversation.id]
+  const selectedUsageRevision = usageRevisionByConversation[selectedConversation.id] ?? 0
+  const isSelectedConversationLoading = loadingConversationIds.has(selectedConversation.id)
   const filteredReferenceOptions = composerReferenceOptions(
     referenceTrigger,
     referenceFiles,
@@ -790,6 +857,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setLoadedConversationIds(new Set())
     setLoadingConversationIds(new Set())
     setTodosByConversation({})
+    setUsageByConversation({})
+    setLoadingUsageIds(new Set())
+    setUsageRevisionByConversation({})
 
     void (async () => {
       try {
@@ -957,6 +1027,45 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       active = false
     }
   }, [isConversationLoading, project.handle, selectedConversation.id, todosByConversation])
+
+  useEffect(() => {
+    if (
+      isConversationLoading ||
+      isSelectedConversationLoading ||
+      isSelectedConversationSending
+    ) return
+
+    let active = true
+    const conversationId = selectedConversation.id
+    setLoadingUsageIds((current) => new Set(current).add(conversationId))
+    void window.agent.getUsage({
+      projectHandle: project.handle,
+      conversationId
+    }).then((usage) => {
+      if (!active) return
+      setUsageByConversation((current) => ({ ...current, [conversationId]: usage }))
+    }).catch((error: unknown) => {
+      reportDiagnosticEvent('warn', 'agent.usage_load_failed', error)
+    }).finally(() => {
+      if (!active) return
+      setLoadingUsageIds((current) => {
+        const next = new Set(current)
+        next.delete(conversationId)
+        return next
+      })
+    })
+
+    return () => {
+      active = false
+    }
+  }, [
+    isConversationLoading,
+    isSelectedConversationLoading,
+    isSelectedConversationSending,
+    project.handle,
+    selectedConversation.id,
+    selectedUsageRevision
+  ])
 
   function startConversation(): void {
     if (isConversationLoading) return
@@ -1964,6 +2073,10 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       stoppedRequestIdsRef.current.delete(requestId)
       setActiveAgentRequest((current) => current?.requestId === requestId ? null : current)
       setIsStopping(false)
+      setUsageRevisionByConversation((current) => ({
+        ...current,
+        [conversationId]: (current[conversationId] ?? 0) + 1
+      }))
     }
   }
 
@@ -2490,6 +2603,11 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               {referenceOptionsError ? (
                 <p className="composer-error" role="alert">{referenceOptionsError}</p>
               ) : null}
+              <ConversationUsageBar
+                isLoading={loadingUsageIds.has(selectedConversation.id)}
+                isUpdating={isSelectedConversationSending}
+                usage={selectedUsage}
+              />
               <div className="composer-input-shell">
                 {referenceTrigger ? (
                   <div className="composer-reference-menu" role="listbox" id="composer-reference-options">

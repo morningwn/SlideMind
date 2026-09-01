@@ -9,6 +9,7 @@ import {
   DEEPSEEK_PROVIDER_ID,
   type AgentActivityEvent,
   type AgentConversationInput,
+  type AgentConversationUsage,
   type AgentPromptReference,
   type AgentPromptInput,
   type AgentPromptResult,
@@ -30,6 +31,7 @@ import {
 } from '../project/project-storage'
 import type { AgentConfigStore, AgentConfiguration } from './config-store'
 import { createToolActivity, toolErrorDetail } from './agent-activity'
+import { conversationUsageFromSession } from './agent-usage'
 import { todosFromSessionEntries, todosFromToolResult } from './agent-todo'
 import { preparePermissionSystem, type PermissionSystemSetup } from './permission-policy'
 import {
@@ -262,6 +264,43 @@ export class BaseAgentService {
       throw new Error('Pi 会话记录标识不匹配')
     }
     return todosFromSessionEntries(sessionManager.getBranch())
+  }
+
+  async getUsage(input: unknown): Promise<AgentConversationUsage> {
+    const conversation = normalizeAgentConversationInput(input)
+    const projectPath = this.projectRoots.resolve(conversation.projectHandle)
+    const activeAgent = this.sessions.get(this.sessionKey(conversation))?.agent
+    if (activeAgent) {
+      return conversationUsageFromSession(
+        activeAgent.sessionManager,
+        activeAgent.model?.contextWindow ?? null
+      )
+    }
+
+    const conversationsDirectory = await resolvePiConversationsDirectory(projectPath, false)
+    if (!conversationsDirectory) {
+      return this.emptyConversationUsage()
+    }
+
+    const { SessionManager } = await loadPiRuntime()
+    const sessionPath = await findPiSessionFile(conversationsDirectory, conversation.conversationId)
+    if (!sessionPath) return this.emptyConversationUsage()
+    const sessionManager = SessionManager.open(
+      sessionPath,
+      conversationsDirectory,
+      projectPath
+    )
+    if (sessionManager.getSessionId() !== conversation.conversationId) {
+      throw new Error('Pi 会话记录标识不匹配')
+    }
+    const modelReference = sessionManager.buildSessionContext().model
+    const contextWindow = modelReference
+      ? (await this.getModelRuntime()).getModel(
+          modelReference.provider,
+          modelReference.modelId
+        )?.contextWindow ?? null
+      : null
+    return conversationUsageFromSession(sessionManager, contextWindow)
   }
 
   async stop(input: unknown): Promise<AgentStopResult> {
@@ -636,6 +675,20 @@ export class BaseAgentService {
 
   private throwIfStopped(session: AgentSessionRecord, requestId: string): void {
     if (session.stoppedRequestIds.has(requestId)) throw new AgentRequestStoppedError()
+  }
+
+  private async emptyConversationUsage(): Promise<AgentConversationUsage> {
+    const status = await this.configStore.getStatus()
+    const contextWindow = (await this.getModelRuntime()).getModel(
+      status.provider,
+      status.modelId
+    )?.contextWindow ?? null
+    return {
+      totalTokens: 0,
+      contextTokens: contextWindow ? 0 : null,
+      contextWindow,
+      contextPercent: contextWindow ? 0 : null
+    }
   }
 
   private evictOldestSession(): void {

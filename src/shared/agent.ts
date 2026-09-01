@@ -103,6 +103,13 @@ export interface AgentConversationInput {
   projectHandle: string
 }
 
+export interface AgentConversationUsage {
+  totalTokens: number
+  contextTokens: number | null
+  contextWindow: number | null
+  contextPercent: number | null
+}
+
 export interface AgentStopInput extends AgentConversationInput {
   requestId: string
 }
@@ -159,6 +166,7 @@ export interface AgentApi {
   saveConfig(input: SaveAgentConfigInput): Promise<AgentConfigStatus>
   listSkills(projectHandle: string): Promise<AgentSkillOption[]>
   getTodos(input: AgentConversationInput): Promise<AgentTodo[]>
+  getUsage(input: AgentConversationInput): Promise<AgentConversationUsage>
   prompt(input: AgentPromptInput): Promise<AgentPromptResult>
   stop(input: AgentStopInput): Promise<AgentStopResult>
   onStream(listener: (event: AgentStreamEvent) => void): () => void

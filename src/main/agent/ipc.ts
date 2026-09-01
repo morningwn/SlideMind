@@ -31,6 +31,11 @@ export function registerAgentIpc(configStore: AgentConfigStore, agentService: Ba
     return agentService.getTodos(input)
   })
 
+  ipcMain.handle('agent:get-usage', (event, input: unknown) => {
+    assertTrustedRenderer(event)
+    return agentService.getUsage(input)
+  })
+
   ipcMain.handle('agent:prompt', (event, input: unknown) => {
     assertTrustedRenderer(event)
     return agentService.prompt(

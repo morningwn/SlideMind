@@ -64,6 +64,7 @@ const agentApi: Readonly<AgentApi> = Object.freeze({
   saveConfig: (input: SaveAgentConfigInput) => ipcRenderer.invoke('agent:save-config', input),
   listSkills: (projectHandle: string) => ipcRenderer.invoke('agent:list-skills', projectHandle),
   getTodos: (input: AgentConversationInput) => ipcRenderer.invoke('agent:get-todos', input),
+  getUsage: (input: AgentConversationInput) => ipcRenderer.invoke('agent:get-usage', input),
   prompt: (input: AgentPromptInput) => ipcRenderer.invoke('agent:prompt', input),
   stop: (input: AgentStopInput) => ipcRenderer.invoke('agent:stop', input),
   onStream: (listener: (event: AgentStreamEvent) => void) => {

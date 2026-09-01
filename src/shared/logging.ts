@@ -1,5 +1,6 @@
 export const RENDERER_DIAGNOSTIC_EVENTS = [
   'agent.todos_load_failed',
+  'agent.usage_load_failed',
   'conversation.flush_failed',
   'presentation.editor_failed',
   'renderer.react_error',
