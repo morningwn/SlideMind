@@ -2219,6 +2219,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
+      if (isSending) return
       event.currentTarget.form?.requestSubmit()
     }
   }
@@ -2807,7 +2808,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     onKeyDown={handleComposerKeyDown}
                     placeholder="输入消息，@ 引用文件，/ 使用 skill…"
                     rows={2}
-                    disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
+                    disabled={isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
                     aria-label="对话消息"
                     aria-autocomplete="list"
                     aria-controls={referenceTrigger ? 'composer-reference-options' : undefined}
@@ -2823,7 +2824,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                       {isStopping
                         ? '正在终止 Pi Agent…'
                         : isSending
-                          ? 'Pi Agent 进行中 · 点击终止'
+                          ? 'Pi Agent 进行中 · 可继续输入，点击终止'
                           : '@ 文件 · / Skill · Enter 发送'}
                     </span>
                     <div className="composer-actions">
