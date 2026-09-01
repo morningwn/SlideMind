@@ -2,6 +2,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FormEvent,
@@ -568,6 +569,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
+  const isSelectedConversationSending =
+    activeAgentRequest?.conversationId === selectedConversation.id
   const activeDocument = openDocuments.find((document) => document.path === activeDocumentPath)
   const activePresentation = openPresentations.find(
     (presentation) => presentation.path === activeDocumentPath
@@ -875,9 +878,18 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     })
   }, [project.handle])
 
-  useEffect(() => {
-    messageEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-  }, [selectedConversation.messages, isSending])
+  useLayoutEffect(() => {
+    messageEndRef.current?.scrollIntoView({
+      behavior: isSelectedConversationSending ? 'smooth' : 'auto',
+      block: 'end'
+    })
+  }, [
+    activeDocumentPath,
+    isHistoryActive,
+    isSelectedConversationSending,
+    selectedConversation.id,
+    selectedConversation.messages
+  ])
 
   useEffect(() => window.agent.onStream((event) => {
     setConversations((current) => current.map((conversation) =>
