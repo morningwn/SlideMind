@@ -33,6 +33,12 @@ export function isAgentThinkingLevel(value: unknown): value is AgentThinkingLeve
 
 export const DEEPSEEK_MODEL_OPTIONS = [
   {
+    id: 'deepseek-v4-flash-vision-exp',
+    name: 'DeepSeek V4 Flash Vision Exp',
+    description: '支持图片理解的实验模型，适合分析截图、图表与视觉素材',
+    thinkingLevels: ['off', 'low', 'high', 'max'] satisfies AgentThinkingLevel[]
+  },
+  {
     id: 'deepseek-v4-flash',
     name: 'DeepSeek V4 Flash',
     description: '响应更快，适合日常构思与大纲整理',

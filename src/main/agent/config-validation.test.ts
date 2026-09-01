@@ -1,18 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { DEEPSEEK_MODEL_OPTIONS } from '../../shared/agent'
+import {
+  DEFAULT_DEEPSEEK_MODEL_ID,
+  DEEPSEEK_MODEL_OPTIONS
+} from '../../shared/agent'
 import { normalizeConfigInput } from './config-validation'
 
-const models = ['deepseek-v4-flash', 'deepseek-v4-pro']
+const models = DEEPSEEK_MODEL_OPTIONS.map((model) => model.id)
 
 describe('normalizeConfigInput', () => {
   it('normalizes a new DeepSeek configuration', () => {
     expect(
       normalizeConfigInput(
-        { modelId: ' deepseek-v4-flash ', apiKey: ' sk-test ' },
+        { modelId: ' deepseek-v4-flash-vision-exp ', apiKey: ' sk-test ' },
         models,
         false
       )
-    ).toEqual({ modelId: 'deepseek-v4-flash', apiKey: 'sk-test' })
+    ).toEqual({ modelId: 'deepseek-v4-flash-vision-exp', apiKey: 'sk-test' })
+  })
+
+  it('uses DeepSeek V4 Flash Vision Exp as the default model', () => {
+    expect(DEFAULT_DEEPSEEK_MODEL_ID).toBe('deepseek-v4-flash-vision-exp')
   })
 
   it('allows retaining an existing API key', () => {
@@ -45,6 +52,9 @@ describe('normalizeConfigInput', () => {
       expect(bundledModel).toBeDefined()
       if (!bundledModel) continue
       expect(getSupportedThinkingLevels(bundledModel)).toEqual(option.thinkingLevels)
+      if (option.id === 'deepseek-v4-flash-vision-exp') {
+        expect(bundledModel.input).toContain('image')
+      }
     }
   })
 })

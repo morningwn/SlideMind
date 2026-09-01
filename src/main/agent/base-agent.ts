@@ -448,6 +448,11 @@ export class BaseAgentService {
       throw new Error('Pi 会话记录标识不匹配')
     }
     const todos = todosFromSessionEntries(sessionManager.getBranch())
+    const skillPaths = [
+      this.bundledSkillsDirectory,
+      join(this.agentDirectory, 'skills'),
+      join(projectPath, '.pi', 'skills')
+    ]
 
     const resourceLoader = new DefaultResourceLoader({
       cwd: projectPath,
@@ -457,7 +462,7 @@ export class BaseAgentService {
         TODO_EXTENSION_PATH,
         ...PI_EXTENSION_PATHS
       ],
-      additionalSkillPaths: [this.bundledSkillsDirectory],
+      additionalSkillPaths: skillPaths,
       extensionFactories: [
         {
           name: 'slidemind-web-access-guard',
@@ -487,7 +492,7 @@ export class BaseAgentService {
         }
       ],
       noExtensions: true,
-      noSkills: false,
+      noSkills: true,
       noPromptTemplates: true,
       noThemes: true,
       noContextFiles: true,
@@ -712,8 +717,12 @@ export class BaseAgentService {
     return loadSkills({
       cwd: projectPath,
       agentDir: this.agentDirectory,
-      skillPaths: [this.bundledSkillsDirectory],
-      includeDefaults: true
+      skillPaths: [
+        this.bundledSkillsDirectory,
+        join(this.agentDirectory, 'skills'),
+        join(projectPath, '.pi', 'skills')
+      ],
+      includeDefaults: false
     }).skills
   }
 

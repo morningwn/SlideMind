@@ -66,6 +66,7 @@ describe('bundled presentation skills', () => {
       agentDir: resolve('/tmp/slidemind-empty-agent'),
       additionalSkillPaths: [resolve('skills')],
       noExtensions: true,
+      noSkills: true,
       noPromptTemplates: true,
       noThemes: true,
       noContextFiles: true
