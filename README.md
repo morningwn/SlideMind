@@ -1,6 +1,6 @@
 # SlideMind
 
-SlideMind 是一个面向 macOS 与 Windows 的 Electron 桌面应用工程。当前包含安全的主进程边界、项目启动台、双平台安装包配置和持续集成构建。
+SlideMind 是一个面向 macOS 与 Windows 的演示文稿创作桌面工作区。应用将项目文件、Markdown 编辑、PPTist 可编辑演示、AI 制作流程、自动版本历史与本地诊断整合在同一个 Electron 应用中。
 
 ## 环境要求
 
@@ -10,7 +10,7 @@ SlideMind 是一个面向 macOS 与 Windows 的 Electron 桌面应用工程。�
 ## 本地开发
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 ```
 
@@ -23,7 +23,7 @@ pnpm package:mac   # macOS DMG/ZIP，Intel + Apple Silicon
 pnpm package:win   # Windows NSIS 安装包，x64
 ```
 
-构建产物写入 `release-dist/`。
+`pnpm build` 的生产构建写入 `out/`；平台安装包写入 `release-dist/`。
 
 ## 工程结构
 
@@ -39,13 +39,20 @@ src/
 
 - 基础 agent 由 `@earendil-works/pi-agent-core` 驱动，在 Electron 主进程中按需创建。
 - 当前服务商为 DeepSeek，默认使用支持图片理解的 DeepSeek V4 Flash Vision Exp，也可选择 DeepSeek V4 Flash 或 DeepSeek V4 Pro。
-- 模型配置入口位于启动台右上角，不会阻塞项目选择；后续可从这里再次进入。
+- 应用启动时会先检查模型配置；首次使用必须选择受支持的 DeepSeek 模型并保存 API Key，完成后才能进入项目启动台。后续可从启动台右上角再次打开设置。
 - API Key 通过 Electron 系统安全存储加密，并写入应用的 `userData/agent-config.json`。渲染进程只能读取非敏感配置状态，无法读取已保存的 Key。
-- preload 已暴露受限的 `window.agent.prompt(input)` 接口，供后续编辑器功能调用基础 agent。
+- preload 通过受限、类型化接口提供模型配置、Skill 列表、对话调用、停止、用量、任务清单和活动流；Agent 的文件访问与项目修改仍由主进程边界校验。
 - 应用内置 PPT 制作总控 Skill，并按阶段调度演示策略、页面文案、视觉设计、数据表达、流程图、模板和成稿审查 Skill；开发态从 `skills/` 加载，打包后作为只读资源注入 Pi Agent。
 - Pi Agent 固定集成 `pi-continue`、`pi-free`、`pi-cache-optimizer` 与 `pi-web-access`。这些扩展不引入原生模块；Web 能力按白名单启用。
 - 插件配置位于应用 `userData/pi-agent/`；首次启动会写入无浏览器弹窗、禁止读取浏览器 Cookie 的 Web 安全默认值，并关闭依赖 `git`、`gh`、`curl`、`yt-dlp` 或 `ffmpeg` 的能力。`pi-free` 上游仍使用用户的 `~/.pi/free.json` 保存其提供商配置。
 - 当前项目仍可通过 `.pi/skills/` 增加或覆盖同名 Skill，用户级 Skill 位于应用 `userData/pi-agent/skills/`。
+
+## 设置与本地诊断
+
+- 设置页按“AI 与模型”和“数据与诊断”分组；首次模型配置期间只开放完成启动所需的模型设置。
+- 应用以 JSONL 记录主进程、渲染界面和导出任务的脱敏日志，并在本机滚动保留最多 5 个 5 MiB 日志文件。
+- 设置页可以打开日志目录与本机崩溃报告目录、清除历史日志，或导出包含应用版本、运行时信息和脱敏日志的 `.json.gz` 诊断包。
+- 原生崩溃报告仅保存在本机，不会自动上传，也不会加入诊断包。
 
 ## 项目启动台
 
@@ -78,6 +85,15 @@ src/
 - 编辑器实例在输入过程中保持常驻，PPTist 状态通过受限消息桥同步；只有显式保存才写入项目文件。
 - `.slides.json` 使用 SlideMind v2 的 PPTist 数据格式，不兼容早期的 v1 快照。
 - 支持通过 `Cmd/Ctrl + S` 保存，并可由主进程导出基础文本、形状、图片和线条为 PPTX。
+
+## PPT 制作工作流
+
+- 完整演示任务按“任务与证据 → Markdown 大纲 → 逐页文案 → 视觉与模板设计 → 可编辑草稿 → 质量审查 → 可选 PPTX 导出”推进，不会因为请求了大纲或审查而自动扩大交付范围。
+- 工作流支持连续模式和审阅模式：完整交付请求默认在安全门禁内连续推进；用户要求逐阶段确认或存在关键选择时，每个阶段完成后等待审阅。
+- 每个任务在项目内使用一个稳定的主题产物目录，并通过 `workflow-status.md` 记录执行模式、阶段状态、产物路径、假设、待确认项和下游失效状态。大纲、逐页文案、设计规范、`.slides.json`、质量报告、素材与按需导出的 `.pptx` 均归入该目录。
+- Agent 写入可编辑演示前必须读取最新 revision，并以一次原子事务替换完整页面集合；写入后会再次回读结构，避免外部修改冲突或部分覆盖。
+- 质量阶段结合确定性预检与真实 PPTist 渲染：预检检查占位符、越界、潜在文字溢出、重叠、遮挡、字号和图片体积；视觉模型可分批渲染页面，检查层次、对比、留白、分组、阅读顺序和跨页一致性。
+- 自动检查不能证明 PowerPoint 中的字体替换、最终文字溢出、图片裁切或 Office 兼容性。只有质量门禁通过且用户要求 PPTX 时才执行导出，剩余人工确认项会保留在交付说明中。
 
 ## 自动版本与外部修改
 
