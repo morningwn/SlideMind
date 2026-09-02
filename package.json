@@ -1,6 +1,6 @@
 {
   "name": "slidemind",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "A focused desktop workspace for shaping presentation ideas.",
   "main": "out/main/index.js",
   "author": "SlideMind",
