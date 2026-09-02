@@ -90,7 +90,7 @@ export function normalizeVersionedPath(projectPath: string, pathInput: unknown):
 
   const targetPath = isAbsolute(pathInput) ? resolve(pathInput) : resolve(projectPath, pathInput)
   if (!isInsideProject(projectPath, targetPath)) throw new Error('版本文件路径超出项目范围')
-  return relative(projectPath, targetPath)
+  return relative(projectPath, targetPath).replaceAll('\\', '/')
 }
 
 export function isVersionedProjectPath(path: string): boolean {

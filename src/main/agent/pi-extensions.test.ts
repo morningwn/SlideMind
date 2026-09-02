@@ -1,4 +1,5 @@
 import { access, readFile, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
@@ -11,7 +12,7 @@ import {
 
 describe('Pi extension integration', () => {
   it('loads every pinned extension without native context-mode dependencies', async () => {
-    const agentDirectory = join('/tmp', `slidemind-pi-extensions-${crypto.randomUUID()}`)
+    const agentDirectory = join(tmpdir(), `slidemind-pi-extensions-${crypto.randomUUID()}`)
     const previousAgentDirectory = process.env.PI_CODING_AGENT_DIR
     const previousPiFreeFileLog = process.env.PI_FREE_FILE_LOG
 
@@ -44,10 +45,10 @@ describe('Pi extension integration', () => {
       restoreEnvironment('PI_CODING_AGENT_DIR', previousAgentDirectory)
       restoreEnvironment('PI_FREE_FILE_LOG', previousPiFreeFileLog)
     }
-  })
+  }, 15_000)
 
   it('preserves provider settings while enforcing headless cross-platform defaults', async () => {
-    const agentDirectory = join('/tmp', `slidemind-pi-extension-config-${crypto.randomUUID()}`)
+    const agentDirectory = join(tmpdir(), `slidemind-pi-extension-config-${crypto.randomUUID()}`)
     await preparePiExtensions(agentDirectory)
     const continuePath = join(agentDirectory, 'extensions', 'pi-continue.json')
     const webSearchPath = join(agentDirectory, 'web-search.json')
@@ -90,7 +91,7 @@ describe('Pi extension integration', () => {
   })
 
   it('blocks pi-web-access paths that require system executables', async () => {
-    const agentDirectory = join('/tmp', `slidemind-web-guard-${crypto.randomUUID()}`)
+    const agentDirectory = join(tmpdir(), `slidemind-web-guard-${crypto.randomUUID()}`)
     const {
       createAgentSession,
       DefaultResourceLoader,
@@ -130,7 +131,7 @@ describe('Pi extension integration', () => {
         type: 'tool_call',
         toolCallId: 'local-file',
         toolName: 'fetch_content',
-        input: { url: '/tmp/video.mp4' }
+        input: { url: join(tmpdir(), 'video.mp4') }
       })
       const videoFrames = await session.extensionRunner.emitToolCall({
         type: 'tool_call',

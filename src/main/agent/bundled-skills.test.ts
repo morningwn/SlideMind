@@ -1,4 +1,5 @@
 import { readFile, readdir } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { resolveBundledSkillsDirectory } from './bundled-skills'
@@ -26,19 +27,21 @@ async function listFiles(directory: string): Promise<string[]> {
 
 describe('resolveBundledSkillsDirectory', () => {
   it('uses the source directory during development', () => {
+    const appPath = resolve('fixtures', 'slidemind')
     expect(resolveBundledSkillsDirectory({
-      appPath: '/app/slidemind',
+      appPath,
       isPackaged: false,
-      resourcesPath: '/app/resources'
-    })).toBe(resolve('/app/slidemind/skills'))
+      resourcesPath: resolve('fixtures', 'resources')
+    })).toBe(resolve(appPath, 'skills'))
   })
 
   it('uses Electron resources in packaged builds', () => {
+    const resourcesPath = resolve('fixtures', 'resources')
     expect(resolveBundledSkillsDirectory({
-      appPath: '/app/slidemind.asar',
+      appPath: resolve('fixtures', 'slidemind.asar'),
       isPackaged: true,
-      resourcesPath: '/app/resources'
-    })).toBe(resolve('/app/resources/skills'))
+      resourcesPath
+    })).toBe(resolve(resourcesPath, 'skills'))
   })
 })
 
@@ -47,7 +50,7 @@ describe('bundled presentation skills', () => {
     const { loadSkills } = await import('@earendil-works/pi-coding-agent')
     const result = loadSkills({
       cwd: process.cwd(),
-      agentDir: resolve('/tmp/slidemind-empty-agent'),
+      agentDir: resolve(tmpdir(), 'slidemind-empty-agent'),
       skillPaths: [resolve('skills')],
       includeDefaults: false
     })
@@ -60,7 +63,7 @@ describe('bundled presentation skills', () => {
     const { loadSkills } = await import('@earendil-works/pi-coding-agent')
     const { skills } = loadSkills({
       cwd: process.cwd(),
-      agentDir: resolve('/tmp/slidemind-empty-agent'),
+      agentDir: resolve(tmpdir(), 'slidemind-empty-agent'),
       skillPaths: [resolve('skills')],
       includeDefaults: false
     })
@@ -100,7 +103,7 @@ describe('bundled presentation skills', () => {
     const { DefaultResourceLoader } = await import('@earendil-works/pi-coding-agent')
     const loader = new DefaultResourceLoader({
       cwd: process.cwd(),
-      agentDir: resolve('/tmp/slidemind-empty-agent'),
+      agentDir: resolve(tmpdir(), 'slidemind-empty-agent'),
       additionalSkillPaths: [resolve('skills')],
       noExtensions: true,
       noSkills: true,

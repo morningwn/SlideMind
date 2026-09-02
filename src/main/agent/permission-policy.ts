@@ -15,7 +15,8 @@ export interface PermissionSystemSetup {
 }
 
 function normalizePermissionPath(path: string): string {
-  return path.replaceAll('\\', '/')
+  const normalizedPath = path.replaceAll('\\', '/')
+  return process.platform === 'win32' ? normalizedPath.toLowerCase() : normalizedPath
 }
 
 export function createManagedPermissionPolicy(

@@ -1,5 +1,6 @@
 import { mkdir, readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { todosFromToolResult } from './agent-todo'
@@ -14,9 +15,14 @@ const todoExtensionPath = join(
   'index.ts'
 )
 
+function permissionPath(path: string): string {
+  const normalizedPath = path.replaceAll('\\', '/')
+  return process.platform === 'win32' ? normalizedPath.toLowerCase() : normalizedPath
+}
+
 describe('createManagedPermissionPolicy', () => {
   it('allows project file tools while denying unknown tools and bash', () => {
-    const policy = createManagedPermissionPolicy('/tmp/slidemind-agent') as {
+    const policy = createManagedPermissionPolicy(join(tmpdir(), 'slidemind-agent')) as {
       tools: Record<string, string>
       bash: Record<string, string>
       defaultPolicy: Record<string, string>
@@ -46,9 +52,9 @@ describe('createManagedPermissionPolicy', () => {
   })
 
   it('allows reading the managed skills directory but denies mutations there', () => {
-    const agentDirectory = '/tmp/slidemind-agent'
-    const skillsDirectory = join(agentDirectory, 'skills')
-    const bundledSkillsDirectory = '/app/resources/skills'
+    const agentDirectory = join(tmpdir(), 'slidemind-agent')
+    const skillsDirectory = permissionPath(join(agentDirectory, 'skills'))
+    const bundledSkillsDirectory = permissionPath(join(tmpdir(), 'slidemind-resources', 'skills'))
     const policy = createManagedPermissionPolicy(agentDirectory, [bundledSkillsDirectory]) as {
       tools: Record<string, string>
       skills: Record<string, string>
@@ -68,7 +74,7 @@ describe('createManagedPermissionPolicy', () => {
 
 describe('preparePermissionSystem', () => {
   it('writes an application-managed policy and disables yolo mode', async () => {
-    const agentDirectory = join('/tmp', `slidemind-permissions-${crypto.randomUUID()}`)
+    const agentDirectory = join(tmpdir(), `slidemind-permissions-${crypto.randomUUID()}`)
     const setup = await preparePermissionSystem(agentDirectory)
     const policy = JSON.parse(await readFile(setup.policyPath, 'utf8')) as {
       defaultPolicy: Record<string, string>
@@ -93,7 +99,7 @@ describe('preparePermissionSystem', () => {
   })
 
   it('blocks project-external file calls and skill mutations with Pi 0.84', async () => {
-    const testDirectory = join('/tmp', `slidemind-permissions-${crypto.randomUUID()}`)
+    const testDirectory = join(tmpdir(), `slidemind-permissions-${crypto.randomUUID()}`)
     const agentDirectory = join(testDirectory, 'agent')
     const projectDirectory = join(testDirectory, 'project')
     const skillsDirectory = join(agentDirectory, 'skills')
