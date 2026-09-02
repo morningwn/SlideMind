@@ -2,10 +2,8 @@ name: Build desktop apps
 
 on:
   push:
-    branches: [master, main]
-  pull_request:
-    branches: [master, main]
-  workflow_dispatch:
+    tags:
+      - '*'
 
 permissions:
   contents: read
