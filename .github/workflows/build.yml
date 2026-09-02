@@ -48,7 +48,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: slidemind-${{ runner.os }}
-          path: release-dist/*
+          path: |
+            release-dist/*.dmg
+            release-dist/*.zip
+            release-dist/*.exe
           if-no-files-found: error
 
   release:
@@ -72,10 +75,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          mapfile -d '' assets < <(find release-dist -maxdepth 1 -type f -print0)
+          if (( ${#assets[@]} == 0 )); then
+            echo "No installers found in release-dist" >&2
+            exit 1
+          fi
+
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" release-dist/* --clobber
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" release-dist/* \
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
               --verify-tag \
               --generate-notes \
               --title "$GITHUB_REF_NAME"
