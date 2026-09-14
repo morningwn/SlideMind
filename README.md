@@ -18,6 +18,7 @@ pnpm dev
 
 ```bash
 pnpm check         # TypeScript（含 PPTist / Vue）+ 单元测试
+pnpm test:renderer # Electron 中的工作区交互、真实 PPTist 渲染与同步基准
 pnpm build         # 生产构建
 pnpm package:mac   # macOS DMG/ZIP，Intel + Apple Silicon
 pnpm package:win   # Windows NSIS 安装包，x64
@@ -30,6 +31,16 @@ pnpm package:win   # Windows NSIS 安装包，x64
 Pull Request 自动执行锁文件安装及 `pnpm check`；tag 发布继续由打包工作流处理。
 `pnpm typecheck:pptist` 单独检查 PPTist 入口、Vue 组件及其依赖源码，使用与构建相同的 `@` 别名。
 Vue 检查工具依赖 JavaScript 编译器 API，因此通过 `typescript-vue` 固定使用 TypeScript 5.9；其余检查继续使用项目的 TypeScript 7。
+
+### 工作区交互与 PPTist 渲染验证
+
+`pnpm test:renderer` 使用临时 Electron 用户目录和仅监听本机的 Vite 服务，运行真实 React 工作区、CodeMirror 和 Vue/PPTist iframe。测试替换项目 IPC 与 Agent API，不读写真实项目或调用模型；覆盖文档编辑保存重开、保存 revision 冲突、外部变更通知、生成中切换会话，以及会话元数据持久化和事件订阅清理。
+
+渲染检查断言画布文字和图片加载结果，并将截图与测量数据写入被 Git 忽略的 `.local/renderer-tests/`。失败返回非零退出码。截图仍需人工检查；这些测试不代表真实 IPC/磁盘端到端验收，也不代表 PowerPoint/Office 兼容性通过。
+
+同步基准在真实 PPTist store 上测量 10、50、200 页，以及无图片、每页 64 × 64 和 128 × 128 PNG 图片的组合。每组预热一次、采样 20 次，分别记录 Vue 更新至下一帧回调、消息到达宿主的延迟，以及原有/优化后 JSON 快照耗时。序列化探针在消息同步完成后运行；同步延迟包含现有的 120 ms 防抖。性能数据用于同机比较，不设置跨机器绝对耗时门槛。运行需要可用的桌面显示环境，首次启动需要编译 PPTist 依赖。
+
+当前会话元数据自动保存与 Agent 流式/活动/待办订阅分别由 `use-conversation-persistence`、`use-agent-events` 管理。PPTist 快照序列化跳过 Vue 代理的依赖收集，加载比较直接使用序列化结果；跨框架消息格式和完整文稿 revision 事务保持原有契约。
 
 ## 工程结构
 

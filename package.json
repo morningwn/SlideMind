@@ -21,7 +21,8 @@
     "package": "pnpm build && electron-builder",
     "package:mac": "pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --x64 --arm64",
     "package:win": "pnpm build && electron-builder --win --x64",
-    "typecheck:pptist": "node scripts/typecheck-pptist.cjs"
+    "typecheck:pptist": "node scripts/typecheck-pptist.cjs",
+    "test:renderer": "tsc --noEmit -p tsconfig.renderer-tests.json && node scripts/test-renderer.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",

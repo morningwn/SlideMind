@@ -2,6 +2,7 @@ import { createApp, nextTick, watch } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { parse } from 'pptxtojson'
 import Editor from './pptist-editor.vue'
+import { serializePptistPresentation, type PresentationState } from './pptist-snapshot'
 import Directive from '@/directive'
 import { useMainStore, useSlidesStore, useSnapshotStore } from '@/store'
 import useImport from '@/hooks/useImport'
@@ -11,14 +12,6 @@ import 'animate.css'
 import '@/assets/styles/prosemirror.scss'
 import '@/assets/styles/global.scss'
 import '@/assets/styles/font.scss'
-
-type PresentationState = {
-  title: string
-  theme: Record<string, unknown>
-  slides: Array<Record<string, unknown>>
-  viewportSize: number
-  viewportRatio: number
-}
 
 type LoadHostMessage = {
   type: 'slidemind:pptist:load'
@@ -75,20 +68,24 @@ let changeTimer: number | undefined
 let mounted = false
 let pendingImport: { requestId: string; timeout: number } | undefined
 
-function currentPresentation(): PresentationState {
-  return JSON.parse(JSON.stringify({
+function serializeCurrentPresentation(): string {
+  return serializePptistPresentation({
     title: slidesStore.title,
     theme: slidesStore.theme,
     slides: slidesStore.slides,
     viewportSize: slidesStore.viewportSize,
     viewportRatio: slidesStore.viewportRatio
-  })) as PresentationState
+  })
+}
+
+function currentPresentation(): PresentationState {
+  return JSON.parse(serializeCurrentPresentation()) as PresentationState
 }
 
 async function loadPresentation(presentation: PresentationState): Promise<void> {
   if (
     mounted &&
-    JSON.stringify(currentPresentation()) === JSON.stringify(presentation)
+    serializeCurrentPresentation() === JSON.stringify(presentation)
   ) return
 
   initialized = false

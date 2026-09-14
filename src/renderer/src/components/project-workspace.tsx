@@ -23,15 +23,16 @@ import { isPresentationPath, PRESENTATION_FILE_SUFFIX } from '../../../shared/pr
 import type {
   ConversationMessage,
   OpenedProject,
-  ProjectConversationState,
   ProjectFileChangedEvent,
   ProjectFileEntry
 } from '../../../shared/project'
 import { AgentModelSelect } from './agent-model-select'
 import { AgentMarkdown } from './agent-markdown'
 import { AgentActivityPanel } from './agent-activity-panel'
-import { applyStreamEvents, createStreamBuffer, isNearMessageBottom } from '../lib/stream-buffer'
-import { applyAgentActivityEvent, stopRunningAgentActivities } from '../lib/agent-activity'
+import { isNearMessageBottom } from '../lib/stream-buffer'
+import { useConversationPersistence } from '../hooks/use-conversation-persistence'
+import { useAgentEvents } from '../hooks/use-agent-events'
+import { stopRunningAgentActivities } from '../lib/agent-activity'
 import {
   isOpenableProjectFile,
   projectFileDisplayKind,
@@ -127,19 +128,6 @@ function createConversation(): Conversation {
     id: crypto.randomUUID(),
     title: '新对话',
     messages: []
-  }
-}
-
-function toPersistedState(
-  conversations: Conversation[],
-  selectedConversationId: string
-): ProjectConversationState {
-  return {
-    selectedConversationId,
-    conversations: conversations.map((conversation) => ({
-      id: conversation.id,
-      title: conversation.title
-    }))
   }
 }
 
@@ -625,17 +613,19 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [isHistoryActive, setIsHistoryActive] = useState(false)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [openingFilePaths, setOpeningFilePaths] = useState<Set<string>>(new Set())
-  const [streamBuffer] = useState(() => createStreamBuffer((events) => {
-    setConversations((current) => applyStreamEvents(current, events))
-  }))
+  const streamBuffer = useAgentEvents(setConversations, setTodosByConversation)
+  const lastSavedConversationSnapshotRef = useConversationPersistence({
+    projectHandle: project.handle,
+    conversations,
+    selectedConversationId,
+    enabled: canPersistConversations && !isConversationLoading,
+    onError: setConversationError
+  })
   const followMessagesRef = useRef(true)
   const messageEndRef = useRef<HTMLDivElement>(null)
   const composerTextareaRef = useRef<HTMLTextAreaElement>(null)
   const createMenuRef = useRef<HTMLDivElement>(null)
   const pptxImportInputRef = useRef<HTMLInputElement>(null)
-  const lastSavedConversationSnapshotRef = useRef('')
-  const latestConversationStateRef = useRef({ conversations, selectedConversationId })
-  const canFlushConversationsRef = useRef(false)
   const openDocumentsRef = useRef<OpenTextDocument[]>([])
   const openPresentationsRef = useRef<OpenPresentationDocument[]>([])
   const openImagesRef = useRef<OpenImageDocument[]>([])
@@ -669,8 +659,6 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   ) || openPresentations.some(
     (presentation) => presentation.serializedDocument !== presentation.savedSerializedDocument
   )
-  latestConversationStateRef.current = { conversations, selectedConversationId }
-  canFlushConversationsRef.current = canPersistConversations && !isConversationLoading
   openDocumentsRef.current = openDocuments
   openPresentationsRef.current = openPresentations
   openImagesRef.current = openImages
@@ -927,40 +915,6 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }, [project.handle])
 
-  useEffect(() => {
-    if (!canPersistConversations || isConversationLoading) return
-
-    const timer = window.setTimeout(() => {
-      const state = toPersistedState(conversations, selectedConversationId)
-      const snapshot = JSON.stringify(state)
-      if (snapshot === lastSavedConversationSnapshotRef.current) return
-      void window.projects
-        .saveConversations(project.handle, state)
-        .then(() => {
-          lastSavedConversationSnapshotRef.current = snapshot
-          setConversationError('')
-        })
-        .catch((error: unknown) => {
-          setConversationError(error instanceof Error ? error.message : '无法保存项目会话')
-        })
-    }, 300)
-
-    return () => window.clearTimeout(timer)
-  }, [canPersistConversations, conversations, isConversationLoading, project.handle, selectedConversationId])
-
-  useEffect(() => () => {
-    if (!canFlushConversationsRef.current) return
-
-    const latest = latestConversationStateRef.current
-    const state = toPersistedState(latest.conversations, latest.selectedConversationId)
-    const snapshot = JSON.stringify(state)
-    if (snapshot === lastSavedConversationSnapshotRef.current) return
-
-    void window.projects.saveConversations(project.handle, state).catch((error: unknown) => {
-      reportDiagnosticEvent('warn', 'conversation.flush_failed', error)
-    })
-  }, [project.handle])
-
   useLayoutEffect(() => {
     followMessagesRef.current = true
   }, [selectedConversation.id, activeDocumentPath, isHistoryActive])
@@ -978,39 +932,6 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     selectedConversation.id,
     selectedConversation.messages
   ])
-
-  useEffect(() => {
-    const unsubscribe = window.agent.onStream(streamBuffer.push)
-    return () => {
-      unsubscribe()
-      streamBuffer.drain()
-    }
-  }, [streamBuffer])
-
-  useEffect(() => window.agent.onActivity((event) => {
-    setConversations((current) => current.map((conversation) =>
-      conversation.id === event.conversationId
-        ? {
-            ...conversation,
-            messages: conversation.messages.map((message) =>
-              message.id === event.requestId
-                ? {
-                    ...message,
-                    activities: applyAgentActivityEvent(message.activities ?? [], event)
-                  }
-                : message
-            )
-          }
-        : conversation
-    ))
-  }), [])
-
-  useEffect(() => window.agent.onTodos((event) => {
-    setTodosByConversation((current) => ({
-      ...current,
-      [event.conversationId]: event.todos
-    }))
-  }), [])
 
   useEffect(() => {
     if (
