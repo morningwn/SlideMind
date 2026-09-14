@@ -4487,3 +4487,53 @@ button.file-tree-item:not(.file-tree-directory) {
   color: #fff;
   cursor: pointer;
 }
+
+.project-sidebar[hidden] { display: none; }
+
+.workspace-resize-handle {
+  position: relative;
+  z-index: 3;
+  touch-action: none;
+  background: #e2e8f1;
+}
+
+.workspace-resize-vertical { cursor: col-resize; }
+.workspace-resize-horizontal { cursor: row-resize; }
+
+.workspace-resize-handle:hover,
+.workspace-resize-handle:focus-visible,
+.workspace-resize-handle.is-dragging {
+  outline: 0;
+  background: #8ea9e9;
+}
+
+.workspace-resize-overlay {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  cursor: inherit;
+}
+
+.workspace-sidebar-toggle {
+  width: 32px;
+  flex: 0 0 32px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  color: #40506a;
+  background: transparent;
+  cursor: pointer;
+}
+
+.workspace-sidebar-toggle:hover { background: #edf2fb; }
+
+.composer-footer {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.composer-footer > span {
+  font-size: 11px;
+  color: #68758b;
+}
+
+.composer-actions { margin-left: auto; }

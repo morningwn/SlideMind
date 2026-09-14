@@ -58,7 +58,9 @@ const subscribe = (kind: string) => {
 Object.assign(window, {
   desktop: { platform: 'darwin', reportDiagnosticEvent: () => {} },
   projects: {
-    listDirectory: async () => [{ kind: 'file', path: 'notes.txt', name: 'notes.txt' }],
+    listDirectory: async (_handle, path) => path === 'assets'
+      ? [{ kind: 'file', path: 'assets/child.txt', name: 'child.txt' }]
+      : [{ kind: 'file', path: 'notes.txt', name: 'notes.txt' }, { kind: 'directory', path: 'assets', name: 'assets' }],
     listFiles: async () => [], watchExternalChanges: async () => {},
     loadConversations: async () => ({ selectedConversationId: 'a', conversations: [{ id: 'a', title: 'Conversation A' }, { id: 'b', title: 'Conversation B' }] }),
     loadConversationMessages: async () => [],
@@ -88,8 +90,81 @@ async function workspaceTests(): Promise<void> {
   console.log('[test] workspace start')
   root.render(createElement(ProjectWorkspace, { project: { handle: 'test', name: 'Test project', path: '/test', lastOpenedAt: '' }, onDirtyChange: () => {} }))
   await until(() => document.querySelector('.conversation-item') && document.querySelector('[role="treeitem"]'), 'workspace ready')
+  const key = (element: Element, value: string): void => {
+    element.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true }))
+  }
+  const firstFile = document.querySelector<HTMLButtonElement>('[role="treeitem"]')!
+  firstFile.focus()
+  key(firstFile, 'ArrowDown')
+  await until(() => document.activeElement?.textContent?.includes('assets'), 'tree next item')
+  const folder = document.activeElement!
+  key(folder, 'ArrowRight')
+  await until(() => document.querySelectorAll('[role="treeitem"]').length === 3, 'tree folder expanded')
+  key(folder, 'ArrowRight')
+  await until(() => document.activeElement?.textContent?.includes('child.txt'), 'tree child focus')
+  key(document.activeElement!, 'ArrowLeft')
+  assert(document.activeElement === folder, 'Tree left arrow did not focus parent')
+  key(folder, 'ArrowLeft')
+  await until(() => document.querySelectorAll('[role="treeitem"]').length === 2, 'tree folder collapsed')
+  assert(document.querySelectorAll('[role="treeitem"][tabindex="0"]').length === 1, 'Tree needs a single tab stop')
+  const sidebar = document.querySelector<HTMLElement>('.project-sidebar')!
+  document.querySelector<HTMLButtonElement>('[aria-label="收起侧栏"]')!.click()
+  await until(() => sidebar.hidden, 'sidebar collapsed')
+  document.querySelector<HTMLButtonElement>('[aria-label="展开侧栏"]')!.click()
+  await until(() => !sidebar.hidden, 'sidebar expanded')
+  const widthHandle = document.querySelector('[aria-label="调整侧栏宽度"]')!
+  key(widthHandle, 'End')
+  await until(() => widthHandle.getAttribute('aria-valuenow') === widthHandle.getAttribute('aria-valuemax'), 'sidebar upper bound')
+  key(widthHandle, 'Home')
+  await until(() => sidebar.getBoundingClientRect().width === 220, 'sidebar lower bound')
+  const heightHandle = document.querySelector('[aria-label="调整对话与文件区域高度"]')!
+  key(heightHandle, 'Home')
+  await until(() => heightHandle.getAttribute('aria-valuenow') === '120', 'conversation lower bound')
+  key(heightHandle, 'ArrowDown')
+  await until(() => heightHandle.getAttribute('aria-valuenow') === '130', 'keyboard pane resizing')
+  const trigger = document.querySelector<HTMLButtonElement>('.file-create-trigger')!
+  trigger.focus()
+  key(trigger, 'ArrowDown')
+  await until(() => document.activeElement?.textContent === '新建文件夹', 'menu initial focus')
+  const menuBounds = document.querySelector('[role="menu"]')!.getBoundingClientRect()
+  const sidebarBounds = sidebar.getBoundingClientRect()
+  assert(menuBounds.left >= sidebarBounds.left && menuBounds.right <= sidebarBounds.right, 'Menu clipped in narrow sidebar')
+  key(document.activeElement!, 'End')
+  assert(document.activeElement?.textContent === '新建 Markdown 文档', 'Menu End did not select last item')
+  key(document.activeElement!, 'ArrowDown')
+  assert(String(document.activeElement?.textContent) === '新建文件夹', 'Menu navigation did not wrap')
+  key(document.activeElement!, 'Escape')
+  await until(() => !document.querySelector('[role="menu"]') && document.activeElement === trigger, 'menu focus restored')
+  const composer = document.querySelector('textarea')!
+  const setDraft = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+  setDraft.call(composer, Array(20).fill('Long message line').join('\n'))
+  composer.dispatchEvent(new Event('input', { bubbles: true }))
+  await until(() => composer.clientHeight === 150, 'composer grows to maximum')
+  assert(composer.scrollHeight > composer.clientHeight, 'Long composer does not scroll')
+  setDraft.call(composer, '')
+  composer.dispatchEvent(new Event('input', { bubbles: true }))
+  await until(() => composer.clientHeight === 62, 'composer shrinks after clearing')
+  const workspace = document.querySelector<HTMLElement>('.project-workspace')!
+  workspace.style.width = '900px'
+  workspace.style.height = '574px'
+  workspace.style.flexShrink = '0'
+  key(widthHandle, 'End')
+  await until(() => widthHandle.getAttribute('aria-valuemax') === '360', 'sidebar adapts to minimum window')
+  await delay(50)
+  const send = document.querySelector<HTMLElement>('.composer-send')!.getBoundingClientRect()
+  const bounds = workspace.getBoundingClientRect()
+  assert(send.right <= bounds.right && send.bottom <= bounds.bottom, 'Composer actions overflow the minimum window')
+  workspace.style.width = ''
+  workspace.style.height = ''
+  workspace.style.flexShrink = ''
+  passed.push('Workspace controls: sidebar collapse and bounds, minimum window, tree/menu/tab keyboard navigation and growing composer')
   document.querySelector('[role="treeitem"]')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
   await until(() => document.querySelector('.cm-content'), 'document open')
+  const activeTab = document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')!
+  key(activeTab, 'Home')
+  await until(() => document.querySelector('textarea'), 'keyboard switches to chat tab')
+  key(document.activeElement!, 'End')
+  await until(() => document.querySelector('.cm-content'), 'keyboard switches to document tab')
   await editText('edited and saved')
   button('保存').click()
   await until(() => content === 'edited and saved' && document.querySelector('[aria-label="notes.txt，已保存"]'), 'document saved')

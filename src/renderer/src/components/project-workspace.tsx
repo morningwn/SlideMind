@@ -26,6 +26,7 @@ import type {
   ProjectFileChangedEvent,
   ProjectFileEntry
 } from '../../../shared/project'
+import { WorkspaceResizeHandle } from './workspace-resize-handle'
 import { AgentModelSelect } from './agent-model-select'
 import { AgentMarkdown } from './agent-markdown'
 import { AgentActivityPanel } from './agent-activity-panel'
@@ -114,6 +115,7 @@ interface FileTreeLevelProps {
   loadingPaths: ReadonlySet<string>
   activeFilePath: string | null
   selectedFilePath: string | null
+  treeTabStopPath: string | null
   renameRequestedPath: string | null
   onOpenFile: (entry: ProjectFileEntry) => void
   onDeleteFile: (entry: ProjectFileEntry) => void
@@ -402,6 +404,7 @@ function FileTreeLevel({
   loadingPaths,
   activeFilePath,
   selectedFilePath,
+  treeTabStopPath,
   renameRequestedPath,
   onOpenFile,
   onDeleteFile,
@@ -438,7 +441,33 @@ function FileTreeLevel({
   }
 
   return (
-    <div role={depth === 0 ? 'tree' : 'group'}>
+    <div role={depth === 0 ? 'tree' : 'group'}
+      aria-label={depth === 0 ? '项目文件' : undefined}
+      onKeyDown={depth === 0 ? (event) => {
+        if (!(event.target instanceof HTMLButtonElement) || event.target.getAttribute('role') !== 'treeitem') return
+        const item = event.target
+        const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="treeitem"]')]
+        const index = items.indexOf(item)
+        let next: HTMLButtonElement | undefined
+        if (event.key === 'ArrowDown') next = items[Math.min(items.length - 1, index + 1)]
+        else if (event.key === 'ArrowUp') next = items[Math.max(0, index - 1)]
+        else if (event.key === 'Home') next = items[0]
+        else if (event.key === 'End') next = items[items.length - 1]
+        else if (event.key === 'ArrowRight') {
+          if (item.getAttribute('aria-expanded') === 'false') item.click()
+          else if (item.getAttribute('aria-expanded') === 'true') {
+            next = item.closest('.file-tree-branch')
+              ?.querySelector<HTMLButtonElement>(':scope > [role="group"] [role="treeitem"]') ?? undefined
+          }
+        } else if (event.key === 'ArrowLeft') {
+          if (item.getAttribute('aria-expanded') === 'true') item.click()
+          else next = item.closest('.file-tree-branch')?.parentElement?.closest('.file-tree-branch')
+            ?.querySelector<HTMLButtonElement>('[role="treeitem"]') ?? undefined
+        } else return
+        event.preventDefault()
+        next?.focus()
+      } : undefined}
+    >
       {entries.map((entry) => {
         const isDirectory = entry.kind === 'directory'
         const displayKind = projectFileDisplayKind(entry)
@@ -503,7 +532,9 @@ function FileTreeLevel({
                   onKeyDown={(event) => {
                     if (isOpenable && event.key === 'Enter') onOpenFile(entry)
                   }}
-                  tabIndex={0}
+                  tabIndex={entry.path === treeTabStopPath ? 0 : -1}
+                  aria-selected={entry.path === selectedFilePath}
+                  onFocus={() => onSelectFile(entry.path)}
                 >
                   <span className="tree-chevron" aria-hidden="true">
                     {isDirectory ? (isLoading ? '·' : isExpanded ? '⌄' : '›') : ''}
@@ -553,6 +584,7 @@ function FileTreeLevel({
                 loadingPaths={loadingPaths}
                 activeFilePath={activeFilePath}
                 selectedFilePath={selectedFilePath}
+                treeTabStopPath={treeTabStopPath}
                 renameRequestedPath={renameRequestedPath}
                 onOpenFile={onOpenFile}
                 onDeleteFile={onDeleteFile}
@@ -573,6 +605,15 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [conversations, setConversations] = useState<Conversation[]>(() => [createConversation()])
   const [selectedConversationId, setSelectedConversationId] = useState(() => conversations[0].id)
   const [draft, setDraft] = useState('')
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(292)
+  const [conversationHeight, setConversationHeight] = useState(280)
+  const [workspaceSize, setWorkspaceSize] = useState({ width: 1180, height: 714 })
+  const workspaceRef = useRef<HTMLElement>(null)
+  const sidebarMaxWidth = Math.min(420, Math.floor(workspaceSize.width * 0.4))
+  const sidebarMaxHeight = Math.max(120, workspaceSize.height - 226)
+  const effectiveSidebarWidth = Math.min(sidebarWidth, sidebarMaxWidth)
+  const effectiveConversationHeight = Math.min(conversationHeight, sidebarMaxHeight)
   const [thinkingLevel, setThinkingLevel] = useState<AgentThinkingLevel>(loadThinkingLevel)
   const [promptReferences, setPromptReferences] = useState<AgentPromptReference[]>([])
   const [referenceFiles, setReferenceFiles] = useState<ProjectFileEntry[]>([])
@@ -632,6 +673,17 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const confirmedRestorePathsRef = useRef<Set<string>>(new Set())
   const stoppedRequestIdsRef = useRef<Set<string>>(new Set())
 
+  let treeTabStopPath = selectedFilePath
+  if (treeTabStopPath) {
+    let directory = parentDirectory(treeTabStopPath)
+    if (!entriesByDirectory[directory]?.some((entry) => entry.path === treeTabStopPath)) treeTabStopPath = null
+    while (directory) {
+      if (!expandedPaths.has(directory)) treeTabStopPath = null
+      directory = parentDirectory(directory)
+    }
+  }
+  treeTabStopPath ??= entriesByDirectory['']?.[0]?.path ?? null
+
   const isSending = activeAgentRequest !== null
 
   const selectedConversation =
@@ -675,6 +727,33 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     directories: [...externalWatchScope.directories].sort()
   })
 
+  useLayoutEffect(() => {
+    const element = workspaceRef.current!
+    const observer = new ResizeObserver(() => {
+      setWorkspaceSize({ width: element.clientWidth, height: element.clientHeight })
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  useLayoutEffect(() => {
+    const textarea = composerTextareaRef.current
+    if (!textarea) return
+    const resize = (): void => {
+      textarea.style.height = 'auto'
+      textarea.style.height = `${Math.min(150, Math.max(62, textarea.scrollHeight))}px`
+    }
+    resize()
+    let width = textarea.clientWidth
+    const observer = new ResizeObserver(() => {
+      if (textarea.clientWidth === width) return
+      width = textarea.clientWidth
+      resize()
+    })
+    observer.observe(textarea)
+    return () => observer.disconnect()
+  }, [draft, activeFile, isHistoryActive])
+
   useEffect(() => {
     onDirtyChange(hasDirtyDocuments)
   }, [hasDirtyDocuments, onDirtyChange])
@@ -700,11 +779,15 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   useEffect(() => {
     if (!isCreateMenuOpen) return
+    createMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
     const closeOnPointerDown = (event: PointerEvent): void => {
       if (!createMenuRef.current?.contains(event.target as Node)) setIsCreateMenuOpen(false)
     }
     const closeOnEscape = (event: globalThis.KeyboardEvent): void => {
-      if (event.key === 'Escape') setIsCreateMenuOpen(false)
+      if (event.key === 'Escape') {
+        setIsCreateMenuOpen(false)
+        createMenuRef.current?.querySelector<HTMLButtonElement>('.file-create-trigger')?.focus()
+      }
     }
     document.addEventListener('pointerdown', closeOnPointerDown)
     window.addEventListener('keydown', closeOnEscape)
@@ -2203,7 +2286,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const titleBarActionSlot = globalThis.document.getElementById('app-title-bar-actions')
 
   return (
-    <section className="project-workspace" aria-label={`${project.name} 项目工作区`}>
+    <section
+      ref={workspaceRef}
+      className="project-workspace"
+      style={{ gridTemplateColumns: isSidebarCollapsed ? 'minmax(0, 1fr)' : `${effectiveSidebarWidth}px 6px minmax(0, 1fr)` }}
+      aria-label={`${project.name} 项目工作区`}
+    >
       {pendingPresentationImport ? (
         <PptxImportFrame
           request={pendingPresentationImport}
@@ -2280,7 +2368,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         </div>,
         titleBarActionSlot
       ) : null}
-      <aside className="project-sidebar">
+      <aside
+        className="project-sidebar"
+        id="project-sidebar"
+        hidden={isSidebarCollapsed}
+        style={{ gridTemplateRows: `${effectiveConversationHeight}px 6px minmax(0, 1fr)` }}
+      >
         <section className="conversation-pane" aria-labelledby="conversation-list-title">
           <header className="sidebar-section-heading">
             <div>
@@ -2310,6 +2403,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           </div>
         </section>
 
+        <WorkspaceResizeHandle orientation="horizontal" label="调整对话与文件区域高度"
+          value={effectiveConversationHeight} min={120} max={sidebarMaxHeight} onChange={setConversationHeight} />
         <section className="file-pane" aria-labelledby="project-files-title">
           <header className="sidebar-section-heading file-heading">
             <div>
@@ -2333,10 +2428,36 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 aria-expanded={isCreateMenuOpen}
                 aria-haspopup="menu"
                 title="新建"
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                    event.preventDefault()
+                    setIsCreateMenuOpen(true)
+                  }
+                }}
                 onClick={() => setIsCreateMenuOpen((current) => !current)}
               >＋</button>
               {isCreateMenuOpen ? (
-                <div className="file-create-menu" role="menu" aria-label="新建项目内容">
+                <div className="file-create-menu" role="menu" aria-label="新建项目内容"
+                  style={{ width: Math.min(218, effectiveSidebarWidth - 32) }}
+                  onClick={(event) => {
+                    if (!(event.target instanceof HTMLButtonElement) || event.target.disabled) return
+                    createMenuRef.current?.querySelector<HTMLButtonElement>('.file-create-trigger')?.focus()
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Tab') {
+                      setIsCreateMenuOpen(false)
+                      createMenuRef.current?.querySelector<HTMLButtonElement>('.file-create-trigger')?.focus()
+                      return
+                    }
+                    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+                    event.preventDefault()
+                    const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')]
+                    const index = items.indexOf(event.target as HTMLButtonElement)
+                    const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+                      : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length
+                    items[next].focus()
+                  }}
+                >
                   <button type="button" role="menuitem" onClick={() => void createDirectory()}>
                     新建文件夹
                   </button>
@@ -2350,12 +2471,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     type="button"
                     role="menuitem"
                     onClick={() => void createPresentation()}
-                  >PPT 原始数据 (.slides.json)</button>
+                  >新建演示文稿</button>
                   <button
                     type="button"
                     role="menuitem"
                     onClick={() => void createMarkdownDocument()}
-                  >Markdown 文档 (.md)</button>
+                  >新建 Markdown 文档</button>
                 </div>
               ) : null}
             </div>
@@ -2378,6 +2499,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 loadingPaths={loadingPaths}
                 activeFilePath={activeDocumentPath}
                 selectedFilePath={selectedFilePath}
+                treeTabStopPath={treeTabStopPath}
                 renameRequestedPath={renameRequestedPath}
                 onOpenFile={(entry) => void openFile(entry)}
                 onDeleteFile={(entry) => void deleteEntry(entry)}
@@ -2391,14 +2513,37 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         </section>
       </aside>
 
+      {!isSidebarCollapsed ? (
+        <WorkspaceResizeHandle orientation="vertical" label="调整侧栏宽度"
+          value={effectiveSidebarWidth} min={220} max={sidebarMaxWidth} onChange={setSidebarWidth} />
+      ) : null}
       <section className="workspace-main">
         <header className="workspace-bar">
-          <nav className="workspace-tabs" aria-label="打开的内容" role="tablist">
+          <button className="workspace-sidebar-toggle" type="button"
+            aria-label={isSidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+            title={isSidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+            aria-expanded={!isSidebarCollapsed} aria-controls="project-sidebar"
+            onClick={() => setIsSidebarCollapsed((current) => !current)}
+          >{isSidebarCollapsed ? '▸' : '◂'}</button>
+          <nav className="workspace-tabs" aria-label="打开的内容" role="tablist"
+            onKeyDown={(event) => {
+              if (!(event.target instanceof HTMLElement) || event.target.getAttribute('role') !== 'tab') return
+              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+              event.preventDefault()
+              const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+              const index = tabs.indexOf(event.target as HTMLButtonElement)
+              const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+                : (index + (event.key === 'ArrowLeft' ? -1 : 1) + tabs.length) % tabs.length
+              tabs[next].focus()
+              tabs[next].click()
+            }}
+          >
             <button
               className={`workspace-tab workspace-chat-tab${activeFile || isHistoryActive ? '' : ' workspace-tab-active'}`}
               type="button"
               role="tab"
               aria-selected={!activeFile && !isHistoryActive}
+              tabIndex={!activeFile && !isHistoryActive ? 0 : -1}
               onClick={() => {
                 setIsHistoryActive(false)
                 setActiveDocumentPath(null)
@@ -2429,6 +2574,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     role="tab"
                     aria-label={`${document.name}，${status}`}
                     aria-selected={isActive}
+                    tabIndex={isActive ? 0 : -1}
                     title={document.path}
                     onClick={() => {
                       setIsHistoryActive(false)
@@ -2476,6 +2622,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     role="tab"
                     aria-label={`${presentation.name}，${status}`}
                     aria-selected={isActive}
+                    tabIndex={isActive ? 0 : -1}
                     title={presentation.path}
                     onClick={() => {
                       setIsHistoryActive(false)
@@ -2515,6 +2662,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     role="tab"
                     aria-label={`${image.name}，图片预览`}
                     aria-selected={isActive}
+                    tabIndex={isActive ? 0 : -1}
                     title={image.path}
                     onClick={() => {
                       setIsHistoryActive(false)
@@ -2544,6 +2692,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                   type="button"
                   role="tab"
                   aria-selected={isHistoryActive}
+                  tabIndex={isHistoryActive ? 0 : -1}
                   onClick={() => setIsHistoryActive(true)}
                 >
                   <HistoryIcon />
@@ -2754,8 +2903,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                       {isStopping
                         ? '正在终止 Pi Agent…'
                         : isSending
-                          ? 'Pi Agent 进行中 · 可继续输入，点击终止'
-                          : '@ 文件 · / Skill · Enter 发送'}
+                          ? '回复进行中，可编辑草稿；结束后可发送'
+                          : 'Enter 发送 · Shift+Enter 换行 · @ 文件 · / Skill'}
                     </span>
                     <div className="composer-actions">
                       <AgentModelSelect
