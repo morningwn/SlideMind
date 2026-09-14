@@ -45,16 +45,21 @@ export class AgentConfigStore {
       const raw = await readFile(this.configPath, 'utf8')
       const stored: unknown = JSON.parse(raw)
 
-      if (!isStoredAgentConfig(stored) || !allowedModelIds.includes(stored.modelId)) {
+      if (!isStoredAgentConfig(stored)) {
         return undefined
       }
+
+      const modelId = stored.modelId === 'deepseek-v4-flash' || stored.modelId === 'deepseek-v4-flash-vision-exp'
+        ? 'deepseek-flash'
+        : stored.modelId
+      if (!allowedModelIds.includes(modelId)) return undefined
 
       if (!safeStorage.isEncryptionAvailable()) {
         return undefined
       }
 
       const apiKey = safeStorage.decryptString(Buffer.from(stored.encryptedApiKey, 'base64')).trim()
-      return apiKey ? { modelId: stored.modelId, apiKey } : undefined
+      return apiKey ? { modelId, apiKey } : undefined
     } catch (error) {
       const code = error instanceof Error && 'code' in error ? error.code : undefined
       if (code !== 'ENOENT') {

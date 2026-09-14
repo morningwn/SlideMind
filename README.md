@@ -38,7 +38,7 @@ src/
 ## Agent 与模型配置
 
 - 基础 agent 由 `@earendil-works/pi-agent-core` 驱动，在 Electron 主进程中按需创建。
-- 当前服务商为 DeepSeek，默认使用支持图片理解的 DeepSeek V4 Flash Vision Exp，也可选择 DeepSeek V4 Flash 或 DeepSeek V4 Pro。
+- 当前服务商为 DeepSeek，默认使用支持图片理解的 DeepSeek V4.1 Flash（`deepseek-flash`），也可选择 DeepSeek V4 Pro；两者均支持关闭、轻量、深入和极致思考。旧 Flash 配置会自动映射到新模型，无需重新填写 API Key。
 - 应用启动时会先检查模型配置；首次使用必须选择受支持的 DeepSeek 模型并保存 API Key，完成后才能进入项目启动台。后续可从启动台右上角再次打开设置。
 - API Key 通过 Electron 系统安全存储加密，并写入应用的 `userData/agent-config.json`。渲染进程只能读取非敏感配置状态，无法读取已保存的 Key。
 - preload 通过受限、类型化接口提供模型配置、Skill 列表、对话调用、停止、用量、任务清单和活动流；Agent 的文件访问与项目修改仍由主进程边界校验。

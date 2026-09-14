@@ -1,3 +1,4 @@
+import { registerDeepSeekModels } from './deepseek-models'
 import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import type { AssistantMessage } from '@earendil-works/pi-ai'
 import type { AgentSession as PiAgentSession, ModelRuntime } from '@earendil-works/pi-coding-agent'
@@ -776,11 +777,15 @@ export class BaseAgentService {
 
   private async getModelRuntime(): Promise<ModelRuntime> {
     if (!this.modelRuntimePromise) {
-      this.modelRuntimePromise = loadPiRuntime().then(({ ModelRuntime }) => ModelRuntime.create({
-        authPath: join(this.agentDirectory, 'auth.json'),
-        modelsPath: null,
-        refreshOnCreate: false
-      }))
+      this.modelRuntimePromise = loadPiRuntime().then(async ({ ModelRuntime }) => {
+        const runtime = await ModelRuntime.create({
+          authPath: join(this.agentDirectory, 'auth.json'),
+          modelsPath: null,
+          refreshOnCreate: false
+        })
+        registerDeepSeekModels(runtime)
+        return runtime
+      })
     }
     return this.modelRuntimePromise
   }
