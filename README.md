@@ -17,13 +17,19 @@ pnpm dev
 ## 验证与构建
 
 ```bash
-pnpm check         # TypeScript + 单元测试
+pnpm check         # TypeScript（含 PPTist / Vue）+ 单元测试
 pnpm build         # 生产构建
 pnpm package:mac   # macOS DMG/ZIP，Intel + Apple Silicon
 pnpm package:win   # Windows NSIS 安装包，x64
 ```
 
 `pnpm build` 的生产构建写入 `out/`；平台安装包写入 `release-dist/`。
+
+### 自动验证
+
+Pull Request 自动执行锁文件安装及 `pnpm check`；tag 发布继续由打包工作流处理。
+`pnpm typecheck:pptist` 单独检查 PPTist 入口、Vue 组件及其依赖源码，使用与构建相同的 `@` 别名。
+Vue 检查工具依赖 JavaScript 编译器 API，因此通过 `typescript-vue` 固定使用 TypeScript 5.9；其余检查继续使用项目的 TypeScript 7。
 
 ## 工程结构
 

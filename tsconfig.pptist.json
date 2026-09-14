@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@/*": ["./node_modules/pptist/src/*"]
+    }
+  },
+  "include": [
+    "src/renderer/pptist-main.ts",
+    "src/renderer/**/*.vue",
+    "node_modules/pptist/src/global.d.ts"
+  ]
+}

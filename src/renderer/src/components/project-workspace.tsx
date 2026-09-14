@@ -30,6 +30,7 @@ import type {
 import { AgentModelSelect } from './agent-model-select'
 import { AgentMarkdown } from './agent-markdown'
 import { AgentActivityPanel } from './agent-activity-panel'
+import { applyStreamEvents, createStreamBuffer, isNearMessageBottom } from '../lib/stream-buffer'
 import { applyAgentActivityEvent, stopRunningAgentActivities } from '../lib/agent-activity'
 import {
   isOpenableProjectFile,
@@ -624,14 +625,16 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const [isHistoryActive, setIsHistoryActive] = useState(false)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
   const [openingFilePaths, setOpeningFilePaths] = useState<Set<string>>(new Set())
+  const [streamBuffer] = useState(() => createStreamBuffer((events) => {
+    setConversations((current) => applyStreamEvents(current, events))
+  }))
+  const followMessagesRef = useRef(true)
   const messageEndRef = useRef<HTMLDivElement>(null)
   const composerTextareaRef = useRef<HTMLTextAreaElement>(null)
   const createMenuRef = useRef<HTMLDivElement>(null)
   const pptxImportInputRef = useRef<HTMLInputElement>(null)
   const lastSavedConversationSnapshotRef = useRef('')
-  const latestConversationStateRef = useRef<ProjectConversationState>(
-    toPersistedState(conversations, selectedConversationId)
-  )
+  const latestConversationStateRef = useRef({ conversations, selectedConversationId })
   const canFlushConversationsRef = useRef(false)
   const openDocumentsRef = useRef<OpenTextDocument[]>([])
   const openPresentationsRef = useRef<OpenPresentationDocument[]>([])
@@ -666,7 +669,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   ) || openPresentations.some(
     (presentation) => presentation.serializedDocument !== presentation.savedSerializedDocument
   )
-  latestConversationStateRef.current = toPersistedState(conversations, selectedConversationId)
+  latestConversationStateRef.current = { conversations, selectedConversationId }
   canFlushConversationsRef.current = canPersistConversations && !isConversationLoading
   openDocumentsRef.current = openDocuments
   openPresentationsRef.current = openPresentations
@@ -927,11 +930,10 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   useEffect(() => {
     if (!canPersistConversations || isConversationLoading) return
 
-    const state = toPersistedState(conversations, selectedConversationId)
-    const snapshot = JSON.stringify(state)
-    if (snapshot === lastSavedConversationSnapshotRef.current) return
-
     const timer = window.setTimeout(() => {
+      const state = toPersistedState(conversations, selectedConversationId)
+      const snapshot = JSON.stringify(state)
+      if (snapshot === lastSavedConversationSnapshotRef.current) return
       void window.projects
         .saveConversations(project.handle, state)
         .then(() => {
@@ -949,7 +951,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   useEffect(() => () => {
     if (!canFlushConversationsRef.current) return
 
-    const state = latestConversationStateRef.current
+    const latest = latestConversationStateRef.current
+    const state = toPersistedState(latest.conversations, latest.selectedConversationId)
     const snapshot = JSON.stringify(state)
     if (snapshot === lastSavedConversationSnapshotRef.current) return
 
@@ -959,8 +962,13 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   }, [project.handle])
 
   useLayoutEffect(() => {
+    followMessagesRef.current = true
+  }, [selectedConversation.id, activeDocumentPath, isHistoryActive])
+
+  useLayoutEffect(() => {
+    if (!followMessagesRef.current) return
     messageEndRef.current?.scrollIntoView({
-      behavior: isSelectedConversationSending ? 'smooth' : 'auto',
+      behavior: 'auto',
       block: 'end'
     })
   }, [
@@ -971,20 +979,13 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     selectedConversation.messages
   ])
 
-  useEffect(() => window.agent.onStream((event) => {
-    setConversations((current) => current.map((conversation) =>
-      conversation.id === event.conversationId
-        ? {
-            ...conversation,
-            messages: conversation.messages.map((message) =>
-              message.id === event.requestId
-                ? { ...message, text: `${message.text}${event.delta}` }
-                : message
-            )
-          }
-        : conversation
-    ))
-  }), [])
+  useEffect(() => {
+    const unsubscribe = window.agent.onStream(streamBuffer.push)
+    return () => {
+      unsubscribe()
+      streamBuffer.drain()
+    }
+  }, [streamBuffer])
 
   useEffect(() => window.agent.onActivity((event) => {
     setConversations((current) => current.map((conversation) =>
@@ -2112,6 +2113,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         references: promptReferences,
         thinkingLevel
       })
+      streamBuffer.flush()
       const wasStopped = stoppedRequestIdsRef.current.has(requestId)
       setConversations((current) => current.map((conversation) =>
         conversation.id === conversationId
@@ -2133,6 +2135,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           : conversation
       ))
     } catch (error) {
+      streamBuffer.flush()
       const wasStopped = stoppedRequestIdsRef.current.has(requestId)
       setConversations((current) => current.map((conversation) =>
         conversation.id === conversationId
@@ -2673,7 +2676,13 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               {selectedConversation.title}
             </h1>
 
-            <div className="message-stream" aria-live="polite">
+            <div
+              className="message-stream"
+              aria-live="polite"
+              onScroll={(event) => {
+                followMessagesRef.current = isNearMessageBottom(event.currentTarget)
+              }}
+            >
               {loadingConversationIds.has(selectedConversation.id) ? (
                 <p className="sidebar-loading">正在加载 Pi 会话…</p>
               ) : selectedConversation.messages.length === 0 ? (
