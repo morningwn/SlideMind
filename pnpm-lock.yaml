@@ -141,6 +141,9 @@ importers:
       electron-vite:
         specifier: 5.0.0
         version: 5.0.0(supports-color@7.2.0)(vite@7.3.6(@types/node@26.4.0)(jiti@2.7.0)(lightningcss@1.33.0)(sass@1.103.1)(yaml@2.9.0))
+      prettier:
+        specifier: 3.6.2
+        version: 3.6.2
       sass:
         specifier: ^1.93.0
         version: 1.103.1
@@ -3492,6 +3495,11 @@ packages:
 
   pptxtojson@2.1.0:
     resolution: {integrity: sha512-CGBe+QVAnxAwry1zQWUpcnBDk2VJTeHD3kogjsqCPIy3muV1J4YGrH/XnOLJvIvlT3jHym1HgXzyLZrWTBI8Eg==}
+
+  prettier@3.6.2:
+    resolution: {integrity: sha512-I7AIg5boAr5R0FFtJ6rCfD+LFsWHp81dolrFD8S79U9tb8Az2nGrJncnMSnys+bpQJfRUzqs9hnA81OAA3hCuQ==}
+    engines: {node: '>=14'}
+    hasBin: true
 
   proc-log@6.1.0:
     resolution: {integrity: sha512-iG+GYldRf2BQ0UDUAd6JQ/RwzaQy6mXmsk/IzlYyal4A4SNFw54MeH4/tLkF4I5WoWG9SQwuqWzS99jaFQHBuQ==}
@@ -8004,6 +8012,8 @@ snapshots:
       jszip: 3.10.1
       tinycolor2: 1.6.0
       txml: 5.2.1
+
+  prettier@3.6.2: {}
 
   proc-log@6.1.0: {}
 

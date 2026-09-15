@@ -17,9 +17,10 @@ pnpm dev
 ## 验证与构建
 
 ```bash
-pnpm check         # TypeScript（含 PPTist / Vue）+ 单元测试
-pnpm test:renderer # Electron 中的工作区交互、真实 PPTist 渲染与同步基准
-pnpm build         # 生产构建
+pnpm test          # 单元测试 + Electron 渲染端测试
+pnpm format        # 使用 Prettier 格式化仓库
+pnpm format:check  # 检查仓库格式
+pnpm package       # 当前平台安装包
 pnpm package:mac   # macOS DMG/ZIP，Intel + Apple Silicon
 pnpm package:win   # Windows NSIS 安装包，x64
 ```
@@ -32,13 +33,13 @@ pnpm package:win   # Windows NSIS 安装包，x64
 
 ### 自动验证
 
-Pull Request 自动执行锁文件安装及 `pnpm check`；tag 发布继续由打包工作流处理。
-`pnpm typecheck:pptist` 单独检查 PPTist 入口、Vue 组件及其依赖源码，使用与构建相同的 `@` 别名。
+Pull Request 自动执行锁文件安装、TypeScript 检查及 `pnpm test`；tag 发布继续由打包工作流处理。
+PPTist 入口、Vue 组件及其依赖源码由 CI 和打包命令调用 `scripts/typecheck-pptist.cjs` 检查，使用与构建相同的 `@` 别名。
 Vue 检查工具依赖 JavaScript 编译器 API，因此通过 `typescript-vue` 固定使用 TypeScript 5.9；其余检查继续使用项目的 TypeScript 7。
 
 ### 工作区交互与 PPTist 渲染验证
 
-`pnpm test:renderer` 使用临时 Electron 用户目录和仅监听本机的 Vite 服务，运行真实 React 工作区、CodeMirror 和 Vue/PPTist iframe。测试替换项目 IPC 与 Agent API，不读写真实项目或调用模型；覆盖文档编辑保存重开、保存 revision 冲突、外部变更通知、生成中切换会话，以及会话元数据持久化和事件订阅清理。
+`pnpm test` 在 Vitest 单元测试后，使用临时 Electron 用户目录和仅监听本机的 Vite 服务运行真实 React 工作区、CodeMirror 和 Vue/PPTist iframe。渲染端测试替换项目 IPC 与 Agent API，不读写真实项目或调用模型；覆盖文档编辑保存重开、保存 revision 冲突、外部变更通知、生成中切换会话，以及会话元数据持久化和事件订阅清理。
 
 渲染检查断言画布文字和图片加载结果，并将截图与测量数据写入被 Git 忽略的 `.local/renderer-tests/`。失败返回非零退出码。截图仍需人工检查；这些测试不代表真实 IPC/磁盘端到端验收，也不代表 PowerPoint/Office 兼容性通过。
 
@@ -66,7 +67,7 @@ src/
 - 应用内置 PPT 制作总控 Skill，并按阶段调度演示策略、页面文案、视觉设计、数据表达、流程图、模板和成稿审查 Skill；开发态从 `skills/` 加载，打包后作为只读资源注入 Pi Agent。
 - Pi Agent 固定集成 `pi-continue`、`pi-free`、`pi-cache-optimizer` 与 `pi-web-access`。这些扩展不引入原生模块；Web 能力按白名单启用。
 - Agent 可通过 `document_read` 分段读取项目内 `.doc` / `.docx` 的正文和筛选后元数据；文件引用会自动路由到该工具，不会交给通用文本读取器处理。读取结果不提供页面视觉还原、准确页码、OCR、嵌入附件递归提取或复杂表格的无损结构。
-- 文档正文由固定版本的本地 Apache Tika 与 Java 运行时解析，不会把文件发送给远程解析服务。源码开发需先运行 `pnpm tika:p0:prepare` 准备被 Git 忽略的本机运行时；安装包内置三平台运行时仍属于 P3 交付范围。
+- 文档正文由固定版本的本地 Apache Tika 与 Java 运行时解析，不会把文件发送给远程解析服务。源码开发需先运行 `node scripts/tika-p0/prepare-runtime.mjs` 准备被 Git 忽略的本机运行时；安装包内置三平台运行时仍属于 P3 交付范围。
 - 插件配置位于应用 `userData/pi-agent/`；首次启动会写入无浏览器弹窗、禁止读取浏览器 Cookie 的 Web 安全默认值，并关闭依赖 `git`、`gh`、`curl`、`yt-dlp` 或 `ffmpeg` 的能力。`pi-free` 上游仍使用用户的 `~/.pi/free.json` 保存其提供商配置。
 - 当前项目仍可通过 `.pi/skills/` 增加或覆盖同名 Skill，用户级 Skill 位于应用 `userData/pi-agent/skills/`。
 

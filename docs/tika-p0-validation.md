@@ -35,8 +35,8 @@
 ## 复现方法
 
 ```bash
-pnpm tika:p0:prepare
-pnpm tika:p0:probe
+node scripts/tika-p0/prepare-runtime.mjs
+node scripts/tika-p0/run-probe.mjs
 ```
 
 资源准备脚本会校验大小和摘要，解压到被 Git 忽略的 `out/.tika-p0-runtime/<platform>/`。探针使用动态回环端口和随机 Server ID，输出结构化结果到 `.local/tika-p0-probe.json`，退出时按所属进程组回收 Tika 父进程与 fork。

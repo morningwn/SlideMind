@@ -25,5 +25,7 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check types and tests
-        run: pnpm check
+      - name: Check types
+        run: pnpm exec tsc --noEmit -p tsconfig.node.json && pnpm exec tsc --noEmit -p tsconfig.web.json && node scripts/typecheck-pptist.cjs
+      - name: Run all tests
+        run: xvfb-run -a pnpm test
