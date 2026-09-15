@@ -69,12 +69,16 @@ node scripts/tika-p0/run-probe.mjs
 SLIDEMIND_TIKA_INTEGRATION=1 pnpm exec vitest run src/main/document/tika-integration.test.ts
 ```
 
-最后一条为 POSIX shell 写法；PowerShell 先设置 `$env:SLIDEMIND_TIKA_INTEGRATION='1'` 再运行 Vitest。真实集成测试在未设置开关或缺少已准备运行时时会跳过，必须确认输出未跳过。样本说明见 [样本说明](tika-fixtures.md)。
+最后一条为 POSIX shell 写法；PowerShell 先设置 `$env:SLIDEMIND_TIKA_INTEGRATION='1'` 再运行 Vitest。真实集成测试仅在未设置开关时跳过，必须确认输出未跳过。样本说明见 [样本说明](tika-fixtures.md)。
 
 打包使用 `pnpm package`、`pnpm package:mac` 或 `pnpm package:win`，链路为：
 
-1. `scripts/tika-package/prepare.mjs` 复用固定下载、摘要与 Apache 发布签名校验，按目标架构准备资源。
-2. `after-pack.mjs` 通过 electron-builder `afterPack` 将对应架构运行时放到 ASAR 外的 `resources/tika-runtime/<platform>/`，保留 launcher 相邻依赖及许可证，不复制下载归档。
-3. `verify.mjs` 检查清单、路径和许可证，在本机架构执行内置 Java/Tika 中文 DOCX 冒烟；交叉架构只检查结构，不视为运行验收。
+1. `scripts/tika-package/prepare.mjs` 复用固定下载、摘要与 Apache 发布签名校验，按目标架构准备资源。默认使用同版本 Temurin JDK 的 `jlink` 生成压缩且裁剪模块的 Java 运行时；保留字体、全部字符集和地区数据、所需加密提供程序及上游许可证。构建 JDK 与下载归档不进入安装包。
+2. `after-pack.mjs` 通过 electron-builder `afterPack` 将对应架构运行时放到 ASAR 外的 `resources/tika-runtime/<platform>/`，保留 launcher 相邻依赖及许可证，校验链接运行时的模块清单与模块许可证。
+3. `verify.mjs` 检查清单、路径和许可证，在本机架构执行 DOC、简单及复杂 DOCX、XLS、XLSX、PDF 六样本文本检查；交叉架构只检查结构，不视为运行验收。
+
+`prepared-runtime.json` 的 `javaOptimization` 记录模式、原始/实际模块、裁剪前后 Java 字节数及构建选项。可通过 `--java-mode full|compressed|minimal` 选择完整原版、仅压缩或压缩并裁剪；默认 `minimal`。设置 `SLIDEMIND_JAVA_MODE=full` 后运行打包命令可回退至完整原版。实现、依赖分析、实测与限制见 [Java 运行时优化](java-runtime-optimization.md)。
+
+真实集成测试支持 `SLIDEMIND_TIKA_RUNTIME_ROOT` 指定对照运行时根目录；显式启用测试但未准备运行时会报错，不再静默跳过。
 
 支持的打包目标为 macOS arm64、macOS x64、Windows x64。运行时不自动在线下载或升级。升级时需同步版本清单、代码版本校验、协议测试及[第三方声明](THIRD_PARTY_NOTICES.md)，重新执行[验收矩阵](tika-validation.md#待完成验收)。

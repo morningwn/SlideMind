@@ -7,16 +7,22 @@ import { TikaRuntime } from './tika-runtime'
 
 const repositoryRoot = resolve(__dirname, '../../..')
 const runtimeRoot = resolve(
-  repositoryRoot,
-  'out/.tika-p0-runtime',
-  `${process.platform}-${process.arch}`,
+  process.env.SLIDEMIND_TIKA_RUNTIME_ROOT ??
+    resolve(
+      repositoryRoot,
+      'out/.tika-p0-runtime',
+      `${process.platform}-${process.arch}`,
+    ),
 )
 const preparedPath = resolve(runtimeRoot, 'prepared-runtime.json')
-const integrationEnabled =
-  process.env.SLIDEMIND_TIKA_INTEGRATION === '1' && existsSync(preparedPath)
+const integrationEnabled = process.env.SLIDEMIND_TIKA_INTEGRATION === '1'
 
 describe.skipIf(!integrationEnabled)('fixed Tika runtime integration', () => {
   it('starts the pinned runtime and extracts the fixed office and PDF fixtures', async () => {
+    expect(
+      existsSync(preparedPath),
+      'Prepare the requested runtime before integration testing',
+    ).toBe(true)
     const prepared = JSON.parse(readFileSync(preparedPath, 'utf8')) as {
       javaBinary: string
       tikaJar: string
@@ -31,6 +37,12 @@ describe.skipIf(!integrationEnabled)('fixed Tika runtime integration', () => {
     })
     try {
       const client = new TikaClient()
+      const expectations = JSON.parse(
+        await readFile(
+          resolve(repositoryRoot, 'scripts/tika-p0/fixtures/expectations.json'),
+          'utf8',
+        ),
+      ) as { samples: Array<{ file: string; requiredText: string[] }> }
       const fixtures = [
         {
           file: 'simple-content.doc',
@@ -40,6 +52,12 @@ describe.skipIf(!integrationEnabled)('fixed Tika runtime integration', () => {
         {
           file: 'simple-content.docx',
           marker: 'SLIDEMIND TIKA P0 END',
+          mimeType:
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
+        {
+          file: 'complex-content.docx',
+          marker: 'PAGE TWO CONTENT',
           mimeType:
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         },
@@ -70,6 +88,11 @@ describe.skipIf(!integrationEnabled)('fixed Tika runtime integration', () => {
         )
         expect(result.mimeType).toBe(fixture.mimeType)
         expect(result.entries[0]['tk:content']).toContain(fixture.marker)
+        for (const marker of expectations.samples.find(
+          (sample) => sample.file === file,
+        )!.requiredText) {
+          expect(result.entries[0]['tk:content'], file).toContain(marker)
+        }
       }
     } finally {
       await runtime.stop()

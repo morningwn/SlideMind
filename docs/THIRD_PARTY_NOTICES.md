@@ -25,4 +25,4 @@ SlideMind bundles Apache Tika Server Standard 4.0.0 and its adjacent runtime dep
 
 ## Eclipse Temurin
 
-SlideMind bundles Eclipse Temurin JRE 21.0.12.1+1 to run Apache Tika without relying on a system Java installation. The complete upstream `NOTICE` and per-module `legal` directory are preserved in each packaged JRE. Temurin/OpenJDK is distributed under GPL-2.0-only with the Classpath Exception and includes components under additional licenses documented in that directory.
+SlideMind bundles a custom Java runtime linked from Eclipse Temurin JDK 21.0.12.1+1 to run Apache Tika without relying on a system Java installation. The default image uses jlink resource compression and debug-information removal with a reduced module set; a full upstream JRE fallback is available. The complete upstream `NOTICE` and per-module `legal` directory are preserved in each packaged JRE. Temurin/OpenJDK is distributed under GPL-2.0-only with the Classpath Exception and includes components under additional licenses documented in that directory.

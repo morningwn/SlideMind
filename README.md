@@ -132,7 +132,7 @@ src/
 
 Agent 通过 `document_read` 分段读取项目内 `.doc`、`.docx`、`.xls`、`.xlsx` 和 `.pdf` 文本及筛选后的元数据，文件引用自动路由到该工具。读取不保留页面或工作表视觉、准确页码、公式计算结果语义、OCR、嵌入附件或全部复杂表格结构。
 
-打包链路按目标架构携带固定版本的 Tika 与 Java，解析无需系统 Java、Docker 或网络；在线模型仍需联网。开发前需显式[准备本机运行时](docs/document-reading.md#开发与打包)。Tika 只监听动态回环端口，空闲后退出；不提供面向不可信本机进程或共享主机的隔离保证。
+打包链路按目标架构携带固定版本的 Tika 与经 jlink 压缩、裁剪的 Java 运行时，可回退完整 JRE，详见 [Java 运行时优化](docs/java-runtime-optimization.md)。解析无需系统 Java、Docker 或网络；在线模型仍需联网。开发前需显式[准备本机运行时](docs/document-reading.md#开发与打包)。Tika 只监听动态回环端口，空闲后退出；不提供面向不可信本机进程或共享主机的隔离保证。
 
 macOS arm64 已有未签名安装包及内置运行时冒烟记录，各平台真实安装、离线、安全软件及签名验收仍未完成，详见[验证记录](docs/tika-validation.md)。
 
