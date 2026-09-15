@@ -1,6 +1,6 @@
 # Tika P0 文档样本
 
-这些样本由 `generate.py` 自行生成，不含用户或第三方文档内容。
+样本位于 `scripts/tika-p0/fixtures/`，由 [generate.py](../scripts/tika-p0/fixtures/generate.py) 自行生成，不含用户或第三方文档内容。以下命令均从仓库根目录执行。
 
 - `simple-content.docx`：中文、英文、混合 Unicode、标题、段落和列表。
 - `simple-content.doc`：由 `simple-content.docx` 通过 LibreOffice 的 `MS Word 97` 导出器生成，是 OLE2 复合文档，不是改后缀文件。

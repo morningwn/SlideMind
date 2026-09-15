@@ -4,15 +4,22 @@
 
 SlideMind 是基于 Electron、React、Vue 和 TypeScript 的桌面应用。各进程职责必须保持清晰：
 
-- `src/main/`：Electron 生命周期与窗口；`agent/`、`logging/`、`presentation/`、`project/`、`version-control/` 分别承载 Agent、诊断、演示文稿、项目存储和自动版本服务及其 IPC。
+- `src/main/`：Electron 生命周期与窗口；`agent/`、`document/`、`logging/`、`presentation/`、`project/`、`version-control/` 分别承载 Agent、本地 Word 读取、诊断、演示文稿、项目存储和自动版本服务及其 IPC。
 - `src/preload/`：向渲染进程暴露受限且类型安全的桥接接口。
 - `src/renderer/src/`：React 应用、工作区组件、样式与浏览器端工具。
 - `src/renderer/pptist-*`：嵌入 React 工作区的独立 Vue/PPTist 编辑器入口与主题；两端只通过受限消息桥同步状态。
 - `src/shared/`：主进程与渲染进程共享的类型定义。
 - `skills/`：打包进应用的 PPT 制作总控及策略、文案、视觉、数据、流程图、模板和质量审查 Skill；`SKILL.md` 引用的规则放在对应 `references/`。
+- `docs/`：开发验证、本地 Word 读取及历史测量记录；入口见 [docs/README.md](docs/README.md)。
 - `assets/`：应用图标；`.github/workflows/`：持续集成配置。
 
 单元测试与实现文件放在同一目录，命名为 `*.test.ts`。不得提交 `out/`、`coverage/` 等生成目录。
+
+## 文档管理
+
+项目说明、开发指南、设计方案、验证记录、样本说明和第三方声明统一放在 `docs/`，总入口为 `docs/README.md`。新增或移动文档时同步更新链接和构建引用，不在根目录或源码、脚本目录重复维护说明文档。
+
+`AGENTS.md` 是仓库协作规则，`skills/` 下的 `SKILL.md` 及 references 是应用运行时资源，`LICENSE` 是许可证原文，保留各自约定位置，不作为普通项目文档迁移。
 
 ## 构建、测试与开发命令
 
@@ -37,7 +44,7 @@ SlideMind 是基于 Electron、React、Vue 和 TypeScript 的桌面应用。各�
 - 外部 `.pptx` 只支持只读内容提取，不能承诺无损导入或原位编辑。PPTX 是从 `.slides.json` 派生的交付物，不得把导出成功等同于真实视觉或 Office 兼容性通过。
 - 完整 PPT 制作由 `skills/ppt-production-workflow/` 编排，并以 `workflow-status.md`、统一主题产物目录和连续/审阅模式维护阶段状态。专项 Skill 只负责自己的阶段，不得复制总控状态机或扩大用户要求的交付层级。
 - 质量验收必须区分确定性结构预检与真实 PPTist 渲染审查：`slides_review` 的通过不代表语义、视觉或兼容性完全通过；修改相关工具或规则时必须同步审查门禁、Skill reference 和测试。
-- 变更内置 Skill 的名称、路径、依赖或生产契约时，同步更新 `src/main/agent/bundled-skills.test.ts`、相关 Skill/reference 以及 README 中的用户可见行为说明。
+- 变更内置 Skill 的名称、路径、依赖或生产契约时，同步更新 `src/main/agent/bundled-skills.test.ts`、相关 Skill/reference 以及 `docs/README.md` 中的用户可见行为说明。
 
 ## 测试指南
 

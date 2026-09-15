@@ -25,27 +25,20 @@ pnpm package:mac   # macOS DMG/ZIP，Intel + Apple Silicon
 pnpm package:win   # Windows NSIS 安装包，x64
 ```
 
-所有构建、检查与打包产物统一写入 `out/`：Electron Vite 生产构建位于
-`out/main/`、`out/preload/` 和 `out/renderer/`，PPTist 类型检查临时目录位于
-`out/.pptist-typecheck-*/`，Tika 开发运行时与打包暂存分别位于
-`out/.tika-p0-runtime/` 和 `out/.tika-package-runtime/`，平台安装包及 Electron Builder
-中间产物位于 `out/release/`。
+生产构建和安装包输出到 `out/`，渲染测试截图与测量结果输出到 `.local/renderer-tests/`；均不提交仓库。
+`pnpm test` 需要桌面显示环境，Linux 无显示环境可使用 `xvfb-run -a pnpm test`。
 
-### 自动验证
+PR 自动运行 TypeScript、PPTist/Vue 类型检查和测试；推送 tag 后构建并发布安装包。
+macOS 打包脚本和 CI 默认关闭签名自动发现；其他本地打包命令受本机签名环境影响。正式分发需另行配置签名与公证。
 
-Pull Request 自动执行锁文件安装、TypeScript 检查及 `pnpm test`；tag 发布继续由打包工作流处理。
-PPTist 入口、Vue 组件及其依赖源码由 CI 和打包命令调用 `scripts/typecheck-pptist.cjs` 检查，使用与构建相同的 `@` 别名。
-Vue 检查工具依赖 JavaScript 编译器 API，因此通过 `typescript-vue` 固定使用 TypeScript 5.9；其余检查继续使用项目的 TypeScript 7。
+## 文档导航
 
-### 工作区交互与 PPTist 渲染验证
-
-`pnpm test` 在 Vitest 单元测试后，使用临时 Electron 用户目录和仅监听本机的 Vite 服务运行真实 React 工作区、CodeMirror 和 Vue/PPTist iframe。渲染端测试替换项目 IPC 与 Agent API，不读写真实项目或调用模型；覆盖文档编辑保存重开、保存 revision 冲突、外部变更通知、生成中切换会话，以及会话元数据持久化和事件订阅清理。
-
-渲染检查断言画布文字和图片加载结果，并将截图与测量数据写入被 Git 忽略的 `.local/renderer-tests/`。失败返回非零退出码。截图仍需人工检查；这些测试不代表真实 IPC/磁盘端到端验收，也不代表 PowerPoint/Office 兼容性通过。
-
-同步基准在真实 PPTist store 上测量 10、50、200 页，以及无图片、每页 64 × 64 和 128 × 128 PNG 图片的组合。每组预热一次、采样 20 次，分别记录 Vue 更新至下一帧回调、消息到达宿主的延迟，以及原有/优化后 JSON 快照耗时。序列化探针在消息同步完成后运行；同步延迟包含现有的 120 ms 防抖。性能数据用于同机比较，不设置跨机器绝对耗时门槛。运行需要可用的桌面显示环境，首次启动需要编译 PPTist 依赖。
-
-当前会话元数据自动保存与 Agent 流式/活动/待办订阅分别由 `use-conversation-persistence`、`use-agent-events` 管理。PPTist 快照序列化跳过 Vue 代理的依赖收集，加载比较直接使用序列化结果；跨框架消息格式和完整文稿 revision 事务保持原有契约。
+- [开发与验证](development.md)：类型检查、渲染测试、构建产物与发布流程。
+- [本地 Word 读取](document-reading.md)：工具契约、运行时准备、资源限制与打包。
+- [Tika 验证记录](tika-validation.md)：已记录结果和待完成的平台验收。
+- [工作区与 PPTist 性能记录](p2-validation-2026-09-14.md)：2026-09-14 的渲染验证与测量。
+- [仓库指南](../AGENTS.md)：开发规范与跨进程、演示文稿安全约束。
+- [第三方声明](THIRD_PARTY_NOTICES.md)。
 
 ## 工程结构
 
@@ -66,8 +59,6 @@ src/
 - preload 通过受限、类型化接口提供模型配置、Skill 列表、对话调用、停止、用量、任务清单和活动流；Agent 的文件访问与项目修改仍由主进程边界校验。
 - 应用内置 PPT 制作总控 Skill，并按阶段调度演示策略、页面文案、视觉设计、数据表达、流程图、模板和成稿审查 Skill；开发态从 `skills/` 加载，打包后作为只读资源注入 Pi Agent。
 - Pi Agent 固定集成 `pi-continue`、`pi-free`、`pi-cache-optimizer` 与 `pi-web-access`。这些扩展不引入原生模块；Web 能力按白名单启用。
-- Agent 可通过 `document_read` 分段读取项目内 `.doc` / `.docx` 的正文和筛选后元数据；文件引用会自动路由到该工具，不会交给通用文本读取器处理。读取结果不提供页面视觉还原、准确页码、OCR、嵌入附件递归提取或复杂表格的无损结构。
-- 文档正文由固定版本的本地 Apache Tika 与 Java 运行时解析，不会把文件发送给远程解析服务。源码开发需先运行 `node scripts/tika-p0/prepare-runtime.mjs` 准备被 Git 忽略的本机运行时；安装包内置三平台运行时仍属于 P3 交付范围。
 - 插件配置位于应用 `userData/pi-agent/`；首次启动会写入无浏览器弹窗、禁止读取浏览器 Cookie 的 Web 安全默认值，并关闭依赖 `git`、`gh`、`curl`、`yt-dlp` 或 `ffmpeg` 的能力。`pi-free` 上游仍使用用户的 `~/.pi/free.json` 保存其提供商配置。
 - 当前项目仍可通过 `.pi/skills/` 增加或覆盖同名 Skill，用户级 Skill 位于应用 `userData/pi-agent/skills/`。
 
@@ -89,10 +80,10 @@ src/
 
 ## 项目会话
 
-- 每个项目的会话记录保存在项目目录下的 `.slideMind/conversations.json`。
+- 会话标题、标识和当前选择保存在项目的 `.slideMind/conversations.json`；消息由 Pi JSONL 会话文件保存在 `.slideMind/convs/`。
 - 打开项目时会自动加载已有会话；首次使用时会创建初始会话和存储目录。
-- 会话记录包含对话标题、当前选择的对话及用户与 Agent 消息，可在应用重启后继续上下文。
-- 文件采用版本化 JSON 格式和原子替换写入；格式损坏时停止自动保存，避免覆盖原记录。
+- 打开会话时从 Pi 会话文件加载消息，应用重启后可继续上下文。
+- 会话元数据采用版本化 JSON 和原子替换写入；格式损坏时停止自动保存，避免覆盖原记录。
 
 ## 文档编辑
 
@@ -108,7 +99,7 @@ src/
 - 演示文稿编辑器基于 [PPTist](https://github.com/pipipi-pikachu/PPTist)，使用独立 Vue 入口嵌入 React 工作区。
 - 编辑器实例在输入过程中保持常驻，PPTist 状态通过受限消息桥同步；只有显式保存才写入项目文件。
 - `.slides.json` 使用 SlideMind v2 的 PPTist 数据格式，不兼容早期的 v1 快照。
-- 支持通过 `Cmd/Ctrl + S` 保存，并可由主进程导出基础文本、形状、图片和线条为 PPTX。
+- 支持通过 `Cmd/Ctrl + S` 保存，并可由主进程导出基础文本、形状、图片和线条为 PPTX。外部 `.pptx` 仅支持只读内容提取，不支持无损导入或原位编辑。
 
 ## PPT 制作工作流
 
@@ -134,20 +125,17 @@ src/
 
 - 渲染进程启用沙箱和 `contextIsolation`。
 - 渲染进程不直接访问 Node.js。
-- preload 只暴露冻结的运行时信息和经过校验的 agent IPC 方法。
+- preload 仅暴露受限、类型化的运行时、Agent、项目、文件、演示文稿、版本和诊断接口；主进程校验调用方与不可信输入。
 - 新窗口和外部导航只允许交给系统浏览器打开 HTTP(S) 地址。
 
 ## 本地 Word 文档读取
 
-- Agent 可读取项目内的 `.doc` 和 `.docx` 正文及可提取元数据；不承诺页面视觉、准确页码、OCR、嵌入附件或复杂表格语义完整还原。
-- 安装包按目标架构携带固定版本的 Apache Tika Server 4.0.0 与 Eclipse Temurin JRE 21.0.12.1+1。文档解析本身无需系统 Java、Docker 或网络连接；在线模型仍需要网络。
-- Tika 仅监听动态分配的 `127.0.0.1` 回环端口，空闲后退出。当前安全边界不面向不可信本机进程或多用户共享主机提供隔离保证。
-- 打包前会校验固定下载摘要与 Apache 发布签名，打包后会检查运行时布局和许可证资源，并在本机架构执行 Java/Tika 冒烟验证。
+Agent 通过 `document_read` 分段读取项目内 `.doc` / `.docx` 正文及筛选后的元数据，文件引用自动路由到该工具。读取不保留页面视觉、准确页码、OCR、嵌入附件或全部复杂表格结构。
 
-## 签名与发布
+打包链路按目标架构携带固定版本的 Tika 与 Java，解析无需系统 Java、Docker 或网络；在线模型仍需联网。开发前需显式[准备本机运行时](document-reading.md#开发与打包)。Tika 只监听动态回环端口，空闲后退出；不提供面向不可信本机进程或共享主机的隔离保证。
 
-本地和 CI 默认生成未签名安装包。正式分发前需要配置 Apple Developer ID、公证凭据以及 Windows 代码签名证书。仓库不会保存证书或密钥。
+macOS arm64 已有未签名安装包及内置运行时冒烟记录，各平台真实安装、离线、安全软件及签名验收仍未完成，详见[验证记录](tika-validation.md)。
 
 ## 许可证
 
-SlideMind 采用 GNU Affero General Public License v3.0（AGPL-3.0-only）。第三方组件信息见 `THIRD_PARTY_NOTICES.md`。
+SlideMind 采用 [GNU Affero General Public License v3.0](../LICENSE)（AGPL-3.0-only）。第三方组件信息见[第三方声明](THIRD_PARTY_NOTICES.md)。
