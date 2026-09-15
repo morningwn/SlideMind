@@ -33,12 +33,12 @@ macOS 打包脚本和 CI 默认关闭签名自动发现；其他本地打包命�
 
 ## 文档导航
 
-- [开发与验证](development.md)：类型检查、渲染测试、构建产物与发布流程。
-- [本地 Word 读取](document-reading.md)：工具契约、运行时准备、资源限制与打包。
-- [Tika 验证记录](tika-validation.md)：已记录结果和待完成的平台验收。
-- [工作区与 PPTist 性能记录](p2-validation-2026-09-14.md)：2026-09-14 的渲染验证与测量。
-- [仓库指南](../AGENTS.md)：开发规范与跨进程、演示文稿安全约束。
-- [第三方声明](THIRD_PARTY_NOTICES.md)。
+- [开发与验证](docs/development.md)：类型检查、渲染测试、构建产物与发布流程。
+- [本地 Word 读取](docs/document-reading.md)：工具契约、运行时准备、资源限制与打包。
+- [Tika 验证记录](docs/tika-validation.md)：已记录结果和待完成的平台验收。
+- [工作区与 PPTist 性能记录](docs/p2-validation-2026-09-14.md)：2026-09-14 的渲染验证与测量。
+- [仓库指南](AGENTS.md)：开发规范与跨进程、演示文稿安全约束。
+- [第三方声明](docs/THIRD_PARTY_NOTICES.md)。
 
 ## 工程结构
 
@@ -132,10 +132,10 @@ src/
 
 Agent 通过 `document_read` 分段读取项目内 `.doc` / `.docx` 正文及筛选后的元数据，文件引用自动路由到该工具。读取不保留页面视觉、准确页码、OCR、嵌入附件或全部复杂表格结构。
 
-打包链路按目标架构携带固定版本的 Tika 与 Java，解析无需系统 Java、Docker 或网络；在线模型仍需联网。开发前需显式[准备本机运行时](document-reading.md#开发与打包)。Tika 只监听动态回环端口，空闲后退出；不提供面向不可信本机进程或共享主机的隔离保证。
+打包链路按目标架构携带固定版本的 Tika 与 Java，解析无需系统 Java、Docker 或网络；在线模型仍需联网。开发前需显式[准备本机运行时](docs/document-reading.md#开发与打包)。Tika 只监听动态回环端口，空闲后退出；不提供面向不可信本机进程或共享主机的隔离保证。
 
-macOS arm64 已有未签名安装包及内置运行时冒烟记录，各平台真实安装、离线、安全软件及签名验收仍未完成，详见[验证记录](tika-validation.md)。
+macOS arm64 已有未签名安装包及内置运行时冒烟记录，各平台真实安装、离线、安全软件及签名验收仍未完成，详见[验证记录](docs/tika-validation.md)。
 
 ## 许可证
 
-SlideMind 采用 [GNU Affero General Public License v3.0](../LICENSE)（AGPL-3.0-only）。第三方组件信息见[第三方声明](THIRD_PARTY_NOTICES.md)。
+SlideMind 采用 [GNU Affero General Public License v3.0](LICENSE)（AGPL-3.0-only）。第三方组件信息见[第三方声明](docs/THIRD_PARTY_NOTICES.md)。

@@ -1,6 +1,6 @@
 # 开发与验证
 
-环境和常用命令见 [README](README.md#环境要求)，工程约束见 [AGENTS.md](../AGENTS.md)。命令以 [package.json](../package.json) 为准。
+环境和常用命令见 [README](../README.md#环境要求)，工程约束见 [AGENTS.md](../AGENTS.md)。命令以 [package.json](../package.json) 为准。
 
 ## 类型检查与测试
 
