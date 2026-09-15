@@ -27,11 +27,16 @@ import {
   installWindowLifecycleLogging
 } from './logging/lifecycle'
 import { getLogger, initializeApplicationLogging } from './logging/logger'
+import { createTikaDocumentReadService } from './document/document-reader'
+import { resolveTikaRuntimeOptions } from './document/tika-runtime'
 
 const APP_URL_PROTOCOLS = new Set(['http:', 'https:'])
 const applicationStartedAt = Date.now()
 const pendingWindowCloseRequests = new Set<number>()
 let isApplicationQuitting = false
+let documentCleanupComplete = false
+let documentCleanupPromise: Promise<void> | undefined
+let closeDocumentReadService: (() => Promise<void>) | undefined
 
 initializeApplicationLogging({
   isPackaged: app.isPackaged,
@@ -235,6 +240,12 @@ app.whenReady().then(() => {
   const mutationService = new ProjectMutationService(versionService)
   const externalChangeMonitor = new ExternalChangeMonitor(mutationService)
   const presentationService = new PresentationService(mutationService)
+  const documentReadService = createTikaDocumentReadService(resolveTikaRuntimeOptions({
+    appPath: app.getAppPath(),
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath
+  }))
+  closeDocumentReadService = () => documentReadService.close()
   const agentService = new BaseAgentService(
     configStore,
     projectRoots,
@@ -297,9 +308,20 @@ app.whenReady().then(() => {
   })
 })
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
   isApplicationQuitting = true
   logger.info('app.shutdown_requested')
+  if (!closeDocumentReadService || documentCleanupComplete) return
+
+  event.preventDefault()
+  if (!documentCleanupPromise) {
+    documentCleanupPromise = closeDocumentReadService()
+      .catch((error) => logger.error('app.document_cleanup_failed', { error }))
+      .finally(() => {
+        documentCleanupComplete = true
+        app.quit()
+      })
+  }
 })
 
 app.on('window-all-closed', () => {
