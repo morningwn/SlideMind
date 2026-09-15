@@ -9,13 +9,14 @@ const repositoryRoot = resolve(__dirname, '../../..')
 const runtimeRoot = resolve(
   repositoryRoot,
   'out/.tika-p0-runtime',
-  `${process.platform}-${process.arch}`
+  `${process.platform}-${process.arch}`,
 )
 const preparedPath = resolve(runtimeRoot, 'prepared-runtime.json')
-const integrationEnabled = process.env.SLIDEMIND_TIKA_INTEGRATION === '1' && existsSync(preparedPath)
+const integrationEnabled =
+  process.env.SLIDEMIND_TIKA_INTEGRATION === '1' && existsSync(preparedPath)
 
 describe.skipIf(!integrationEnabled)('fixed Tika runtime integration', () => {
-  it('starts the pinned runtime and extracts the fixed DOC and DOCX fixtures', async () => {
+  it('starts the pinned runtime and extracts the fixed office and PDF fixtures', async () => {
     const prepared = JSON.parse(readFileSync(preparedPath, 'utf8')) as {
       javaBinary: string
       tikaJar: string
@@ -26,15 +27,49 @@ describe.skipIf(!integrationEnabled)('fixed Tika runtime integration', () => {
       idleTimeoutMs: 60_000,
       javaBinary: resolve(runtimeRoot, prepared.javaBinary),
       tikaJar: resolve(runtimeRoot, prepared.tikaJar),
-      tikaVersion: prepared.tikaVersion
+      tikaVersion: prepared.tikaVersion,
     })
     try {
       const client = new TikaClient()
-      for (const file of ['simple-content.doc', 'simple-content.docx']) {
-        const bytes = await readFile(resolve(repositoryRoot, 'scripts/tika-p0/fixtures', file))
-        const result = await runtime.run((baseUrl) => client.parse(baseUrl, bytes, file))
-        expect(result.mimeType).toMatch(/msword|wordprocessingml\.document/)
-        expect(result.entries[0]['tk:content']).toContain('SlideMind')
+      const fixtures = [
+        {
+          file: 'simple-content.doc',
+          marker: 'SLIDEMIND TIKA P0 END',
+          mimeType: 'application/msword',
+        },
+        {
+          file: 'simple-content.docx',
+          marker: 'SLIDEMIND TIKA P0 END',
+          mimeType:
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        },
+        {
+          file: 'simple-spreadsheet.xls',
+          marker: 'SLIDEMIND TIKA EXCEL END',
+          mimeType: 'application/vnd.ms-excel',
+        },
+        {
+          file: 'simple-spreadsheet.xlsx',
+          marker: 'SLIDEMIND TIKA EXCEL END',
+          mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+        {
+          file: 'simple-content.pdf',
+          marker: 'SLIDEMIND TIKA P0 END',
+          mimeType: 'application/pdf',
+        },
+      ]
+      for (const fixture of fixtures) {
+        const { file } = fixture
+        const bytes = await readFile(
+          resolve(repositoryRoot, 'scripts/tika-p0/fixtures', file),
+        )
+        const result = await runtime.run((baseUrl) =>
+          client.parse(baseUrl, bytes, file),
+        )
+        expect(result.mimeType).toBe(fixture.mimeType)
+        expect(result.entries[0]['tk:content']).toContain(fixture.marker)
       }
     } finally {
       await runtime.stop()

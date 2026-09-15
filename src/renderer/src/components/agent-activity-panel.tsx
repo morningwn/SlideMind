@@ -14,11 +14,11 @@ const toolLabels: Readonly<Record<string, string>> = {
   find: '查找文件',
   ls: '浏览目录',
   todo: '更新任务',
-  document_read: '读取 Word 文档',
+  document_read: '读取办公文档',
   slides_create: '创建演示文稿',
   slides_read: '读取演示文稿',
   slides_write: '更新演示文稿',
-  slides_export: '导出演示文稿'
+  slides_export: '导出演示文稿',
 }
 
 export function activityTitle(activity: AgentActivity): string {
@@ -42,7 +42,7 @@ function activityStatusLabel(activity: AgentActivity): string {
 
 export function AgentActivityPanel({
   activities,
-  isStreaming
+  isStreaming,
 }: AgentActivityPanelProps): React.JSX.Element | null {
   const [isExpanded, setIsExpanded] = useState(isStreaming)
   const wasStreaming = useRef(isStreaming)
@@ -55,11 +55,16 @@ export function AgentActivityPanel({
 
   if (activities.length === 0) return null
 
-  const hasRunningActivity = activities.some((activity) => activity.status === 'running')
-  const statusLabel = hasRunningActivity || isStreaming ? '正在执行' : '执行过程'
+  const hasRunningActivity = activities.some(
+    (activity) => activity.status === 'running',
+  )
+  const statusLabel =
+    hasRunningActivity || isStreaming ? '正在执行' : '执行过程'
 
   return (
-    <section className={`agent-activity-panel${hasRunningActivity ? ' is-running' : ''}`}>
+    <section
+      className={`agent-activity-panel${hasRunningActivity ? ' is-running' : ''}`}
+    >
       <button
         aria-expanded={isExpanded}
         className="agent-activity-toggle"
@@ -79,19 +84,29 @@ export function AgentActivityPanel({
           {activities.map((activity) => {
             const body = activity.content?.trim() || activity.detail?.trim()
             return (
-              <details className={`agent-activity-item is-${activity.status}`} key={activity.id}>
+              <details
+                className={`agent-activity-item is-${activity.status}`}
+                key={activity.id}
+              >
                 <summary>
                   <span className={`agent-activity-kind is-${activity.kind}`}>
                     {activityKindLabel(activity)}
                   </span>
                   <strong>{activityTitle(activity)}</strong>
                   <small>{activityStatusLabel(activity)}</small>
-                  {body ? <span className="agent-activity-item-chevron" aria-hidden="true" /> : null}
+                  {body ? (
+                    <span
+                      className="agent-activity-item-chevron"
+                      aria-hidden="true"
+                    />
+                  ) : null}
                 </summary>
                 {body ? (
-                  activity.kind === 'thinking'
-                    ? <p>{body}</p>
-                    : <pre>{body}</pre>
+                  activity.kind === 'thinking' ? (
+                    <p>{body}</p>
+                  ) : (
+                    <pre>{body}</pre>
+                  )
                 ) : null}
               </details>
             )

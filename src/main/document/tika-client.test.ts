@@ -12,14 +12,22 @@ function response(body: string, init?: ResponseInit): Response {
 
 describe('TikaClient', () => {
   it('detects the actual MIME type and parses bounded recursive metadata', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.endsWith('/detect')
-      ? response('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-      : response(JSON.stringify([{ 'tk:content': 'hello', 'dc:title': 'sample' }]))
-    ))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url.endsWith('/detect')
+          ? response(
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            )
+          : response(
+              JSON.stringify([{ 'tk:content': 'hello', 'dc:title': 'sample' }]),
+            ),
+      ),
+    )
     const result = await new TikaClient().parse(
       'http://127.0.0.1:9998',
       new Uint8Array([1, 2]),
-      '测试.docx'
+      '测试.docx',
     )
     expect(result.mimeType).toContain('wordprocessingml')
     expect(result.entries[0]['tk:content']).toBe('hello')
@@ -27,23 +35,73 @@ describe('TikaClient', () => {
   })
 
   it('rejects disguised files after content detection', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => response('application/pdf')))
-    await expect(new TikaClient().parse(
-      'http://127.0.0.1:9998',
-      new Uint8Array([1]),
-      'fake.docx'
-    )).rejects.toMatchObject({ code: 'unsupported_format' })
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response('application/pdf')),
+    )
+    await expect(
+      new TikaClient().parse(
+        'http://127.0.0.1:9998',
+        new Uint8Array([1]),
+        'fake.docx',
+      ),
+    ).rejects.toMatchObject({ code: 'unsupported_format' })
+  })
+
+  it.each([
+    [
+      '数据.xlsx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ],
+    ['legacy.xls', 'application/vnd.ms-excel'],
+    ['报告.pdf', 'application/pdf'],
+  ])('accepts supported %s content', async (file, mimeType) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url.endsWith('/detect')
+          ? response(mimeType)
+          : response(JSON.stringify([{ 'tk:content': 'extracted content' }])),
+      ),
+    )
+    await expect(
+      new TikaClient().parse(
+        'http://127.0.0.1:9998',
+        new Uint8Array([1, 2]),
+        file,
+      ),
+    ).resolves.toMatchObject({ mimeType })
+  })
+
+  it('rejects a supported MIME type when it does not match the extension', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => response('application/pdf')),
+    )
+    await expect(
+      new TikaClient().parse(
+        'http://127.0.0.1:9998',
+        new Uint8Array([1]),
+        'renamed.xlsx',
+      ),
+    ).rejects.toMatchObject({ code: 'unsupported_format' })
   })
 
   it('rejects an oversized response before parsing it', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.endsWith('/detect')
-      ? response('application/msword')
-      : response('x'.repeat(128))
-    ))
-    await expect(new TikaClient({ maxResponseBytes: 64 }).parse(
-      'http://127.0.0.1:9998',
-      new Uint8Array([1]),
-      'large.doc'
-    )).rejects.toBeInstanceOf(DocumentReadError)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url.endsWith('/detect')
+          ? response('application/msword')
+          : response('x'.repeat(128)),
+      ),
+    )
+    await expect(
+      new TikaClient({ maxResponseBytes: 64 }).parse(
+        'http://127.0.0.1:9998',
+        new Uint8Array([1]),
+        'large.doc',
+      ),
+    ).rejects.toBeInstanceOf(DocumentReadError)
   })
 })

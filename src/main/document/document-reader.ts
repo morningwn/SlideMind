@@ -1,6 +1,11 @@
 import { constants } from 'node:fs'
 import { lstat, open, realpath, type FileHandle } from 'node:fs/promises'
-import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import {
+  createHash,
+  createHmac,
+  randomBytes,
+  timingSafeEqual,
+} from 'node:crypto'
 import {
   DOCUMENT_DEFAULT_MAX_CHARS,
   DOCUMENT_MAX_FILE_BYTES,
@@ -8,11 +13,15 @@ import {
   isDocumentPath,
   normalizeDocumentReadInput,
   type DocumentReadInput,
-  type DocumentReadResult
+  type DocumentReadResult,
 } from '../../shared/document'
 import { resolveRegularProjectFile } from '../project/project-files'
 import { diagnosticId, getLogger } from '../logging/logger'
-import { documentChunk, normalizeTikaDocument, type NormalizedDocument } from './document-content'
+import {
+  documentChunk,
+  normalizeTikaDocument,
+  type NormalizedDocument,
+} from './document-content'
 import { TikaClient, type TikaParseResult } from './tika-client'
 import { TikaRuntime } from './tika-runtime'
 
@@ -66,7 +75,7 @@ export interface DocumentParser {
     baseUrl: string,
     bytes: Uint8Array,
     file: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<TikaParseResult>
 }
 
@@ -80,62 +89,96 @@ export interface DocumentReadServiceOptions {
 }
 
 function sameFileState(
-  left: { ctimeMs: number; dev: number; ino: number; mtimeMs: number; size: number },
-  right: { ctimeMs: number; dev: number; ino: number; mtimeMs: number; size: number }
+  left: {
+    ctimeMs: number
+    dev: number
+    ino: number
+    mtimeMs: number
+    size: number
+  },
+  right: {
+    ctimeMs: number
+    dev: number
+    ino: number
+    mtimeMs: number
+    size: number
+  },
 ): boolean {
-  return left.dev === right.dev &&
+  return (
+    left.dev === right.dev &&
     left.ino === right.ino &&
     left.ctimeMs === right.ctimeMs &&
     left.mtimeMs === right.mtimeMs &&
     left.size === right.size
+  )
 }
 
 async function readBoundedFile(handle: FileHandle): Promise<Buffer> {
   const chunks: Buffer[] = []
   let total = 0
   while (total <= DOCUMENT_MAX_FILE_BYTES) {
-    const chunk = Buffer.allocUnsafe(Math.min(64 * 1024, DOCUMENT_MAX_FILE_BYTES + 1 - total))
+    const chunk = Buffer.allocUnsafe(
+      Math.min(64 * 1024, DOCUMENT_MAX_FILE_BYTES + 1 - total),
+    )
     const { bytesRead } = await handle.read(chunk, 0, chunk.length, total)
     if (bytesRead === 0) break
     chunks.push(chunk.subarray(0, bytesRead))
     total += bytesRead
   }
   if (total > DOCUMENT_MAX_FILE_BYTES) {
-    throw new DocumentReadError('file_too_large', '文档必须大于 0 且不超过 30 MiB')
+    throw new DocumentReadError(
+      'file_too_large',
+      '文档必须大于 0 且不超过 30 MiB',
+    )
   }
   return Buffer.concat(chunks, total)
 }
 
 export async function createDocumentSnapshot(
   projectPathInput: string,
-  relativePath: string
+  relativePath: string,
 ): Promise<FileSnapshot> {
   if (!isDocumentPath(relativePath)) {
-    throw new DocumentReadError('unsupported_format', '只能读取 .doc 或 .docx 文档')
+    throw new DocumentReadError(
+      'unsupported_format',
+      '只能读取 .doc、.docx、.xls、.xlsx 或 .pdf 文档',
+    )
   }
   const projectPath = await realpath(projectPathInput)
   const file = await resolveRegularProjectFile(projectPath, relativePath)
-  const handle = await open(file.targetPath, constants.O_RDONLY | constants.O_NOFOLLOW)
+  const handle = await open(
+    file.targetPath,
+    constants.O_RDONLY | constants.O_NOFOLLOW,
+  )
   try {
     const before = await handle.stat()
     if (before.size === 0 || before.size > DOCUMENT_MAX_FILE_BYTES) {
-      throw new DocumentReadError('file_too_large', '文档必须大于 0 且不超过 30 MiB')
+      throw new DocumentReadError(
+        'file_too_large',
+        '文档必须大于 0 且不超过 30 MiB',
+      )
     }
     const data = await readBoundedFile(handle)
     const after = await handle.stat()
     const current = await lstat(file.targetPath)
     if (!sameFileState(before, after) || !sameFileState(after, current)) {
-      throw new DocumentReadError('file_changed', '读取期间文档已发生变化，请重试')
+      throw new DocumentReadError(
+        'file_changed',
+        '读取期间文档已发生变化，请重试',
+      )
     }
     if (data.byteLength === 0 || data.byteLength > DOCUMENT_MAX_FILE_BYTES) {
-      throw new DocumentReadError('file_too_large', '文档必须大于 0 且不超过 30 MiB')
+      throw new DocumentReadError(
+        'file_too_large',
+        '文档必须大于 0 且不超过 30 MiB',
+      )
     }
     return {
       bytes: data,
       file: file.relativePath,
       projectPath,
       revision: createHash('sha256').update(data).digest('hex'),
-      size: data.byteLength
+      size: data.byteLength,
     }
   } finally {
     await handle.close()
@@ -159,7 +202,7 @@ export class DocumentReadService {
     this.runtime = options.runtime
     this.parser = options.parser ?? new TikaClient()
     this.cacheBytes = options.cacheBytes ?? DEFAULT_CACHE_BYTES
-    this.configVersion = options.configVersion ?? 'tika-4.0.0-doc-v1'
+    this.configVersion = options.configVersion ?? 'tika-4.0.0-document-v2'
     this.cursorKey = options.cursorKey ?? randomBytes(32)
     this.maxQueueLength = options.maxQueueLength ?? DEFAULT_QUEUE_LENGTH
   }
@@ -167,10 +210,11 @@ export class DocumentReadService {
   async read(
     projectPath: string,
     inputValue: DocumentReadInput | unknown,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<DocumentReadResult> {
     const input = normalizeDocumentReadInput(inputValue)
-    if (signal?.aborted) throw new DocumentReadError('cancelled', '文档读取已取消')
+    if (signal?.aborted)
+      throw new DocumentReadError('cancelled', '文档读取已取消')
     const startedAt = Date.now()
     const snapshot = await createDocumentSnapshot(projectPath, input.file)
     const key = this.cacheKey(snapshot)
@@ -180,26 +224,38 @@ export class DocumentReadService {
     if (input.cursor) {
       const payload = this.decodeCursor(input.cursor)
       if (payload.revision !== snapshot.revision) {
-        throw new DocumentReadError('file_changed', '文档已发生变化，请从头读取')
+        throw new DocumentReadError(
+          'file_changed',
+          '文档已发生变化，请从头读取',
+        )
       }
       if (payload.key !== key) {
-        throw new DocumentReadError('invalid_cursor', '文档游标不属于当前项目或文件')
+        throw new DocumentReadError(
+          'invalid_cursor',
+          '文档游标不属于当前项目或文件',
+        )
       }
-      document = this.getCached(key) ?? (() => {
-        throw new DocumentReadError('cursor_expired', '文档游标已过期，请从头读取')
-      })()
+      document =
+        this.getCached(key) ??
+        (() => {
+          throw new DocumentReadError(
+            'cursor_expired',
+            '文档游标已过期，请从头读取',
+          )
+        })()
       offset = payload.offset
       if (offset <= 0 || offset >= document.content.length) {
         throw new DocumentReadError('invalid_cursor', '文档游标偏移无效')
       }
     } else {
-      document = this.getCached(key) ?? await this.joinParse(snapshot, key, signal)
+      document =
+        this.getCached(key) ?? (await this.joinParse(snapshot, key, signal))
     }
 
     const chunk = documentChunk(
       document.content,
       offset,
-      input.maxChars ?? DOCUMENT_DEFAULT_MAX_CHARS
+      input.maxChars ?? DOCUMENT_DEFAULT_MAX_CHARS,
     )
     logger.info('document.read_completed', {
       durationMs: Date.now() - startedAt,
@@ -207,8 +263,8 @@ export class DocumentReadService {
         bytes: snapshot.size,
         documentId: diagnosticId(`${snapshot.projectPath}\0${snapshot.file}`),
         extractionStatus: document.extractionStatus,
-        mimeType: document.mimeType
-      }
+        mimeType: document.mimeType,
+      },
     })
     return {
       content: chunk.content,
@@ -218,9 +274,15 @@ export class DocumentReadService {
       mimeType: document.mimeType,
       ...(chunk.nextOffset === undefined
         ? {}
-        : { nextCursor: this.encodeCursor(key, document.revision, chunk.nextOffset) }),
+        : {
+            nextCursor: this.encodeCursor(
+              key,
+              document.revision,
+              chunk.nextOffset,
+            ),
+          }),
       revision: document.revision,
-      warnings: document.warnings
+      warnings: document.warnings,
     }
   }
 
@@ -277,11 +339,18 @@ export class DocumentReadService {
     this.currentCacheBytes -= value.sizeBytes
   }
 
-  private joinParse(snapshot: FileSnapshot, key: string, signal?: AbortSignal): Promise<CachedDocument> {
+  private joinParse(
+    snapshot: FileSnapshot,
+    key: string,
+    signal?: AbortSignal,
+  ): Promise<CachedDocument> {
     let task = this.tasks.get(key)
     if (!task) {
       if (this.pending.length >= this.maxQueueLength) {
-        throw new DocumentReadError('queue_full', '文档读取队列已满，请稍后重试')
+        throw new DocumentReadError(
+          'queue_full',
+          '文档读取队列已满，请稍后重试',
+        )
       }
       let resolveTask!: (value: CachedDocument) => void
       let rejectTask!: (error: unknown) => void
@@ -297,7 +366,7 @@ export class DocumentReadService {
         resolve: resolveTask,
         settled: false,
         snapshot,
-        waiters: 0
+        waiters: 0,
       }
       this.tasks.set(key, task)
       this.pending.push(task)
@@ -306,7 +375,10 @@ export class DocumentReadService {
     return this.waitForTask(task, signal)
   }
 
-  private waitForTask(task: ParseTask, signal?: AbortSignal): Promise<CachedDocument> {
+  private waitForTask(
+    task: ParseTask,
+    signal?: AbortSignal,
+  ): Promise<CachedDocument> {
     task.waiters += 1
     return new Promise((resolve, reject) => {
       let released = false
@@ -334,7 +406,7 @@ export class DocumentReadService {
         (error) => {
           release()
           reject(error)
-        }
+        },
       )
     })
   }
@@ -362,12 +434,14 @@ export class DocumentReadService {
 
   private async parseTask(task: ParseTask): Promise<void> {
     try {
-      const parsed = await this.runtime.run((baseUrl) => this.parser.parse(
-        baseUrl,
-        task.snapshot.bytes,
-        task.snapshot.file,
-        task.controller.signal
-      ))
+      const parsed = await this.runtime.run((baseUrl) =>
+        this.parser.parse(
+          baseUrl,
+          task.snapshot.bytes,
+          task.snapshot.file,
+          task.controller.signal,
+        ),
+      )
       const normalized = normalizeTikaDocument(parsed.entries)
       const document: CachedDocument = {
         ...normalized,
@@ -375,7 +449,7 @@ export class DocumentReadService {
         mimeType: parsed.mimeType,
         projectPath: task.snapshot.projectPath,
         revision: task.snapshot.revision,
-        sizeBytes: Buffer.byteLength(normalized.content, 'utf8')
+        sizeBytes: Buffer.byteLength(normalized.content, 'utf8'),
       }
       this.putCached(task.key, document)
       task.settled = true
@@ -390,8 +464,10 @@ export class DocumentReadService {
           error,
           context: {
             bytes: task.snapshot.size,
-            documentId: diagnosticId(`${task.snapshot.projectPath}\0${task.snapshot.file}`)
-          }
+            documentId: diagnosticId(
+              `${task.snapshot.projectPath}\0${task.snapshot.file}`,
+            ),
+          },
         })
         task.settled = true
         task.reject(error)
@@ -400,13 +476,17 @@ export class DocumentReadService {
   }
 
   private encodeCursor(key: string, revision: string, offset: number): string {
-    const body = Buffer.from(JSON.stringify({
-      key,
-      offset,
-      revision,
-      version: CURSOR_VERSION
-    } satisfies CursorPayload)).toString('base64url')
-    const signature = createHmac('sha256', this.cursorKey).update(body).digest('base64url')
+    const body = Buffer.from(
+      JSON.stringify({
+        key,
+        offset,
+        revision,
+        version: CURSOR_VERSION,
+      } satisfies CursorPayload),
+    ).toString('base64url')
+    const signature = createHmac('sha256', this.cursorKey)
+      .update(body)
+      .digest('base64url')
     return `${body}.${signature}`
   }
 
@@ -453,7 +533,7 @@ export class DocumentReadService {
 }
 
 export function createTikaDocumentReadService(
-  options: ConstructorParameters<typeof TikaRuntime>[0]
+  options: ConstructorParameters<typeof TikaRuntime>[0],
 ): DocumentReadService {
   return new DocumentReadService({ runtime: new TikaRuntime(options) })
 }

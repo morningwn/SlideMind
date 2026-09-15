@@ -21,7 +21,7 @@ The corresponding package license texts are distributed with the packaged depend
 
 ## Apache Tika
 
-SlideMind bundles Apache Tika Server Standard 4.0.0 and its adjacent runtime dependencies for local DOC/DOCX text extraction. Apache Tika is licensed under the Apache License 2.0. The upstream `LICENSE` and `NOTICE` files are preserved beside the packaged Tika runtime.
+SlideMind bundles Apache Tika Server Standard 4.0.0 and its adjacent runtime dependencies for local DOC, DOCX, XLS, XLSX, and PDF text extraction. Apache Tika is licensed under the Apache License 2.0. The upstream `LICENSE` and `NOTICE` files are preserved beside the packaged Tika runtime.
 
 ## Eclipse Temurin
 

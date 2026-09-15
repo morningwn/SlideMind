@@ -1,7 +1,14 @@
 {
   "parsers": [
     "ooxml-parser",
-    "office-parser"
+    "office-parser",
+    {
+      "pdf-parser": {
+        "ocr": {
+          "strategy": "NO_OCR"
+        }
+      }
+    }
   ],
   "parse-context": {
     "embedded-limits": {
@@ -47,14 +54,7 @@
     "allowPipes": false,
     "allowPerRequestConfig": false,
     "cors": "",
-    "endpoints": [
-      "tika",
-      "rmeta",
-      "meta",
-      "detect",
-      "version",
-      "status"
-    ],
+    "endpoints": ["tika", "rmeta", "meta", "detect", "version", "status"],
     "maxRequestSizeBytes": 31457280
   }
 }

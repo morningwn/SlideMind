@@ -37,7 +37,11 @@ export interface DocumentReadResult {
 export class DocumentReadError extends Error {
   readonly code: DocumentReadErrorCode
 
-  constructor(code: DocumentReadErrorCode, message: string, options?: ErrorOptions) {
+  constructor(
+    code: DocumentReadErrorCode,
+    message: string,
+    options?: ErrorOptions,
+  ) {
     super(message, options)
     this.name = 'DocumentReadError'
     this.code = code
@@ -45,7 +49,7 @@ export class DocumentReadError extends Error {
 }
 
 export function isDocumentPath(path: string): boolean {
-  return /\.docx?$/i.test(path)
+  return /\.(?:docx?|pdf|xlsx?)$/i.test(path)
 }
 
 export function normalizeDocumentReadInput(value: unknown): DocumentReadInput {
@@ -61,26 +65,28 @@ export function normalizeDocumentReadInput(value: unknown): DocumentReadInput {
   ) {
     throw new DocumentReadError('unsupported_format', '文档路径无效')
   }
-  if (input.cursor !== undefined && (
-    typeof input.cursor !== 'string' ||
-    !input.cursor ||
-    input.cursor.length > 2048
-  )) {
+  if (
+    input.cursor !== undefined &&
+    (typeof input.cursor !== 'string' ||
+      !input.cursor ||
+      input.cursor.length > 2048)
+  ) {
     throw new DocumentReadError('invalid_cursor', '文档游标无效')
   }
-  if (input.maxChars !== undefined && (
-    !Number.isInteger(input.maxChars) ||
-    input.maxChars < 1 ||
-    input.maxChars > DOCUMENT_MAX_CHARS
-  )) {
+  if (
+    input.maxChars !== undefined &&
+    (!Number.isInteger(input.maxChars) ||
+      input.maxChars < 1 ||
+      input.maxChars > DOCUMENT_MAX_CHARS)
+  ) {
     throw new DocumentReadError(
       'invalid_cursor',
-      `maxChars 必须是 1 到 ${DOCUMENT_MAX_CHARS} 之间的整数`
+      `maxChars 必须是 1 到 ${DOCUMENT_MAX_CHARS} 之间的整数`,
     )
   }
   return {
     file: input.file,
     ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-    ...(input.maxChars === undefined ? {} : { maxChars: input.maxChars })
+    ...(input.maxChars === undefined ? {} : { maxChars: input.maxChars }),
   }
 }
