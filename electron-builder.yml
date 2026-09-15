@@ -15,6 +15,10 @@ extraResources:
     to: skills
     filter:
       - '**/*'
+  - from: LICENSE
+    to: LICENSE
+  - from: THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
 
 asar: true
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
@@ -44,3 +48,5 @@ nsis:
   shortcutName: SlideMind
 
 publish: null
+
+afterPack: scripts/tika-package/after-pack.mjs

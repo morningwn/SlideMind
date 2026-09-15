@@ -18,3 +18,11 @@ SlideMind bundles the following pinned Pi extensions:
 - [pi-web-access 0.27.0](https://github.com/nicobailon/pi-web-access), licensed under the MIT License.
 
 The corresponding package license texts are distributed with the packaged dependencies.
+
+## Apache Tika
+
+SlideMind bundles Apache Tika Server Standard 4.0.0 and its adjacent runtime dependencies for local DOC/DOCX text extraction. Apache Tika is licensed under the Apache License 2.0. The upstream `LICENSE` and `NOTICE` files are preserved beside the packaged Tika runtime.
+
+## Eclipse Temurin
+
+SlideMind bundles Eclipse Temurin JRE 21.0.12.1+1 to run Apache Tika without relying on a system Java installation. The complete upstream `NOTICE` and per-module `legal` directory are preserved in each packaged JRE. Temurin/OpenJDK is distributed under GPL-2.0-only with the Classpath Exception and includes components under additional licenses documented in that directory.

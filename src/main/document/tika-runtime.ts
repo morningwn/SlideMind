@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { DocumentReadError } from '../../shared/document'
 import { getLogger } from '../logging/logger'
@@ -30,6 +30,8 @@ export interface TikaRuntimeLocationOptions {
 
 interface PreparedRuntimeManifest {
   javaBinary: string
+  platform?: string
+  schemaVersion?: number
   tikaJar: string
   tikaVersion: string
 }
@@ -53,17 +55,25 @@ export function resolveTikaRuntimeOptions(
     } catch (error) {
       throw new DocumentReadError('runtime_unavailable', 'Tika 运行时清单无效', { cause: error })
     }
+    const resourcePath = (path: string): string => isAbsolute(path)
+      ? path
+      : resolve(runtimeRoot, path)
+    const pathsStayInRuntime = [value.javaBinary, value.tikaJar].every((path) => {
+      if (typeof path !== 'string' || isAbsolute(path)) return !options.isPackaged
+      return resourcePath(path).startsWith(`${resolve(runtimeRoot)}${sep}`)
+    })
     if (
       typeof value.javaBinary !== 'string' ||
       typeof value.tikaJar !== 'string' ||
       value.tikaVersion !== '4.0.0' ||
-      (options.isPackaged && (isAbsolute(value.javaBinary) || isAbsolute(value.tikaJar)))
+      (options.isPackaged && (
+        value.schemaVersion !== 1 ||
+        value.platform !== platform ||
+        !pathsStayInRuntime
+      ))
     ) {
       throw new DocumentReadError('runtime_unavailable', 'Tika 运行时清单无效')
     }
-    const resourcePath = (path: string): string => isAbsolute(path)
-      ? path
-      : resolve(runtimeRoot, path)
     return {
       configPath,
       javaBinary: resourcePath(value.javaBinary),

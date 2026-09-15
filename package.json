@@ -18,13 +18,15 @@
     "test": "vitest run",
     "check": "pnpm typecheck && pnpm test",
     "build": "pnpm check && electron-vite build",
-    "package": "pnpm build && electron-builder",
-    "package:mac": "pnpm build && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --x64 --arm64",
-    "package:win": "pnpm build && electron-builder --win --x64",
+    "package": "pnpm build && pnpm tika:package:prepare && electron-builder && pnpm tika:package:verify",
+    "package:mac": "pnpm build && pnpm tika:package:prepare --platforms darwin-x64,darwin-arm64 && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --x64 --arm64 && pnpm tika:package:verify --platforms darwin-x64,darwin-arm64",
+    "package:win": "pnpm build && pnpm tika:package:prepare --platforms win32-x64 && electron-builder --win --x64 && pnpm tika:package:verify --platforms win32-x64",
     "typecheck:pptist": "node scripts/typecheck-pptist.cjs",
     "test:renderer": "tsc --noEmit -p tsconfig.renderer-tests.json && node scripts/test-renderer.mjs",
     "tika:p0:prepare": "node scripts/tika-p0/prepare-runtime.mjs",
-    "tika:p0:probe": "node scripts/tika-p0/run-probe.mjs"
+    "tika:p0:probe": "node scripts/tika-p0/run-probe.mjs",
+    "tika:package:prepare": "node scripts/tika-package/prepare.mjs",
+    "tika:package:verify": "node scripts/tika-package/verify.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",

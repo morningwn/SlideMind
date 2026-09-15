@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { access, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { access, copyFile, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
 import { dirname, join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -13,6 +13,7 @@ const manifest = JSON.parse(await readFile(join(scriptDirectory, 'runtime-manife
 const platform = readOption('--platform') ?? `${process.platform}-${process.arch}`
 const hostPlatform = `${process.platform}-${process.arch}`
 const outputRoot = resolve(readOption('--output') ?? join(repositoryRoot, '.tika-p0-runtime', platform))
+const skipExecution = process.argv.includes('--skip-execution')
 const downloadsRoot = join(outputRoot, 'downloads')
 const runtimeRoot = join(outputRoot, 'runtime')
 const javaArtifact = manifest.java.artifacts[platform]
@@ -20,7 +21,7 @@ const javaArtifact = manifest.java.artifacts[platform]
 if (!javaArtifact) {
   throw new Error(`Unsupported P0 platform: ${platform}`)
 }
-if (platform !== hostPlatform) {
+if (platform !== hostPlatform && !skipExecution) {
   throw new Error(`P0 preparation executes the runtime and must run on its target platform: requested ${platform}, host ${hostPlatform}`)
 }
 
@@ -39,20 +40,26 @@ await extract(tikaArchive, tikaRoot)
 await extract(javaArchive, javaRoot)
 
 const tikaJar = await findFile(tikaRoot, `tika-server-standard-${manifest.tika.version}.jar`)
-const javaBinaryName = process.platform === 'win32' ? 'java.exe' : 'java'
+const javaBinaryName = platform.startsWith('win32-') ? 'java.exe' : 'java'
 const javaBinary = await findFile(javaRoot, javaBinaryName, (path) => path.includes(`${join('bin', javaBinaryName)}`))
-await run(javaBinary, ['-version'])
-await run(javaBinary, ['-jar', tikaJar, '--help'], { cwd: dirname(tikaJar) })
+if (!skipExecution) {
+  await run(javaBinary, ['-version'])
+  await run(javaBinary, ['-jar', tikaJar, '--help'], { cwd: dirname(tikaJar) })
+}
+
+await copyFile(join(scriptDirectory, 'tika-config.json'), join(outputRoot, 'tika-config.json'))
 
 const prepared = {
+  schemaVersion: 1,
   platform,
   tikaVersion: manifest.tika.version,
   javaVersion: manifest.java.version,
-  tikaJar,
-  javaBinary,
+  tikaJar: portablePath(tikaJar),
+  javaBinary: portablePath(javaBinary),
   downloadedBytes: manifest.tika.size + javaArtifact.size,
   runtimeBytes: await directorySize(runtimeRoot),
   tikaPgpVerified,
+  executionVerified: !skipExecution,
   preparedAt: new Date().toISOString()
 }
 await writeFile(join(outputRoot, 'prepared-runtime.json'), `${JSON.stringify(prepared, null, 2)}\n`)
@@ -61,6 +68,10 @@ console.log(JSON.stringify(prepared, null, 2))
 function readOption(name) {
   const index = process.argv.indexOf(name)
   return index === -1 ? undefined : process.argv[index + 1]
+}
+
+function portablePath(path) {
+  return path.slice(outputRoot.length + 1).split('\\').join('/')
 }
 
 async function downloadVerified(artifact, algorithm) {
