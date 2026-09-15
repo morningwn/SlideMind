@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "tika": {
+    "version": "4.0.0",
+    "archive": "tika-server-standard-4.0.0.zip",
+    "url": "https://downloads.apache.org/tika/4.0.0/tika-server-standard-4.0.0.zip",
+    "sha512": "fa3723da09fae8b4c7cf33009912e05cb29da0a563d8513d1a4f83863accd83e2a205418b0bfd400647c864543ad2b52666b01081808a7181f53057f8bcdd9e5",
+    "size": 58363270,
+    "signatureUrl": "https://downloads.apache.org/tika/4.0.0/tika-server-standard-4.0.0.zip.asc",
+    "keysUrl": "https://downloads.apache.org/tika/KEYS",
+    "signerFingerprint": "184454FAD8697760F3E00D2E4A51A45B944FFD51"
+  },
+  "java": {
+    "vendor": "Eclipse Temurin",
+    "version": "21.0.12.1+1",
+    "release": "jdk-21.0.12.1+1",
+    "artifacts": {
+      "darwin-arm64": {
+        "archive": "OpenJDK21U-jre_aarch64_mac_hotspot_21.0.12.1_1.tar.gz",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_aarch64_mac_hotspot_21.0.12.1_1.tar.gz",
+        "sha256": "dec50fc6f9fcd4fe3ae8cabf5a5fa68f6afc48841f7698e468e9aa5d54beed84",
+        "size": 48144965
+      },
+      "darwin-x64": {
+        "archive": "OpenJDK21U-jre_x64_mac_hotspot_21.0.12.1_1.tar.gz",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_x64_mac_hotspot_21.0.12.1_1.tar.gz",
+        "sha256": "6717ec641fd9ce0bb209ca083ee23b42202ac68cb6fcc5753496e0e4a0f41989",
+        "size": 42131876
+      },
+      "win32-x64": {
+        "archive": "OpenJDK21U-jre_x64_windows_hotspot_21.0.12.1_1.zip",
+        "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jre_x64_windows_hotspot_21.0.12.1_1.zip",
+        "sha256": "d35f31e712f0fcf6ac5a093edc90204fbff22f720ba3950bd09d331d5e621636",
+        "size": 48999141
+      }
+    }
+  }
+}

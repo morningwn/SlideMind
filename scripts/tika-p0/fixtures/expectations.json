@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "samples": [
+    {
+      "file": "simple-content.docx",
+      "requiredText": [
+        "SlideMind 中文文档读取样本",
+        "春江潮水连海平",
+        "faithful extraction",
+        "第一项 苹果",
+        "SLIDEMIND TIKA P0 END"
+      ],
+      "knownLimitations": [
+        "不验证页码或视觉布局",
+        "列表符号可能被规范化"
+      ]
+    },
+    {
+      "file": "simple-content.doc",
+      "requiredText": [
+        "SlideMind 中文文档读取样本",
+        "春江潮水连海平",
+        "faithful extraction",
+        "第一项 苹果",
+        "SLIDEMIND TIKA P0 END"
+      ],
+      "knownLimitations": [
+        "由 LibreOffice MS Word 97 导出器生成的真实 OLE2 DOC",
+        "列表符号和样式可能与 DOCX 输出不同"
+      ]
+    },
+    {
+      "file": "complex-content.docx",
+      "requiredText": [
+        "SlideMind 复杂内容读取样本",
+        "页眉标记 HEADER 中文",
+        "页脚标记 FOOTER",
+        "华东",
+        "第二季度",
+        "135",
+        "PAGE TWO CONTENT",
+        "繁體中文",
+        "café"
+      ],
+      "orderedTextGroups": [
+        ["华东", "第二季度", "135"],
+        ["PAGE TWO CONTENT", "繁體中文", "café"]
+      ],
+      "knownLimitations": [
+        "表格单元格内容可提取不等于行列关系完整",
+        "页眉页脚顺序不保证对应页面",
+        "不验证精确分页"
+      ]
+    }
+  ]
+}

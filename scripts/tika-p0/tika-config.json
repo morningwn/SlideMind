@@ -1,0 +1,60 @@
+{
+  "parsers": [
+    "ooxml-parser",
+    "office-parser"
+  ],
+  "parse-context": {
+    "embedded-limits": {
+      "maxDepth": 0,
+      "throwOnMaxDepth": false,
+      "maxCount": 0,
+      "throwOnMaxCount": false
+    },
+    "output-limits": {
+      "writeLimit": 2000000,
+      "throwOnWriteLimit": false,
+      "maxXmlDepth": 100,
+      "maxPackageEntryDepth": 10,
+      "zipBombThreshold": 1000000,
+      "zipBombRatio": 100
+    },
+    "timeout-limits": {
+      "totalTaskTimeoutMillis": 90000,
+      "progressTimeoutMillis": 30000,
+      "throwOnDeadline": false
+    },
+    "standard-metadata-limiter-factory": {
+      "maxTotalBytes": 1048576,
+      "maxFieldSize": 102400,
+      "maxKeySize": 1024,
+      "maxValuesPerField": 100
+    }
+  },
+  "pipes": {
+    "numClients": 1,
+    "maxFilesProcessedPerProcess": 100,
+    "maxWaitForClientMillis": 5000,
+    "forkedJvmArgs": [
+      "-Xmx512m",
+      "-XX:ActiveProcessorCount=2",
+      "-Dtika.pipes.cacheMemoryBudgetBytes=67108864"
+    ]
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 9998,
+    "id": "slidemind-tika-p0",
+    "allowPipes": false,
+    "allowPerRequestConfig": false,
+    "cors": "",
+    "endpoints": [
+      "tika",
+      "rmeta",
+      "meta",
+      "detect",
+      "version",
+      "status"
+    ],
+    "maxRequestSizeBytes": 31457280
+  }
+}
