@@ -3,11 +3,13 @@ productName: SlideMind
 copyright: Copyright © 2026 SlideMind
 
 directories:
-  output: release-dist
+  output: out/release
   buildResources: assets
 
 files:
-  - out/**
+  - out/main/**
+  - out/preload/**
+  - out/renderer/**
   - package.json
 
 extraResources:

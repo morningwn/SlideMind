@@ -9,7 +9,7 @@ import { performance } from 'node:perf_hooks'
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = resolve(scriptDirectory, '../..')
-const runtimeRoot = resolve(readOption('--runtime') ?? join(repositoryRoot, '.tika-p0-runtime', `${process.platform}-${process.arch}`))
+const runtimeRoot = resolve(readOption('--runtime') ?? join(repositoryRoot, 'out/.tika-p0-runtime', `${process.platform}-${process.arch}`))
 const prepared = JSON.parse(await readFile(join(runtimeRoot, 'prepared-runtime.json'), 'utf8'))
 prepared.javaBinary = resolve(runtimeRoot, prepared.javaBinary)
 prepared.tikaJar = resolve(runtimeRoot, prepared.tikaJar)

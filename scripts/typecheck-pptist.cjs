@@ -1,9 +1,11 @@
-const { realpathSync, mkdtempSync, writeFileSync, rmSync } = require('node:fs')
+const { realpathSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } = require('node:fs')
 const { resolve, join } = require('node:path')
 
 // Resolve the source directory physically so Vue resolves PPTist's own dependencies
 // beside its pnpm package instead of beside the workspace symlink.
-const directory = mkdtempSync(resolve('.pptist-typecheck-'))
+const outputRoot = resolve('out')
+mkdirSync(outputRoot, { recursive: true })
+const directory = mkdtempSync(join(outputRoot, '.pptist-typecheck-'))
 const config = join(directory, 'tsconfig.json')
 writeFileSync(config, JSON.stringify({
   extends: resolve('tsconfig.pptist.json'),

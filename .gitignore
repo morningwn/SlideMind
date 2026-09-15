@@ -66,8 +66,6 @@ coverage/
 
 # Local image-loading benchmark corpus and reports (may contain private paths)
 .local
-.tika-p0-runtime/
-.tika-package-runtime/
 __pycache__/
 *.tsbuildinfo
 .vite/

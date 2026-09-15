@@ -42,7 +42,7 @@ export function resolveTikaRuntimeOptions(
   const platform = `${process.platform}-${process.arch}`
   const runtimeRoot = options.isPackaged
     ? join(options.resourcesPath, 'tika-runtime', platform)
-    : join(options.appPath, '.tika-p0-runtime', platform)
+    : join(options.appPath, 'out/.tika-p0-runtime', platform)
   const preparedPath = join(runtimeRoot, 'prepared-runtime.json')
   const configPath = options.isPackaged
     ? join(runtimeRoot, 'tika-config.json')

@@ -39,7 +39,7 @@ pnpm tika:p0:prepare
 pnpm tika:p0:probe
 ```
 
-资源准备脚本会校验大小和摘要，解压到被 Git 忽略的 `.tika-p0-runtime/<platform>/`。探针使用动态回环端口和随机 Server ID，输出结构化结果到 `.local/tika-p0-probe.json`，退出时按所属进程组回收 Tika 父进程与 fork。
+资源准备脚本会校验大小和摘要，解压到被 Git 忽略的 `out/.tika-p0-runtime/<platform>/`。探针使用动态回环端口和随机 Server ID，输出结构化结果到 `.local/tika-p0-probe.json`，退出时按所属进程组回收 Tika 父进程与 fork。
 
 测试样本位于 `scripts/tika-p0/fixtures/`，由仓库内 `generate.py` 自行生成，不包含用户数据。DOCX 通过文档渲染流程做视觉核对。`simple-content.doc` 由 LibreOffice 的 Microsoft Word 97 导出器生成，`file` 识别为 OLE2 Composite Document File，不是 DOCX 改后缀文件。
 

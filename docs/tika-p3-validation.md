@@ -6,11 +6,11 @@
 
 ## 固定交付链路
 
-`scripts/tika-package/prepare.mjs` 根据目标平台调用 P0 的固定版本下载与校验流程，输出到 Git 忽略的 `.tika-package-runtime/<platform>/`。本机架构执行 Java 和 Tika；交叉准备只允许解压和结构准备，不能标记为执行已验证。
+`scripts/tika-package/prepare.mjs` 根据目标平台调用 P0 的固定版本下载与校验流程，输出到 Git 忽略的 `out/.tika-package-runtime/<platform>/`。本机架构执行 Java 和 Tika；交叉准备只允许解压和结构准备，不能标记为执行已验证。
 
 `scripts/tika-package/after-pack.mjs` 由 electron-builder 的 `afterPack` 钩子调用。它只向当前应用目录复制对应平台的 `runtime/`、相对路径清单和固定 Tika 配置，不复制下载归档，也不把其他架构运行时装入安装包。
 
-`scripts/tika-package/verify.mjs` 在构建完成后从 `release-dist/` 回查运行时，验证：
+`scripts/tika-package/verify.mjs` 在构建完成后从 `out/release/` 回查运行时，验证：
 
 - 清单版本、平台和相对路径；
 - Java 与 Tika 主文件存在且路径不能逃逸运行时目录；

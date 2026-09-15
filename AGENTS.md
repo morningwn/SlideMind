@@ -12,7 +12,7 @@ SlideMind 是基于 Electron、React、Vue 和 TypeScript 的桌面应用。各�
 - `skills/`：打包进应用的 PPT 制作总控及策略、文案、视觉、数据、流程图、模板和质量审查 Skill；`SKILL.md` 引用的规则放在对应 `references/`。
 - `assets/`：应用图标；`.github/workflows/`：持续集成配置。
 
-单元测试与实现文件放在同一目录，命名为 `*.test.ts`。不得提交 `out/`、`release-dist/`、`coverage/` 等生成目录。
+单元测试与实现文件放在同一目录，命名为 `*.test.ts`。不得提交 `out/`、`coverage/` 等生成目录。
 
 ## 构建、测试与开发命令
 
@@ -24,7 +24,7 @@ SlideMind 是基于 Electron、React、Vue 和 TypeScript 的桌面应用。各�
 - `pnpm test`：单次运行 Vitest 测试套件。
 - `pnpm check`：依次执行类型检查与测试；提交 PR 前必须运行。
 - `pnpm build`：完成校验并将生产构建写入 `out/`。
-- `pnpm package:mac` / `pnpm package:win`：在 `release-dist/` 生成平台安装包。
+- `pnpm package:mac` / `pnpm package:win`：在 `out/release/` 生成平台安装包。
 
 ## 编码风格与命名约定
 

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = resolve(scriptDirectory, '../..')
+const packageRuntimeRoot = join(repositoryRoot, 'out/.tika-package-runtime')
 const hostPlatform = `${process.platform}-${process.arch}`
 const requested = readOption('--platforms') ?? hostPlatform
 const platforms = requested.split(',').map((value) => value.trim()).filter(Boolean)
@@ -17,7 +18,7 @@ for (const platform of platforms) {
   const args = [
     join(repositoryRoot, 'scripts/tika-p0/prepare-runtime.mjs'),
     '--platform', platform,
-    '--output', join(repositoryRoot, '.tika-package-runtime', platform)
+    '--output', join(packageRuntimeRoot, platform)
   ]
   if (platform !== hostPlatform) args.push('--skip-execution')
   await run(process.execPath, args)

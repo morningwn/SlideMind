@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = resolve(scriptDirectory, '../..')
+const packageRuntimeRoot = join(repositoryRoot, 'out/.tika-package-runtime')
 const archNames = new Map([
   [1, 'x64'],
   [3, 'arm64']
@@ -17,7 +18,7 @@ export default async function afterPack(context) {
   }
 
   const target = `${platform}-${arch}`
-  const source = join(repositoryRoot, '.tika-package-runtime', target)
+  const source = join(packageRuntimeRoot, target)
   await validateRuntime(source, target)
 
   const resourcesDirectory = context.packager.getResourcesDir(context.appOutDir)

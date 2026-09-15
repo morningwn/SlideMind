@@ -49,9 +49,9 @@ jobs:
         with:
           name: slidemind-${{ runner.os }}
           path: |
-            release-dist/*.dmg
-            release-dist/*.zip
-            release-dist/*.exe
+            out/release/*.dmg
+            out/release/*.zip
+            out/release/*.exe
           if-no-files-found: error
 
   release:
@@ -66,7 +66,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           pattern: slidemind-*
-          path: release-dist
+          path: out/release
           merge-multiple: true
 
       - name: Create release and upload installers
@@ -75,9 +75,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          mapfile -d '' assets < <(find release-dist -maxdepth 1 -type f -print0)
+          mapfile -d '' assets < <(find out/release -maxdepth 1 -type f -print0)
           if (( ${#assets[@]} == 0 )); then
-            echo "No installers found in release-dist" >&2
+            echo "No installers found in out/release" >&2
             exit 1
           fi
 

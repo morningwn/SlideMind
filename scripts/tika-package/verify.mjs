@@ -9,7 +9,7 @@ import { validateRuntime } from './after-pack.mjs'
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = resolve(scriptDirectory, '../..')
-const releaseRoot = join(repositoryRoot, 'release-dist')
+const releaseRoot = join(repositoryRoot, 'out/release')
 const expectedPlatforms = (readOption('--platforms') ?? `${process.platform}-${process.arch}`)
   .split(',')
   .map((value) => value.trim())

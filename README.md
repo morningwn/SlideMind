@@ -24,7 +24,11 @@ pnpm package:mac   # macOS DMG/ZIP，Intel + Apple Silicon
 pnpm package:win   # Windows NSIS 安装包，x64
 ```
 
-`pnpm build` 的生产构建写入 `out/`；平台安装包写入 `release-dist/`。
+所有构建、检查与打包产物统一写入 `out/`：Electron Vite 生产构建位于
+`out/main/`、`out/preload/` 和 `out/renderer/`，PPTist 类型检查临时目录位于
+`out/.pptist-typecheck-*/`，Tika 开发运行时与打包暂存分别位于
+`out/.tika-p0-runtime/` 和 `out/.tika-package-runtime/`，平台安装包及 Electron Builder
+中间产物位于 `out/release/`。
 
 ### 自动验证
 

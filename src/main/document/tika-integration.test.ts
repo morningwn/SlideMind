@@ -8,7 +8,7 @@ import { TikaRuntime } from './tika-runtime'
 const repositoryRoot = resolve(__dirname, '../../..')
 const runtimeRoot = resolve(
   repositoryRoot,
-  '.tika-p0-runtime',
+  'out/.tika-p0-runtime',
   `${process.platform}-${process.arch}`
 )
 const preparedPath = resolve(runtimeRoot, 'prepared-runtime.json')
@@ -24,8 +24,8 @@ describe.skipIf(!integrationEnabled)('fixed Tika runtime integration', () => {
     const runtime = new TikaRuntime({
       configPath: resolve(repositoryRoot, 'scripts/tika-p0/tika-config.json'),
       idleTimeoutMs: 60_000,
-      javaBinary: prepared.javaBinary,
-      tikaJar: prepared.tikaJar,
+      javaBinary: resolve(runtimeRoot, prepared.javaBinary),
+      tikaJar: resolve(runtimeRoot, prepared.tikaJar),
       tikaVersion: prepared.tikaVersion
     })
     try {
