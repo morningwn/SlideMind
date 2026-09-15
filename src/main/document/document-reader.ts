@@ -422,7 +422,11 @@ export class DocumentReadService {
     } catch {
       throw new DocumentReadError('invalid_cursor', '文档游标无效')
     }
-    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    if (
+      actual.toString('base64url') !== signature ||
+      actual.length !== expected.length ||
+      !timingSafeEqual(actual, expected)
+    ) {
       throw new DocumentReadError('invalid_cursor', '文档游标无效')
     }
     let value: unknown

@@ -91,6 +91,8 @@ describe('bundled presentation skills', () => {
     expect(workflow).toContain('审阅模式')
     expect(contract).toContain('`continuous`')
     expect(contract).toContain('`review`')
+    expect(contract).toContain('`document_read`')
+    expect(contract).toContain('`nextCursor`')
     expect(workflow).not.toMatch(/\.\.\/[^\s`]+\/SKILL\.md/)
     for (const guide of imageGuides) {
       expect(guide).toContain('项目内图片')

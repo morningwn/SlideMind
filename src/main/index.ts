@@ -256,7 +256,8 @@ app.whenReady().then(() => {
       resourcesPath: process.resourcesPath
     }),
     presentationService,
-    mutationService
+    mutationService,
+    documentReadService
   )
   const recentProjectStore = new RecentProjectStore(
     join(app.getPath('userData'), 'recent-projects.json')

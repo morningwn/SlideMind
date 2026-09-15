@@ -38,6 +38,7 @@ describe('createManagedPermissionPolicy', () => {
       find: 'allow',
       ls: 'allow',
       todo: 'allow',
+      document_read: 'allow',
       pptx_read: 'allow',
       slides_render: 'allow',
       slides_review: 'allow',

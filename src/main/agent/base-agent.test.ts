@@ -170,6 +170,7 @@ describe('BaseAgentService.stop', () => {
       '/agent',
       '/skills',
       {} as never,
+      {} as never,
       {} as never
     )
     const session = {
@@ -210,6 +211,7 @@ describe('BaseAgentService prompt references', () => {
       '/agent',
       '/skills',
       {} as never,
+      {} as never,
       {} as never
     )
     const internal = service as unknown as {
@@ -243,6 +245,7 @@ describe('BaseAgentService prompt references', () => {
       '/agent',
       '/skills',
       {} as never,
+      {} as never,
       {} as never
     )
     const internal = service as unknown as {
@@ -262,5 +265,69 @@ describe('BaseAgentService prompt references', () => {
     expect(injected).toContain('使用 slides_read 工具')
     expect(injected).toContain('brief.slides.json')
     expect(injected).not.toContain('使用 read 工具读取')
+  })
+
+  it('routes Word documents through document_read instead of the binary read tool', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-agent-document-'))
+    await writeFile(join(projectPath, 'brief.docx'), Buffer.from([1, 2, 3]))
+    const service = new BaseAgentService(
+      {} as never,
+      {} as never,
+      '/agent',
+      '/skills',
+      {} as never,
+      {} as never,
+      {} as never
+    )
+    const internal = service as unknown as {
+      injectPromptReferences(input: ReturnType<typeof normalizeAgentPromptInput>, path: string):
+        Promise<string>
+    }
+    const prompt = normalizeAgentPromptInput({
+      requestId: 'request-1',
+      conversationId: 'conversation-1',
+      projectHandle: 'project-1',
+      input: '总结这份 Word 文档',
+      references: [{ type: 'file', path: 'brief.docx' }]
+    })
+
+    const injected = await internal.injectPromptReferences(prompt, projectPath)
+
+    expect(injected).toContain('使用 document_read 工具')
+    expect(injected).toContain('brief.docx')
+    expect(injected).toContain('nextCursor')
+    expect(injected).not.toContain('使用 read 工具读取')
+  })
+
+  it('keeps regular text references on the text read tool', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-agent-text-'))
+    await writeFile(join(projectPath, 'brief.md'), '# Brief')
+    const service = new BaseAgentService(
+      {} as never,
+      {} as never,
+      '/agent',
+      '/skills',
+      {} as never,
+      {} as never,
+      {} as never
+    )
+    const internal = service as unknown as {
+      injectPromptReferences(input: ReturnType<typeof normalizeAgentPromptInput>, path: string):
+        Promise<string>
+    }
+    const prompt = normalizeAgentPromptInput({
+      requestId: 'request-1',
+      conversationId: 'conversation-1',
+      projectHandle: 'project-1',
+      input: '总结这份 Markdown',
+      references: [{ type: 'file', path: 'brief.md' }]
+    })
+
+    const injected = await internal.injectPromptReferences(prompt, projectPath)
+
+    expect(injected).toContain('使用 read 工具读取')
+    expect(injected).not.toContain('document_read')
+    expect(injected).not.toContain('pptx_read')
+    expect(injected).not.toContain('slides_read')
   })
 })

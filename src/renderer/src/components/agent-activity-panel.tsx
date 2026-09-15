@@ -14,13 +14,14 @@ const toolLabels: Readonly<Record<string, string>> = {
   find: '查找文件',
   ls: '浏览目录',
   todo: '更新任务',
+  document_read: '读取 Word 文档',
   slides_create: '创建演示文稿',
   slides_read: '读取演示文稿',
   slides_write: '更新演示文稿',
   slides_export: '导出演示文稿'
 }
 
-function activityTitle(activity: AgentActivity): string {
+export function activityTitle(activity: AgentActivity): string {
   if (activity.kind === 'thinking') return '思考'
   if (activity.kind === 'skill') return activity.name
   return toolLabels[activity.name] ?? activity.name
