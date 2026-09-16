@@ -1,7 +1,7 @@
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TikaParseResult } from './tika-client'
 import {
   DocumentReadService,
@@ -84,6 +84,33 @@ function parsed(content: string): TikaParseResult {
 }
 
 describe('DocumentReadService', () => {
+  it('parses bounded Web PDF bytes through the managed runtime without a project file', async () => {
+    const parser = {
+      parse: vi.fn(async () => ({
+        entries: [{ 'tk:content': 'Web PDF text' }],
+        mimeType: 'application/pdf',
+      })),
+    }
+    const { service } = createService(parser)
+    const signal = new AbortController().signal
+    expect(
+      await service.parseWebPdf(Buffer.from('%PDF-1.7'), signal),
+    ).toContain('Web PDF text')
+    expect(parser.parse).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Uint8Array),
+      'web-source.pdf',
+      signal,
+    )
+    await expect(
+      service.parseWebPdf(Buffer.alloc(20 * 1024 * 1024 + 1), signal),
+    ).rejects.toThrow('20 MiB')
+    await expect(
+      service.parseWebPdf(Buffer.from('%PDF-1.7'), AbortSignal.abort()),
+    ).rejects.toThrow()
+    expect(parser.parse).toHaveBeenCalledOnce()
+  })
+
   it.each(['sample.xls', 'sample.xlsx', 'sample.pdf'])(
     'accepts the supported document path %s',
     async (file) => {

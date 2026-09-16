@@ -86,6 +86,7 @@ describe('preparePermissionSystem', () => {
       `slidemind-permissions-${crypto.randomUUID()}`,
     )
     const setup = await preparePermissionSystem(agentDirectory)
+    expect(process.env.PI_CODING_AGENT_DIR).toBe(agentDirectory)
     const policy = JSON.parse(await readFile(setup.policyPath, 'utf8')) as {
       defaultPolicy: Record<string, string>
     }

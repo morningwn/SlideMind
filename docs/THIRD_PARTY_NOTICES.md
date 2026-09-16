@@ -8,11 +8,12 @@ PPTist is copyright © 2020-present pipipi-pikachu and contributors, and is lice
 
 SlideMind's PPTist bridge and integration changes are distributed as part of this repository under the same AGPL-3.0-only license.
 
-## Pi agent extensions
+## Web content extraction
 
-SlideMind bundles the following pinned Pi extensions:
+SlideMind's internal Web tools use these pinned extraction libraries:
 
-- [pi-web-access 0.27.0](https://github.com/nicobailon/pi-web-access), licensed under the MIT License.
+- [Mozilla Readability 0.6.0](https://github.com/mozilla/readability), licensed under the Apache License 2.0.
+- [linkedom 0.16.0](https://github.com/WebReflection/linkedom), licensed under the ISC License.
 
 The corresponding package license texts are distributed with the packaged dependencies.
 

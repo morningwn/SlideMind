@@ -66,7 +66,8 @@ src/
 - preload 通过受限、类型化接口提供模型配置、Skill 列表、对话调用、停止、用量、任务清单和活动流；Agent 的文件访问与项目修改仍由主进程边界校验。
 - 工作清单由应用内置 `todo` 工具管理，支持 `replace`、`add`、`update`、`list`；清单随会话分支恢复，旧会话的任务快照可只读显示。
 - 应用内置 PPT 制作总控 Skill，并按阶段调度演示策略、页面文案、视觉设计、数据表达、流程图、模板和成稿审查 Skill；开发态从 `skills/` 加载，打包后作为只读资源注入 Pi Agent。
-- Pi Agent 使用应用内的缓存前缀整理逻辑与 `pi-web-access`，并使用 Pi 原生压缩。DeepSeek 模型由应用注册；Web 能力按白名单启用。缓存 token 用量、压缩事件与历史会话重新加载的结构性信号记录在本地诊断日志中，不自动上传。
+- Pi Agent 使用应用内的缓存前缀整理逻辑和 Web 工具，并使用 Pi 原生压缩。DeepSeek 模型由应用注册；Web 固定使用 Exa 公共搜索，不读取本机搜索凭据、旧配置或浏览器 Cookie。公共接口可能限流，失败不会自动改用付费服务。缓存 token 用量、压缩事件与历史会话重新加载的结构性信号记录在本地诊断日志中，不自动上传。
+- Web 工具保留 `web_search`、`source_check`、`fetch_content`、`get_search_content`。支持域名/发布日期过滤、公开网页/文本/PDF 正文及分页字面量查找；`source_check` 组织证据，不判断论断真假。缓存按项目和会话分支授权，单会话最多 32 项/16 MiB，读取有效期一小时；过期、旧插件结果或已清理内容须重新获取。禁止代理、登录、脚本执行、音视频、OCR、raw/answer 和模糊查找。限制和验证记录见 [Web 工具方案](docs/pi-web-tools-plan.md)。
 - 插件配置位于应用 `userData/pi-agent/`；首次启动会写入无浏览器弹窗、禁止读取浏览器 Cookie 的 Web 安全默认值，并关闭依赖 `git`、`gh`、`curl`、`yt-dlp` 或 `ffmpeg` 的能力。
 - 当前项目仍可通过 `.pi/skills/` 增加或覆盖同名 Skill，用户级 Skill 位于应用 `userData/pi-agent/skills/`。
 

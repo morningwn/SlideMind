@@ -42,14 +42,11 @@ import {
   preparePermissionSystem,
   type PermissionSystemSetup,
 } from './permission-policy'
-import {
-  PI_AGENT_TOOL_NAMES,
-  PI_EXTENSION_PATHS,
-  createWebAccessGuardExtension,
-  preparePiExtensions,
-} from './pi-extensions'
+import { PI_AGENT_TOOL_NAMES } from './pi-extensions'
 import { createPresentationToolsExtension } from './presentation-tools'
 import { createProjectMutationToolsExtension } from './project-mutation-tools'
+import { createWebToolsExtension } from './web-tools'
+import { createHash } from 'node:crypto'
 import { createTemplateToolsExtension } from './template-tools'
 import { createDocumentToolsExtension } from './document-tools'
 import { createCacheOptimizationExtension } from './cache-optimization'
@@ -59,8 +56,7 @@ import { isDocumentPath } from '../../shared/document'
 const MAX_AGENT_SESSIONS = 50
 const MAX_PROMPT_REFERENCES = 20
 const BUILT_IN_EXTENSION_FACTORY_COUNT = 7
-const EXPECTED_AGENT_EXTENSION_COUNT =
-  1 + PI_EXTENSION_PATHS.length + BUILT_IN_EXTENSION_FACTORY_COUNT
+const EXPECTED_AGENT_EXTENSION_COUNT = 1 + BUILT_IN_EXTENSION_FACTORY_COUNT
 const SESSION_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/
 const SYSTEM_PROMPT = `你是 SlideMind 的基础演示创作 agent。
 你的职责是帮助用户梳理材料、建立清晰叙事、规划演示结构并打磨表达。
@@ -491,7 +487,6 @@ export class BaseAgentService {
       await loadPiRuntime()
     const modelRuntime = await this.getModelRuntime()
     const permissionSystem = await this.getPermissionSystem()
-    await preparePiExtensions(this.agentDirectory)
     await modelRuntime.setRuntimeApiKey(DEEPSEEK_PROVIDER_ID, config.apiKey)
     const model = modelRuntime.getModel(DEEPSEEK_PROVIDER_ID, config.modelId)
 
@@ -530,10 +525,7 @@ export class BaseAgentService {
     const resourceLoader = new DefaultResourceLoader({
       cwd: projectPath,
       agentDir: this.agentDirectory,
-      additionalExtensionPaths: [
-        permissionSystem.extensionPath,
-        ...PI_EXTENSION_PATHS,
-      ],
+      additionalExtensionPaths: [permissionSystem.extensionPath],
       additionalSkillPaths: skillPaths,
       extensionFactories: [
         {
@@ -547,8 +539,19 @@ export class BaseAgentService {
           factory: createCacheOptimizationExtension(projectPath),
         },
         {
-          name: 'slidemind-web-access-guard',
-          factory: createWebAccessGuardExtension,
+          name: 'slidemind-web-tools',
+          factory: createWebToolsExtension({
+            cacheDirectory: join(
+              this.agentDirectory,
+              'web-cache',
+              createHash('sha256')
+                .update(`${projectPath}\0${conversationId}`)
+                .digest('hex'),
+            ),
+            getBranch: () => sessionManager.getBranch(),
+            parsePdf: (bytes, signal) =>
+              this.documentReader.parseWebPdf(bytes, signal),
+          }),
         },
         {
           name: 'slidemind-presentations',

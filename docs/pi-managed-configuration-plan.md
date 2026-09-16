@@ -2,7 +2,7 @@
 
 日期：2026-09-16。
 
-状态：部分实施。已移除 pi-free、pi-continue 和 pi-cache-optimizer；其余阶段仍待实施。
+状态：部分实施。已移除 pi-free、pi-continue 和 pi-cache-optimizer，Todo 和 Web 已改为应用内置工具；Pi 核心与权限隔离等阶段仍待实施。
 
 ## 实施记录
 
@@ -17,6 +17,8 @@
 2026-09-16：Todo 已替换为应用内置 ExtensionFactory，工具操作改为 `replace`、`add`、`update`、`list`。任务快照保存在 Pi 会话工具结果中，启动、重载和分支切换时回放当前分支；旧 `rpiv-todo` 快照仅只读转换界面字段。已移除旧插件加载入口、依赖和最低发布时间例外，不删除用户历史会话。权限系统与 Web Access 的配置隔离仍待实施，不能据此认定整体隔离已完成。
 
 ## 目标与边界
+
+2026-09-16：用户明确要求 Web 直接切换，已移除 pi-web-access 并内置四个 Web 工具，固定使用 Exa 无 Key 公共接口，不读取旧搜索配置、环境凭据或浏览器资料。正文提取复用 Readability/linkedom 和 Tika；缓存按会话及当前分支授权。无双实现和自动回退。行为差异与验证边界见 [Web 工具实施记录](pi-web-tools-plan.md)，不据此认定 Pi 核心和权限配置已隔离。
 
 采用“应用统一管理配置 + 非必要能力移除 + 简单必要能力自研 + 复杂必要能力按需适配”，关闭 Pi 核心与扩展的外部配置自动发现，保留必要的 Agent 能力。
 
@@ -106,6 +108,8 @@ SlideMind 选择宿主控制的嵌入式集成：复用 Pi 的模型调用、工
 | Web Access | 评估自研限定能力，复杂路径适配   | 产品必要能力按现有 web_search、source_check、fetch_content、get_search_content 调用方核查。优先复用项目已有网络与文档能力，实现固定搜索服务、内容获取及结果缓存；不承诺完整 Web 抓取是低成本，无可用服务或存在复杂缺口时保留适配版 |
 
 权限系统的威胁模型、工具边界、迁移顺序和验收门槛见 [Pi 权限系统替换实施提案](pi-permission-replacement-plan.md)。
+
+Web 工具已按用户要求直接切换，服务选择、执行边界、行为差异及验证记录见 [Web 工具直接切换方案](pi-web-tools-plan.md)。
 
 ### Todo 实施设计
 

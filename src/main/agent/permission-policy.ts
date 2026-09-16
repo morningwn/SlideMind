@@ -16,25 +16,36 @@ export interface PermissionSystemSetup {
 
 function normalizePermissionPath(path: string): string {
   const normalizedPath = path.replaceAll('\\', '/')
-  return process.platform === 'win32' ? normalizedPath.toLowerCase() : normalizedPath
+  return process.platform === 'win32'
+    ? normalizedPath.toLowerCase()
+    : normalizedPath
 }
 
 export function createManagedPermissionPolicy(
   agentDirectory: string,
-  readOnlyDirectories: readonly string[] = []
+  readOnlyDirectories: readonly string[] = [],
 ): Record<string, unknown> {
-  const skillsDirectory = normalizePermissionPath(join(agentDirectory, 'skills'))
-  const protectedDirectories = [skillsDirectory, ...readOnlyDirectories.map(normalizePermissionPath)]
-  const fileToolRules = Object.fromEntries(protectedDirectories.flatMap((directory) => [
-    [`write:${directory}`, 'deny'],
-    [`write:${directory}/*`, 'deny'],
-    [`edit:${directory}`, 'deny'],
-    [`edit:${directory}/*`, 'deny']
-  ]))
-  const externalDirectoryRules = Object.fromEntries(protectedDirectories.flatMap((directory) => [
-    [`external_directory:${directory}`, 'allow'],
-    [`external_directory:${directory}/*`, 'allow']
-  ]))
+  const skillsDirectory = normalizePermissionPath(
+    join(agentDirectory, 'skills'),
+  )
+  const protectedDirectories = [
+    skillsDirectory,
+    ...readOnlyDirectories.map(normalizePermissionPath),
+  ]
+  const fileToolRules = Object.fromEntries(
+    protectedDirectories.flatMap((directory) => [
+      [`write:${directory}`, 'deny'],
+      [`write:${directory}/*`, 'deny'],
+      [`edit:${directory}`, 'deny'],
+      [`edit:${directory}/*`, 'deny'],
+    ]),
+  )
+  const externalDirectoryRules = Object.fromEntries(
+    protectedDirectories.flatMap((directory) => [
+      [`external_directory:${directory}`, 'allow'],
+      [`external_directory:${directory}/*`, 'allow'],
+    ]),
+  )
 
   return {
     defaultPolicy: {
@@ -42,7 +53,7 @@ export function createManagedPermissionPolicy(
       bash: 'deny',
       mcp: 'deny',
       skills: 'deny',
-      special: 'deny'
+      special: 'deny',
     },
     tools: {
       '*': 'deny',
@@ -63,28 +74,28 @@ export function createManagedPermissionPolicy(
       slides_export: 'allow',
       template_query: 'allow',
       ...Object.fromEntries(PI_AGENT_TOOL_NAMES.map((name) => [name, 'allow'])),
-      ...fileToolRules
+      ...fileToolRules,
     },
     bash: {
-      '*': 'deny'
+      '*': 'deny',
     },
     mcp: {
-      '*': 'deny'
+      '*': 'deny',
     },
     skills: {
-      '*': 'allow'
+      '*': 'allow',
     },
     special: {
       '*': 'deny',
       external_directory: 'deny',
-      ...externalDirectoryRules
-    }
+      ...externalDirectoryRules,
+    },
   }
 }
 
 export async function preparePermissionSystem(
   agentDirectory: string,
-  readOnlyDirectories: readonly string[] = []
+  readOnlyDirectories: readonly string[] = [],
 ): Promise<PermissionSystemSetup> {
   const permissionDirectory = join(agentDirectory, PERMISSION_SYSTEM_DIRECTORY)
   const policyPath = join(permissionDirectory, PERMISSION_POLICY_FILE)
@@ -96,26 +107,32 @@ export async function preparePermissionSystem(
     writeFile(
       policyPath,
       `${JSON.stringify(createManagedPermissionPolicy(agentDirectory, readOnlyDirectories), null, 2)}\n`,
-      { encoding: 'utf8', mode: 0o600 }
+      { encoding: 'utf8', mode: 0o600 },
     ),
     writeFile(
       configPath,
-      `${JSON.stringify({
-        enabled: true,
-        debug: false,
-        yoloMode: false,
-        forwardedPromptTimeoutSeconds: null
-      }, null, 2)}\n`,
-      { encoding: 'utf8', mode: 0o600 }
-    )
+      `${JSON.stringify(
+        {
+          enabled: true,
+          debug: false,
+          yoloMode: false,
+          forwardedPromptTimeoutSeconds: null,
+        },
+        null,
+        2,
+      )}\n`,
+      { encoding: 'utf8', mode: 0o600 },
+    ),
   ])
 
+  // The retained permission extension still uses getAgentDir() for auxiliary paths.
+  process.env.PI_CODING_AGENT_DIR = agentDirectory
   process.env.PI_PERMISSION_SYSTEM_POLICY_AGENT_DIR = permissionDirectory
   process.env.PI_PERMISSION_SYSTEM_CONFIG_PATH = configPath
   process.env.PI_PERMISSION_SYSTEM_LOGS_DIR = logsDirectory
 
   return {
     extensionPath: require.resolve('pi-permission-system'),
-    policyPath
+    policyPath,
   }
 }

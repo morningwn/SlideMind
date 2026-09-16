@@ -207,6 +207,22 @@ export class DocumentReadService {
     this.maxQueueLength = options.maxQueueLength ?? DEFAULT_QUEUE_LENGTH
   }
 
+  async parseWebPdf(bytes: Uint8Array, signal: AbortSignal): Promise<string> {
+    signal.throwIfAborted()
+    if (bytes.byteLength === 0 || bytes.byteLength > 20 * 1024 * 1024) {
+      throw new DocumentReadError(
+        'file_too_large',
+        '网页 PDF 必须大于 0 且不超过 20 MiB',
+      )
+    }
+    const parsed = await this.runtime.run((baseUrl) => {
+      signal.throwIfAborted()
+      return this.parser.parse(baseUrl, bytes, 'web-source.pdf', signal)
+    })
+    signal.throwIfAborted()
+    return normalizeTikaDocument(parsed.entries).content
+  }
+
   async read(
     projectPath: string,
     inputValue: DocumentReadInput | unknown,
