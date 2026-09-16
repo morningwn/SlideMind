@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
 import { stat, writeFile } from 'node:fs/promises'
-import { dirname, join } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, session } from 'electron'
 import PDFDocument from 'pdfkit'
@@ -129,7 +129,7 @@ async function renderMarkdownPdf(
           (url.protocol === 'ws:' || url.protocol === 'wss:') &&
           url.host === new URL(developmentOrigin).host) ||
         (url.protocol === 'file:' &&
-          fileURLToPath(url).startsWith(`${allowedRoot}/`))
+          fileURLToPath(url).startsWith(`${allowedRoot}${sep}`))
     } catch {
       allowed = false
     }

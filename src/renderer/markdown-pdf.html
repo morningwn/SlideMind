@@ -4,15 +4,16 @@
     <meta charset="UTF-8" />
     <link rel="stylesheet" href="./src/styles.css" />
     <style>
-      :root {
+      /* Vite places bundled CSS after this block in production builds. */
+      html:root {
         --blue: #2f61e9;
         background: #fff;
       }
-      body {
+      html body {
         margin: 0;
         background: #fff;
       }
-      .markdown-preview {
+      html body .markdown-preview {
         width: auto;
         margin: 0;
       }
@@ -31,7 +32,7 @@
         blockquote {
           break-inside: avoid;
         }
-        .markdown-preview pre {
+        html body .markdown-preview pre {
           overflow: visible;
           white-space: pre-wrap;
           overflow-wrap: anywhere;

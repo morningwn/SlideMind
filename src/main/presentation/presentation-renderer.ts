@@ -1,6 +1,6 @@
 import { app, BrowserWindow, session } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { PptistPresentation } from '../../shared/presentation'
 
@@ -198,7 +198,7 @@ export async function renderPresentationSlidesIncrementally(
             (url.protocol === 'ws:' || url.protocol === 'wss:') &&
             url.host === new URL(developmentOrigin).host) ||
           (url.protocol === 'file:' &&
-            fileURLToPath(url).startsWith(`${allowedRoot}/`))
+            fileURLToPath(url).startsWith(`${allowedRoot}${sep}`))
       } catch {
         /* invalid URL */
       }
@@ -231,16 +231,16 @@ export async function renderPresentationSlidesIncrementally(
     await loadPptistRenderer(window)
     window.webContents.setZoomFactor(1)
     if (options.targetPixelWidth) {
-      const devicePixelRatio = (await window.webContents.executeJavaScript(
-        'window.devicePixelRatio',
-        true,
-      )) as number
-      if (!Number.isFinite(devicePixelRatio) || devicePixelRatio <= 0) {
-        throw new Error('幻灯片渲染缩放比例无效')
+      const calibration = await window.webContents.capturePage()
+      const [contentWidth] = window.getContentSize()
+      const capturedWidth = calibration.getSize().width
+      const captureScale = capturedWidth > 0 ? capturedWidth / contentWidth : 0
+      if (!Number.isFinite(captureScale) || captureScale <= 0) {
+        throw new Error('幻灯片截图缩放比例无效')
       }
       const targetWidth = Math.max(
         640,
-        Math.min(2560, Math.round(options.targetPixelWidth / devicePixelRatio)),
+        Math.min(2560, Math.round(options.targetPixelWidth / captureScale)),
       )
       const targetSize = renderWindowSize(
         presentation,
@@ -267,10 +267,15 @@ export async function renderPresentationSlidesIncrementally(
       )
       if (blockedResource) throw new Error(`第 ${slideNumber} 页包含未授权资源`)
       if (image.isEmpty()) throw new Error(`第 ${slideNumber} 页渲染结果为空`)
-      const png = image.toPNG()
+      const captured =
+        options.targetPixelWidth &&
+        image.getSize().width > options.targetPixelWidth
+          ? image.resize({ width: options.targetPixelWidth, quality: 'best' })
+          : image
+      const png = captured.toPNG()
       if (png.byteLength === 0)
         throw new Error(`第 ${slideNumber} 页 PNG 编码结果为空`)
-      const imageSize = image.getSize()
+      const imageSize = captured.getSize()
       await consume({
         height: imageSize.height,
         number: slideNumber,
