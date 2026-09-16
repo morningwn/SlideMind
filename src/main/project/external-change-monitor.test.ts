@@ -19,11 +19,14 @@ async function waitForEvents(
 }
 
 describe('ExternalChangeMonitor', () => {
-  it('reports only opened files and entries in visible directories', async () => {
+  it('reports changes throughout the project and ignores internal directories', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-watch-'))
     await mkdir(join(projectPath, 'visible'))
+    await mkdir(join(projectPath, 'nested'))
+    await mkdir(join(projectPath, 'nested', 'deep'))
+    await mkdir(join(projectPath, '.slidemind'))
     await writeFile(join(projectPath, 'opened.md'), '# open\n')
-    await writeFile(join(projectPath, 'ignored.md'), '# ignored\n')
+    await writeFile(join(projectPath, 'nested', 'deep', 'existing.md'), '# existing\n')
     const versions = new ProjectVersionService()
     const mutations = new ProjectMutationService(versions)
     const monitor = new ExternalChangeMonitor(mutations, { usePolling: true })
@@ -36,13 +39,15 @@ describe('ExternalChangeMonitor', () => {
     })
     await writeFile(join(projectPath, 'opened.md'), '# changed externally\n')
     await writeFile(join(projectPath, 'visible', 'new.md'), '# visible\n')
-    await writeFile(join(projectPath, 'ignored.md'), '# still ignored\n')
-    await waitForEvents(events, 2)
+    await writeFile(join(projectPath, 'nested', 'deep', 'existing.md'), '# changed\n')
+    await writeFile(join(projectPath, '.slidemind', 'internal.md'), '# internal\n')
+    await waitForEvents(events, 3)
 
     expect(events.map((event) => event.path).sort()).toEqual([
+      join('nested', 'deep', 'existing.md'),
       'opened.md',
       join('visible', 'new.md')
-    ])
+    ].sort())
     expect(events.every((event) => event.source === 'external')).toBe(true)
 
     const beforeInternalWrite = events.length

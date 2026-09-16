@@ -1,4 +1,4 @@
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import { isAbsolute, relative, resolve, sep } from 'node:path'
 import chokidar, { type FSWatcher } from 'chokidar'
 import type {
   ProjectExternalWatchScope,
@@ -14,9 +14,6 @@ const MAX_WATCHED_DIRECTORIES = 100
 const logger = getLogger('external-change-monitor')
 
 interface ProjectWatcher {
-  directories: Set<string>
-  files: Set<string>
-  key: string
   projectPath: string
   watcher: FSWatcher
 }
@@ -115,26 +112,23 @@ export class ExternalChangeMonitor {
     scopeInput: unknown
   ): Promise<void> {
     const scope = normalizeScope(projectPath, scopeInput)
-    const files = new Set(scope.files.filter(isVersionedProjectPath))
-    const directories = new Set(scope.directories.filter(
-      (path) => path === '' || isVersionedProjectPath(path)
-    ))
-    const key = JSON.stringify({ files: [...files].sort(), directories: [...directories].sort() })
     const current = this.watchers.get(projectHandle)
-    if (current?.key === key && current.projectPath === projectPath) return
+    if (current?.projectPath === projectPath && (scope.files.length || scope.directories.length)) {
+      return
+    }
     if (current) {
       this.watchers.delete(projectHandle)
       await current.watcher.close()
     }
-    if (files.size === 0 && directories.size === 0) return
+    if (scope.files.length === 0 && scope.directories.length === 0) return
 
-    const watchPaths = new Set<string>()
-    for (const path of files) watchPaths.add(resolve(projectPath, dirname(path)))
-    for (const path of directories) watchPaths.add(resolve(projectPath, path))
-    const watcher = chokidar.watch([...watchPaths], {
+    const watcher = chokidar.watch(projectPath, {
       ignoreInitial: true,
       followSymlinks: false,
-      depth: 0,
+      ignored: (path) => {
+        const relativePath = relative(projectPath, path)
+        return Boolean(relativePath) && !isVersionedProjectPath(relativePath)
+      },
       usePolling: this.options.usePolling ?? false,
       atomic: true,
       awaitWriteFinish: {
@@ -142,7 +136,7 @@ export class ExternalChangeMonitor {
         pollInterval: 100
       }
     })
-    const registered: ProjectWatcher = { directories, files, key, projectPath, watcher }
+    const registered: ProjectWatcher = { projectPath, watcher }
     this.watchers.set(projectHandle, registered)
     watcher.on('all', (event, absolutePath) => {
       void this.handleEvent(projectHandle, registered, event, absolutePath)
@@ -172,10 +166,6 @@ export class ExternalChangeMonitor {
     if (!kind) return
     const path = relative(registered.projectPath, absolutePath)
     if (!path || !isVersionedProjectPath(path)) return
-    const isOpenedFile = registered.files.has(path)
-    const parentDirectory = dirname(path) === '.' ? '' : dirname(path)
-    const isVisibleDirectoryEntry = registered.directories.has(parentDirectory)
-    if (!isOpenedFile && !isVisibleDirectoryEntry) return
     if (await this.mutations.isInternalEcho(registered.projectPath, path)) return
 
     const changedEvent: ProjectFileChangedEvent = {

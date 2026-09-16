@@ -48,6 +48,7 @@ let request: AgentPromptInput | undefined
 let finishPrompt: ((value: AgentPromptResult) => void) | undefined
 let content = 'original document'
 let revision = 'r1'
+let externalFileVisible = false
 let saves = 0
 let exportAttempt = 0
 const exportSnapshots: Array<{ path: string; content: string }> = []
@@ -63,7 +64,12 @@ Object.assign(window, {
   projects: {
     listDirectory: async (_handle, path) => path === 'assets'
       ? [{ kind: 'file', path: 'assets/child.txt', name: 'child.txt' }]
-      : [{ kind: 'file', path: 'notes.txt', name: 'notes.txt' }, { kind: 'directory', path: 'assets', name: 'assets' }, { kind: 'file', path: 'guide.md', name: 'guide.md' }],
+      : [
+        { kind: 'file', path: 'notes.txt', name: 'notes.txt' },
+        { kind: 'directory', path: 'assets', name: 'assets' },
+        { kind: 'file', path: 'guide.md', name: 'guide.md' },
+        ...(externalFileVisible ? [{ kind: 'file' as const, path: 'external.md', name: 'external.md' }] : [])
+      ],
     listFiles: async () => [], watchExternalChanges: async () => {},
     loadConversations: async () => ({ selectedConversationId: 'a', conversations: [{ id: 'a', title: 'Conversation A' }, { id: 'b', title: 'Conversation B' }] }),
     loadConversationMessages: async () => [],
@@ -173,6 +179,11 @@ async function workspaceTests(): Promise<void> {
   workspace.style.height = ''
   workspace.style.flexShrink = ''
   passed.push('Workspace controls: sidebar collapse and bounds, minimum window, tree/menu/tab keyboard navigation and growing composer')
+  externalFileVisible = true
+  fileListener?.({ projectHandle: 'test', path: 'external.md', kind: 'add', source: 'external' })
+  await until(() => [...document.querySelectorAll('[role="treeitem"]')]
+    .some((item) => item.textContent?.includes('external.md')), 'external file appears in tree')
+  passed.push('React workspace: external file creation refreshes the file tree')
   document.querySelector('[role="treeitem"]')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
   await until(() => document.querySelector('.cm-content'), 'document open')
   const activeTab = document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')!

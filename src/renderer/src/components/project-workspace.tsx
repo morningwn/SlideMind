@@ -714,19 +714,6 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   openDocumentsRef.current = openDocuments
   openPresentationsRef.current = openPresentations
   openImagesRef.current = openImages
-  const externalWatchScope = {
-    files: [
-      ...openDocuments.map((document) => document.path),
-      ...openPresentations.map((presentation) => presentation.path),
-      ...openImages.map((image) => image.path)
-    ],
-    directories: ['', ...expandedPaths]
-  }
-  const externalWatchScopeKey = JSON.stringify({
-    files: [...externalWatchScope.files].sort(),
-    directories: [...externalWatchScope.directories].sort()
-  })
-
   useLayoutEffect(() => {
     const element = workspaceRef.current!
     const observer = new ResizeObserver(() => {
@@ -892,11 +879,11 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   useEffect(() => {
     void window.projects
-      .watchExternalChanges(project.handle, externalWatchScope)
+      .watchExternalChanges(project.handle, { files: [], directories: [''] })
       .catch((error: unknown) => {
         setFileError(error instanceof Error ? error.message : '无法监听外部文件修改')
       })
-  }, [externalWatchScopeKey, project.handle])
+  }, [project.handle])
 
   useEffect(() => () => {
     void window.projects.watchExternalChanges(project.handle, {
@@ -905,11 +892,23 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }).catch(() => undefined)
   }, [project.handle])
 
-  useEffect(() => window.projects.onFileChanged((event) => {
-    if (event.projectHandle !== project.handle) return
-    void window.projects.listFiles(project.handle).then(setReferenceFiles).catch(() => undefined)
-    void handleProjectFileChanged(event)
-  }), [project.handle])
+  useEffect(() => {
+    let referenceRefreshTimeout: ReturnType<typeof setTimeout> | undefined
+    const unsubscribe = window.projects.onFileChanged((event) => {
+      if (event.projectHandle !== project.handle) return
+      if (event.kind !== 'change') {
+        clearTimeout(referenceRefreshTimeout)
+        referenceRefreshTimeout = setTimeout(() => {
+          void window.projects.listFiles(project.handle).then(setReferenceFiles).catch(() => undefined)
+        }, 250)
+      }
+      void handleProjectFileChanged(event)
+    })
+    return () => {
+      unsubscribe()
+      clearTimeout(referenceRefreshTimeout)
+    }
+  }, [project.handle, expandedPaths])
 
   useEffect(() => {
     function refreshVisibleProjectFiles(): void {
@@ -1149,7 +1148,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   async function handleProjectFileChanged(event: ProjectFileChangedEvent): Promise<void> {
     if (event.source === 'text-editor' || event.source === 'presentation-editor') return
-    await refreshDirectory(parentDirectory(event.path))
+    const directory = parentDirectory(event.path)
+    if (directory === '' || expandedPaths.has(directory)) await refreshDirectory(directory)
     const confirmedRestore = event.source === 'restore' && confirmedRestorePathsRef.current.delete(
       event.path
     )
