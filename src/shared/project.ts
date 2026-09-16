@@ -90,6 +90,7 @@ export interface ConversationMessage {
 export interface ProjectConversation {
   id: string
   title: string
+  archived?: boolean
 }
 
 export interface ProjectConversationState {

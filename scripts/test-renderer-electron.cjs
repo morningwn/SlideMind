@@ -13,6 +13,12 @@ app.whenReady().then(async () => {
   const errors = []
   let markdownExportScreenshot = Promise.resolve()
   window.webContents.on('page-title-updated', (_event, title) => {
+    if (title === 'SlideMind renderer tests - conversation archive ready') {
+      markdownExportScreenshot = window.webContents.capturePage().then((image) =>
+        writeFile(join(output, 'conversation-archive.png'), image.toPNG())
+      )
+      return
+    }
     if (title !== 'SlideMind renderer tests - markdown export ready') return
     markdownExportScreenshot = window.webContents.capturePage().then((image) =>
       writeFile(join(output, 'markdown-word-export.png'), image.toPNG())

@@ -4552,3 +4552,84 @@ button.file-tree-item:not(.file-tree-directory) {
 }
 
 .composer-actions { margin-left: auto; }
+
+.conversation-filter {
+  padding: 0 8px 6px;
+}
+.conversation-filter button,
+.conversation-archive-button {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #66748a;
+  cursor: pointer;
+}
+.conversation-filter > button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  font-size: 11px;
+}
+.conversation-filter svg,
+.conversation-archive-button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.conversation-filter-options {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.conversation-filter-options button {
+  padding: 5px 9px;
+  font-size: 11px;
+}
+.conversation-filter-options button[aria-pressed='true'] {
+  background: #e9effc;
+  color: #24488e;
+}
+.conversation-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.conversation-row .conversation-item {
+  flex: 1;
+  min-width: 0;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+}
+.conversation-item small {
+  font-size: 10px;
+  font-weight: 400;
+  color: #66748a;
+}
+.conversation-archive-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  height: 28px;
+  opacity: 0;
+}
+.conversation-row:hover .conversation-archive-button,
+.conversation-row:focus-within .conversation-archive-button {
+  opacity: 1;
+}
+.conversation-filter button:hover,
+.conversation-archive-button:hover {
+  background: #eef2f8;
+}
+.conversation-archive-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+.conversation-empty {
+  padding: 12px;
+  color: #66748a;
+  font-size: 12px;
+}

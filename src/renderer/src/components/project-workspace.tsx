@@ -87,6 +87,7 @@ interface ChatMessage extends ConversationMessage {
 interface Conversation {
   id: string
   title: string
+  archived?: boolean
   messages: ChatMessage[]
 }
 
@@ -604,6 +605,8 @@ function FileTreeLevel({
 
 export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspaceProps): React.JSX.Element {
   const [conversations, setConversations] = useState<Conversation[]>(() => [createConversation()])
+  const [conversationFilter, setConversationFilter] = useState<'active' | 'archived' | 'all'>('active')
+  const [isConversationFilterOpen, setIsConversationFilterOpen] = useState(false)
   const [selectedConversationId, setSelectedConversationId] = useState(() => conversations[0].id)
   const [draft, setDraft] = useState('')
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
@@ -689,6 +692,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   treeTabStopPath ??= entriesByDirectory['']?.[0]?.path ?? null
 
   const isSending = activeAgentRequest !== null
+  const visibleConversations = conversations.filter((conversation) =>
+    conversationFilter === 'all' || Boolean(conversation.archived) === (conversationFilter === 'archived')
+  )
 
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
@@ -938,6 +944,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   useEffect(() => {
     let active = true
+    setConversationFilter('active')
+    setIsConversationFilterOpen(false)
     setIsConversationLoading(true)
     setCanPersistConversations(false)
     setConversationError('')
@@ -1089,8 +1097,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   function startConversation(): void {
     if (isConversationLoading) return
     setActiveDocumentPath(null)
+    setConversationFilter('active')
     const existingDraft = conversations.find((conversation) =>
-      loadedConversationIds.has(conversation.id) && conversation.messages.length === 0
+      !conversation.archived && loadedConversationIds.has(conversation.id) && conversation.messages.length === 0
     )
     if (existingDraft) {
       setSelectedConversationId(existingDraft.id)
@@ -2483,18 +2492,53 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               title="新建对话"
             >＋</button>
           </header>
+          <div className="conversation-filter">
+            <button type="button" aria-label="筛选会话" aria-expanded={isConversationFilterOpen}
+              aria-controls="conversation-filter-options"
+              onClick={() => setIsConversationFilterOpen((open) => !open)}>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M6 10h8M8 15h4" /></svg>
+              {conversationFilter === 'active' ? '未归档' : conversationFilter === 'archived' ? '已归档' : '全部会话'}
+              <span>⌄</span>
+            </button>
+            {isConversationFilterOpen ? (
+              <div id="conversation-filter-options" className="conversation-filter-options" role="group" aria-label="会话筛选条件">
+                {(['active', 'archived', 'all'] as const).map((filter) => (
+                  <button key={filter} type="button" aria-pressed={conversationFilter === filter}
+                    onClick={() => { setConversationFilter(filter); setIsConversationFilterOpen(false) }}>
+                    {filter === 'active' ? '未归档' : filter === 'archived' ? '已归档' : '全部'}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <div className="conversation-list">
-            {conversations.map((conversation) => (
+            {visibleConversations.map((conversation) => (
+              <div className="conversation-row" key={conversation.id}>
                 <button
                   className={conversation.id === selectedConversation.id ? 'conversation-item conversation-item-active' : 'conversation-item'}
                   type="button"
-                  key={conversation.id}
+                  title={conversation.title}
                   onClick={() => void selectConversation(conversation.id)}
                 >
                   <ConversationIcon />
                   <span>{conversation.title}</span>
+                  {conversation.archived ? <small>已归档</small> : null}
                 </button>
-              ))}
+                <button className="conversation-archive-button" type="button"
+                  disabled={!canPersistConversations || isConversationLoading}
+                  aria-label={`${conversation.archived ? '取消归档' : '归档'}：${conversation.title}`}
+                  title={conversation.archived ? '取消归档' : '归档'}
+                  onClick={() => setConversations((current) => current.map((item) => item.id === conversation.id ? { ...item, archived: !item.archived } : item))}>
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    <path d="M3 7h14V4H3zM4 7v10h12V7" />
+                    <path d={conversation.archived ? 'M10 14V9m-2 2 2-2 2 2' : 'M8 10h4'} />
+                  </svg>
+                </button>
+              </div>
+            ))}
+            {visibleConversations.length === 0 ? (
+              <p className="conversation-empty">{conversationFilter === 'archived' ? '暂无已归档会话' : '暂无未归档会话'}</p>
+            ) : null}
           </div>
         </section>
 

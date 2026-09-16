@@ -10,7 +10,8 @@ function toPersistedState(
     selectedConversationId,
     conversations: conversations.map((conversation) => ({
       id: conversation.id,
-      title: conversation.title
+      title: conversation.title,
+      ...(conversation.archived !== undefined ? { archived: conversation.archived } : {})
     }))
   }
 }

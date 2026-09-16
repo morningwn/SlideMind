@@ -66,6 +66,24 @@ describe('ProjectConversationStore', () => {
       .toEqual({ version: 2, ...conversationState })
   })
 
+  it('persists archive and restore state without changing the conversation identity', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    const store = new ProjectConversationStore()
+    for (const archived of [true, false]) {
+      const state = { ...conversationState, conversations: conversationState.conversations.map((conversation) => ({ ...conversation, archived })) }
+      await store.save(projectPath, state)
+      expect(await store.load(projectPath)).toEqual(state)
+    }
+  })
+
+  it('rejects invalid archive metadata at the storage boundary', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    await expect(new ProjectConversationStore().save(projectPath, {
+      ...conversationState,
+      conversations: [{ ...conversationState.conversations[0], archived: 'true' }]
+    })).rejects.toThrow('项目会话记录无效')
+  })
+
   it('loads visible messages from the original Pi JSONL session', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
     const conversationsDirectory = join(projectPath, '.slideMind', 'convs')

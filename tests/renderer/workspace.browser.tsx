@@ -204,6 +204,27 @@ async function workspaceTests(): Promise<void> {
   workspace.style.width = ''
   workspace.style.height = ''
   workspace.style.flexShrink = ''
+  const filterButton = () => document.querySelector<HTMLButtonElement>('[aria-label="筛选会话"]')!
+  document.querySelector<HTMLButtonElement>('[aria-label="归档：Conversation B"]')!.click()
+  await until(() => document.querySelectorAll('.conversation-item').length === 1, 'archived conversation hidden by default')
+  await until(() => persisted?.conversations.find((item) => item.id === 'b')?.archived === true, 'archive persisted')
+  filterButton().click()
+  await until(() => document.querySelector('#conversation-filter-options'), 'filter opened')
+  button('已归档').click()
+  await until(() => document.querySelector('.conversation-item')?.textContent?.includes('Conversation B'), 'archived filter')
+  document.title = 'SlideMind renderer tests - conversation archive ready'
+  await delay(150)
+  document.querySelector<HTMLButtonElement>('[aria-label="取消归档：Conversation B"]')!.click()
+  await until(() => document.querySelector('.conversation-empty'), 'empty archive state')
+  filterButton().click()
+  await until(() => document.querySelector('#conversation-filter-options'), 'filter reopened')
+  button('全部').click()
+  await until(() => document.querySelectorAll('.conversation-item').length === 2, 'all filter includes restored conversation')
+  filterButton().click()
+  await until(() => document.querySelector('#conversation-filter-options'), 'filter reopened again')
+  button('未归档').click()
+  await until(() => persisted?.conversations.find((item) => item.id === 'b')?.archived === false, 'restore persisted')
+  passed.push('Conversation list: archive, restore, default hiding, filters and empty state')
   passed.push('Workspace controls: sidebar collapse and bounds, minimum window, tree/menu/tab keyboard navigation and growing composer')
   externalFileVisible = true
   fileListener?.({ projectHandle: 'test', path: 'external.md', kind: 'add', source: 'external' })

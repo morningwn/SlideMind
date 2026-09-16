@@ -54,7 +54,8 @@ function isProjectConversation(value: unknown): value is ProjectConversation {
   if (!value || typeof value !== 'object') return false
 
   const candidate = value as Record<string, unknown>
-  return isConversationId(candidate.id) && isBoundedString(candidate.title, MAX_TITLE_LENGTH)
+  return isConversationId(candidate.id) && isBoundedString(candidate.title, MAX_TITLE_LENGTH) &&
+    (candidate.archived === undefined || typeof candidate.archived === 'boolean')
 }
 
 function isProjectConversationState(value: unknown): value is ProjectConversationState {
