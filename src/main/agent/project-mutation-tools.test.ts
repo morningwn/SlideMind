@@ -9,15 +9,15 @@ describe('createProjectMutationToolsExtension', () => {
     const extension = createProjectMutationToolsExtension({
       mutations: {} as ProjectMutationService,
       projectHandle: 'project-handle',
-      projectPath: process.cwd()
+      projectPath: process.cwd(),
     })
 
     await extension({
       registerTool: (tool: { name: string }) => {
         toolNames.push(tool.name)
-      }
+      },
     } as unknown as ExtensionAPI)
 
-    expect(toolNames).toEqual(['edit', 'write', 'download_asset'])
+    expect(toolNames).toEqual(['edit', 'write', 'read', 'download_asset'])
   })
 })

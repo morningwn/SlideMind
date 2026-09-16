@@ -62,9 +62,6 @@ importers:
       pdfkit:
         specifier: 0.17.2
         version: 0.17.2
-      pi-permission-system:
-        specifier: 0.8.0
-        version: 0.8.0(@earendil-works/pi-ai@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-tui@0.80.10)(@sinclair/typebox@0.34.52)
       pinia:
         specifier: ^3.0.2
         version: 3.0.4(typescript@7.0.2)(vue@3.5.42(typescript@7.0.2))
@@ -423,10 +420,6 @@ packages:
 
   '@earendil-works/pi-telemetry@0.85.1':
     resolution: {integrity: sha512-Bg/YN6kA7Swja/NQxka8xFdecb4E/auIEGF2G5A25EaQXhRnPj300/7/KpgsDDMYUzHTDAv4RyUxaQPJKW81Rw==}
-    engines: {node: '>=22.19.0'}
-
-  '@earendil-works/pi-tui@0.80.10':
-    resolution: {integrity: sha512-c2JO29PbhKPEQ6fgHQKAl0WhwuFqzWfzspMmP+8B5tpDuP+0mvarRbKKg8gq4b+pQx/QX+6aVS4ko7deoyjQjg==}
     engines: {node: '>=22.19.0'}
 
   '@earendil-works/pi-tui@0.85.1':
@@ -1397,9 +1390,6 @@ packages:
 
   '@silvia-odwyer/photon-node@0.3.4':
     resolution: {integrity: sha512-bnly4BKB3KDTFxrUIcgCLbaeVVS8lrAkri1pEzskpmxu9MdfGQTy8b8EgcD83ywD3RPMsIulY8xJH5Awa+t9fA==}
-
-  '@sinclair/typebox@0.34.52':
-    resolution: {integrity: sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==}
 
   '@sindresorhus/is@4.6.0':
     resolution: {integrity: sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw==}
@@ -2790,9 +2780,6 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
-  jsonc-parser@3.3.1:
-    resolution: {integrity: sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==}
-
   jsonfile@4.0.0:
     resolution: {integrity: sha512-m6F1R3z8jjlf2imQHS2Qez5sjKWQzbuuhuJ/FKYFRZvPE3PuHcSMVZzfsLhGVOkfd20obL5SWEBew5ShlquNxg==}
 
@@ -3184,15 +3171,6 @@ packages:
 
   perfect-debounce@1.0.0:
     resolution: {integrity: sha512-xCy9V055GLEqoFaHoC1SoLIaLmWctgCUaBaWxDZ7/Zx4CTyX7cJQLJOok/orfjZAh9kEYpjJa4d0KcJmCbctZA==}
-
-  pi-permission-system@0.8.0:
-    resolution: {integrity: sha512-pGogaOxM5HQpjW4sVUkrJI7+6+HrENp0hBxUF3YYriNWesL5PqC5SECvfJvw0LRJAEMvOtM82gCk5A2gzpnh1w==}
-    engines: {bun: '>=1.1.0', node: '>=20'}
-    peerDependencies:
-      '@earendil-works/pi-ai': ^0.74.0 || ^0.75.0 || ^0.78.0 || ^0.79.0 || ^0.80.0
-      '@earendil-works/pi-coding-agent': ^0.74.0 || ^0.75.0 || ^0.78.0 || ^0.79.0 || ^0.80.0
-      '@earendil-works/pi-tui': ^0.74.0 || ^0.75.0 || ^0.78.0 || ^0.79.0 || ^0.80.0
-      '@sinclair/typebox': ^0.34.49
 
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
@@ -4573,11 +4551,6 @@ snapshots:
 
   '@earendil-works/pi-telemetry@0.85.1': {}
 
-  '@earendil-works/pi-tui@0.80.10':
-    dependencies:
-      get-east-asian-width: 1.6.0
-      marked: 18.0.5
-
   '@earendil-works/pi-tui@0.85.1':
     dependencies:
       get-east-asian-width: 1.6.0
@@ -5275,8 +5248,6 @@ snapshots:
     optional: true
 
   '@silvia-odwyer/photon-node@0.3.4': {}
-
-  '@sinclair/typebox@0.34.52': {}
 
   '@sindresorhus/is@4.6.0': {}
 
@@ -6887,8 +6858,6 @@ snapshots:
 
   json5@2.2.3: {}
 
-  jsonc-parser@3.3.1: {}
-
   jsonfile@4.0.0:
     optionalDependencies:
       graceful-fs: 4.2.11
@@ -7232,14 +7201,6 @@ snapshots:
   pe-library@0.4.1: {}
 
   perfect-debounce@1.0.0: {}
-
-  pi-permission-system@0.8.0(@earendil-works/pi-ai@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-tui@0.80.10)(@sinclair/typebox@0.34.52):
-    dependencies:
-      '@earendil-works/pi-ai': 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
-      '@earendil-works/pi-coding-agent': 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
-      '@earendil-works/pi-tui': 0.80.10
-      '@sinclair/typebox': 0.34.52
-      jsonc-parser: 3.3.1
 
   picocolors@1.1.1: {}
 

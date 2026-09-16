@@ -68,8 +68,9 @@ src/
 - 应用内置 PPT 制作总控 Skill，并按阶段调度演示策略、页面文案、视觉设计、数据表达、流程图、模板和成稿审查 Skill；开发态从 `skills/` 加载，打包后作为只读资源注入 Pi Agent。
 - Pi Agent 使用应用内的缓存前缀整理逻辑和 Web 工具，并使用 Pi 原生压缩。DeepSeek 模型由应用注册；Web 固定使用 Exa 公共搜索，不读取本机搜索凭据、旧配置或浏览器 Cookie。公共接口可能限流，失败不会自动改用付费服务。缓存 token 用量、压缩事件与历史会话重新加载的结构性信号记录在本地诊断日志中，不自动上传。
 - Web 工具保留 `web_search`、`source_check`、`fetch_content`、`get_search_content`。支持域名/发布日期过滤、公开网页/文本/PDF 正文及分页字面量查找；`source_check` 组织证据，不判断论断真假。缓存按项目和会话分支授权，单会话最多 32 项/16 MiB，读取有效期一小时；过期、旧插件结果或已清理内容须重新获取。禁止代理、登录、脚本执行、音视频、OCR、raw/answer 和模糊查找。限制和验证记录见 [Web 工具方案](docs/pi-web-tools-plan.md)。
-- 插件配置位于应用 `userData/pi-agent/`；首次启动会写入无浏览器弹窗、禁止读取浏览器 Cookie 的 Web 安全默认值，并关闭依赖 `git`、`gh`、`curl`、`yt-dlp` 或 `ffmpeg` 的能力。
-- 当前项目仍可通过 `.pi/skills/` 增加或覆盖同名 Skill，用户级 Skill 位于应用 `userData/pi-agent/skills/`。
+- 权限由应用内置固定策略管理，未知工具、Shell 和通用 MCP 不注册。文件操作限当前项目及明确列出的只读内置 Skill，拒绝目录越界、符号链接、硬链接、凭据文件和受保护目录；演示文稿图片与导出路径也进入同一检查。
+- Pi 使用内存设置和凭据存储，仅显式加载内置 Skill 与工具；不自动读取项目/用户扩展、Skill、权限文件或 AGENTS.md/SYSTEM.md/APPEND_SYSTEM.md。旧配置和会话不删除。
+- `grep`、`find`、`ls` 使用应用内有界遍历，不查找或下载系统命令；不读取 `.gitignore`。正则与 glob 在可终止 Worker 中匹配。范围、限制和验证记录见 [权限替换方案](docs/pi-permission-replacement-plan.md)。
 
 ## 设置与本地诊断
 

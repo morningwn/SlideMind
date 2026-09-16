@@ -52,7 +52,9 @@ Exa 官方确认公共 MCP 有限额，生产用途可以显式提供自有 Key�
 
 ## 回滚
 
-最终核查：保留的权限插件仍通过 getAgentDir() 构造辅助目录，因此将原 Web 初始化中的 PI_CODING_AGENT_DIR 设置移到 preparePermissionSystem，维持权限路径不变；内置 Web 不读取该变量。这不是 Pi 核心与权限配置隔离的完成标志。
+后续权限替换已删除 preparePermissionSystem、权限插件及其环境变量设置，详见 [权限替换实施记录](pi-permission-replacement-plan.md)。
+
+Web 切换时的历史记录（现已被权限替换覆盖）：当时保留的权限插件仍通过 getAgentDir() 构造辅助目录，因此将原 Web 初始化中的 PI_CODING_AGENT_DIR 设置移到 preparePermissionSystem，维持权限路径不变；内置 Web 不读取该变量。这不是 Pi 核心与权限配置隔离的完成标志。
 
 验证记录：完整单元测试 320 项通过，渲染测试、生产构建以及两项真实 Web 冒烟通过。真实搜索包括域名过滤验证。Node/Web 类型检查通过；全仓格式检查存在既有问题，本次涉及文件单独校验，不扩大为全仓重排。
 

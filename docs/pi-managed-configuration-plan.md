@@ -2,9 +2,11 @@
 
 日期：2026-09-16。
 
-状态：部分实施。已移除 pi-free、pi-continue 和 pi-cache-optimizer，Todo 和 Web 已改为应用内置工具；Pi 核心与权限隔离等阶段仍待实施。
+状态：部分实施。已移除 pi-free、pi-continue 和 pi-cache-optimizer，Todo 和 Web 已改为应用内置工具；权限已改为内置固定策略，Pi 设置、凭据和资源加载已接管；完整跨平台隔离验收仍有未完成项。
 
 ## 实施记录
+
+2026-09-16：已直接移除 pi-permission-system，所有注册工具在 execute 边界接受固定权限检查；read/write/edit 接管文件 I/O，grep/find/ls 改为有界内部搜索。会话使用内存设置和凭据存储，自定义资源加载器只接受内部工厂与内置 Skill。详见 [权限替换实施记录](pi-permission-replacement-plan.md)。以下早期记录保留决策历史，以本条为当前状态；尚未完成全部平台安装包及所有配置入口的系统调用跟踪验收。
 
 2026-09-16：SlideMind 仅在设置界面提供 DeepSeek，模型由 `registerDeepSeekModels` 注册，凭据由应用安全存储提供。pi-free 提供的其他服务商、免费模型筛选、配额和遥测没有产品调用方，因此已移除其加载入口、环境变量设置、直接依赖和第三方声明；未删除已有用户文件。现有用量统计仍由 `agent-usage.ts` 实现。
 

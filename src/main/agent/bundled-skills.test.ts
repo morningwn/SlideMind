@@ -4,6 +4,8 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { resolveBundledSkillsDirectory } from './bundled-skills'
 import { queryTemplate } from './template-query'
+import { FilePolicy } from './file-policy'
+import { loadManagedSkills } from './managed-resources'
 
 const EXPECTED_SKILLS = [
   'data-storytelling',
@@ -54,6 +56,19 @@ describe('resolveBundledSkillsDirectory', () => {
 })
 
 describe('bundled presentation skills', () => {
+  it('loads the application catalog from validated bundled files only', async () => {
+    const root = resolve('skills')
+    const policy = await FilePolicy.create(process.cwd(), [root])
+    const skills = await loadManagedSkills(root, policy)
+    expect(skills.map((skill) => skill.name).sort()).toEqual(
+      [...EXPECTED_SKILLS].sort(),
+    )
+    for (const skill of skills)
+      await expect(policy.resolve(skill.filePath, 'write')).rejects.toThrow(
+        '只允许读取',
+      )
+  })
+
   it('keeps web evidence distinct from automatic fact judgments', async () => {
     const workflow = await readFile(
       resolve('skills/ppt-production-workflow/SKILL.md'),

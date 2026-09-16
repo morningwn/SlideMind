@@ -38,11 +38,10 @@ import { createToolActivity, toolErrorDetail } from './agent-activity'
 import { conversationUsageFromSession } from './agent-usage'
 import { todosFromSessionEntries, todosFromToolResult } from './agent-todo'
 import { createTodoToolsExtension } from './todo-tools'
-import {
-  preparePermissionSystem,
-  type PermissionSystemSetup,
-} from './permission-policy'
-import { PI_AGENT_TOOL_NAMES } from './pi-extensions'
+import { FilePolicy } from './file-policy'
+import { createManagedResources, loadManagedSkills } from './managed-resources'
+import { createFileSearchTools } from './file-search-tools'
+import { AGENT_TOOL_NAMES, createPermissionGuard } from './managed-permissions'
 import { createPresentationToolsExtension } from './presentation-tools'
 import { createProjectMutationToolsExtension } from './project-mutation-tools'
 import { createWebToolsExtension } from './web-tools'
@@ -55,8 +54,6 @@ import { isDocumentPath } from '../../shared/document'
 
 const MAX_AGENT_SESSIONS = 50
 const MAX_PROMPT_REFERENCES = 20
-const BUILT_IN_EXTENSION_FACTORY_COUNT = 7
-const EXPECTED_AGENT_EXTENSION_COUNT = 1 + BUILT_IN_EXTENSION_FACTORY_COUNT
 const SESSION_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/
 const SYSTEM_PROMPT = `你是 SlideMind 的基础演示创作 agent。
 你的职责是帮助用户梳理材料、建立清晰叙事、规划演示结构并打磨表达。
@@ -91,10 +88,9 @@ class AgentRequestStoppedError extends Error {
 
 interface PiRuntime {
   createAgentSession: typeof import('@earendil-works/pi-coding-agent').createAgentSession
-  DefaultResourceLoader: typeof import('@earendil-works/pi-coding-agent').DefaultResourceLoader
+  SettingsManager: typeof import('@earendil-works/pi-coding-agent').SettingsManager
   ModelRuntime: typeof import('@earendil-works/pi-coding-agent').ModelRuntime
   SessionManager: typeof import('@earendil-works/pi-coding-agent').SessionManager
-  loadSkills: typeof import('@earendil-works/pi-coding-agent').loadSkills
 }
 
 let piRuntimePromise: Promise<PiRuntime> | undefined
@@ -103,10 +99,9 @@ async function loadPiRuntime(): Promise<PiRuntime> {
   piRuntimePromise ??= import('@earendil-works/pi-coding-agent').then(
     (codingAgent) => ({
       createAgentSession: codingAgent.createAgentSession,
-      DefaultResourceLoader: codingAgent.DefaultResourceLoader,
+      SettingsManager: codingAgent.SettingsManager,
       ModelRuntime: codingAgent.ModelRuntime,
       SessionManager: codingAgent.SessionManager,
-      loadSkills: codingAgent.loadSkills,
     }),
   )
 
@@ -257,7 +252,6 @@ function normalizePromptReferences(value: unknown): AgentPromptReference[] {
 export class BaseAgentService {
   private readonly sessions = new Map<string, AgentSessionRecord>()
   private modelRuntimePromise?: Promise<ModelRuntime>
-  private permissionSystemPromise?: Promise<PermissionSystemSetup>
 
   constructor(
     private readonly configStore: AgentConfigStore,
@@ -483,10 +477,17 @@ export class BaseAgentService {
     thinkingLevel: AgentThinkingLevel,
     onTodoRestore?: (todos: AgentTodo[]) => void,
   ): Promise<{ agent: PiAgentSession; todos: AgentTodo[] }> {
-    const { createAgentSession, DefaultResourceLoader, SessionManager } =
+    const { createAgentSession, SettingsManager, SessionManager } =
       await loadPiRuntime()
     const modelRuntime = await this.getModelRuntime()
-    const permissionSystem = await this.getPermissionSystem()
+    const policy = await FilePolicy.create(projectPath, [
+      this.bundledSkillsDirectory,
+    ])
+    const settingsManager = SettingsManager.inMemory({
+      compaction: { enabled: true },
+      enableAnalytics: false,
+      enableInstallTelemetry: false,
+    })
     await modelRuntime.setRuntimeApiKey(DEEPSEEK_PROVIDER_ID, config.apiKey)
     const model = modelRuntime.getModel(DEEPSEEK_PROVIDER_ID, config.modelId)
 
@@ -516,18 +517,16 @@ export class BaseAgentService {
     const hadCompaction = sessionManager
       .getBranch()
       .some((entry) => entry.type === 'compaction')
-    const skillPaths = [
-      this.bundledSkillsDirectory,
-      join(this.agentDirectory, 'skills'),
-      join(projectPath, '.pi', 'skills'),
-    ]
-
-    const resourceLoader = new DefaultResourceLoader({
-      cwd: projectPath,
-      agentDir: this.agentDirectory,
-      additionalExtensionPaths: [permissionSystem.extensionPath],
-      additionalSkillPaths: skillPaths,
-      extensionFactories: [
+    const resourceLoader = await createManagedResources({
+      policy,
+      skillsDirectory: this.bundledSkillsDirectory,
+      systemPrompt: SYSTEM_PROMPT,
+      factories: [
+        { name: 'slidemind-permissions', factory: createPermissionGuard },
+        {
+          name: 'slidemind-file-search',
+          factory: createFileSearchTools(policy),
+        },
         {
           name: 'slidemind-todo',
           factory: createTodoToolsExtension(onTodoRestore, () =>
@@ -581,25 +580,12 @@ export class BaseAgentService {
             mutations: this.mutations,
             projectHandle,
             projectPath,
+            filePolicy: policy,
           }),
         },
       ],
-      noExtensions: true,
-      noSkills: true,
-      noPromptTemplates: true,
-      noThemes: true,
-      noContextFiles: true,
-      systemPrompt: SYSTEM_PROMPT,
     })
     await resourceLoader.reload()
-    const extensions = resourceLoader.getExtensions()
-    if (
-      extensions.errors.length > 0 ||
-      extensions.extensions.length !== EXPECTED_AGENT_EXTENSION_COUNT
-    ) {
-      const details = extensions.errors.map((entry) => entry.error).join('; ')
-      throw new Error(`Agent 扩展加载失败${details ? `：${details}` : ''}`)
-    }
 
     const { session } = await createAgentSession({
       cwd: projectPath,
@@ -607,28 +593,20 @@ export class BaseAgentService {
       modelRuntime,
       model,
       thinkingLevel,
-      tools: [
-        'read',
-        'write',
-        'edit',
-        'grep',
-        'find',
-        'ls',
-        'todo',
-        'document_read',
-        'pptx_read',
-        'slides_create',
-        'slides_read',
-        'slides_render',
-        'slides_review',
-        'slides_write',
-        'slides_export',
-        'template_query',
-        ...PI_AGENT_TOOL_NAMES,
-      ],
+      settingsManager,
+      tools: [...AGENT_TOOL_NAMES],
       resourceLoader,
       sessionManager,
     })
+    if (
+      session.getActiveToolNames().length !== AGENT_TOOL_NAMES.length ||
+      session
+        .getActiveToolNames()
+        .some((name) => !AGENT_TOOL_NAMES.includes(name))
+    ) {
+      session.dispose()
+      throw new Error('Agent 活动工具与白名单不一致')
+    }
     if (sessionPath) {
       logger.info('agent.session_restored', {
         context: { hadCompaction, todoCount: todos.length },
@@ -893,17 +871,10 @@ export class BaseAgentService {
   }
 
   private async loadAvailableSkills(projectPath: string) {
-    const { loadSkills } = await loadPiRuntime()
-    return loadSkills({
-      cwd: projectPath,
-      agentDir: this.agentDirectory,
-      skillPaths: [
-        this.bundledSkillsDirectory,
-        join(this.agentDirectory, 'skills'),
-        join(projectPath, '.pi', 'skills'),
-      ],
-      includeDefaults: false,
-    }).skills
+    const policy = await FilePolicy.create(projectPath, [
+      this.bundledSkillsDirectory,
+    ])
+    return loadManagedSkills(this.bundledSkillsDirectory, policy)
   }
 
   private async injectPromptReferences(
@@ -970,8 +941,11 @@ export class BaseAgentService {
     if (!this.modelRuntimePromise) {
       this.modelRuntimePromise = loadPiRuntime().then(
         async ({ ModelRuntime }) => {
+          const { InMemoryCredentialStore } = await import(
+            '@earendil-works/pi-ai'
+          )
           const runtime = await ModelRuntime.create({
-            authPath: join(this.agentDirectory, 'auth.json'),
+            credentials: new InMemoryCredentialStore(),
             modelsPath: null,
             refreshOnCreate: false,
           })
@@ -981,13 +955,5 @@ export class BaseAgentService {
       )
     }
     return this.modelRuntimePromise
-  }
-
-  private getPermissionSystem(): Promise<PermissionSystemSetup> {
-    this.permissionSystemPromise ??= preparePermissionSystem(
-      this.agentDirectory,
-      [this.bundledSkillsDirectory],
-    )
-    return this.permissionSystemPromise
   }
 }

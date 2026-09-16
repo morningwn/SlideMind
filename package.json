@@ -45,7 +45,6 @@
     "isomorphic-git": "1.41.9",
     "marked": "^18.0.11",
     "pdfkit": "0.17.2",
-    "pi-permission-system": "0.8.0",
     "pinia": "^3.0.2",
     "pptist": "https://github.com/pipipi-pikachu/PPTist/archive/e4912589ffdbec389fcc1bf25a85852dfe3040a8.tar.gz",
     "pptxgenjs": "4.0.1",
