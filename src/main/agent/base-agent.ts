@@ -521,6 +521,9 @@ export class BaseAgentService {
       throw new Error('Pi 会话记录标识不匹配')
     }
     const todos = todosFromSessionEntries(sessionManager.getBranch())
+    const hadCompaction = sessionManager
+      .getBranch()
+      .some((entry) => entry.type === 'compaction')
     const skillPaths = [
       this.bundledSkillsDirectory,
       join(this.agentDirectory, 'skills'),
@@ -617,6 +620,11 @@ export class BaseAgentService {
       resourceLoader,
       sessionManager,
     })
+    if (sessionPath) {
+      logger.info('agent.session_restored', {
+        context: { hadCompaction, todoCount: todos.length },
+      })
+    }
     return { agent: session, todos }
   }
 
@@ -662,7 +670,41 @@ export class BaseAgentService {
     session.lastUsedAt = Date.now()
     let thinkingSequence = 0
     let activeThinkingId: string | undefined
+    let compactionStartedAt: number | undefined
+    let successfulCompactions = 0
+    let assistantAfterLatestCompaction = false
+    let promptCompleted = false
+    const operationId = diagnosticId(input.requestId)
     const unsubscribe = session.agent.subscribe((event) => {
+      if (event.type === 'compaction_start') {
+        compactionStartedAt = Date.now()
+      }
+      if (event.type === 'compaction_end') {
+        logger.info('agent.compaction_finished', {
+          operationId,
+          ...(compactionStartedAt === undefined
+            ? {}
+            : { durationMs: Date.now() - compactionStartedAt }),
+          context: {
+            reason: event.reason,
+            succeeded: Boolean(event.result),
+            aborted: event.aborted,
+            willRetry: event.willRetry,
+          },
+        })
+        compactionStartedAt = undefined
+        if (event.result) {
+          successfulCompactions += 1
+          assistantAfterLatestCompaction = false
+        }
+      }
+      if (
+        event.type === 'message_end' &&
+        isAssistantMessage(event.message) &&
+        successfulCompactions > 0
+      ) {
+        assistantAfterLatestCompaction = true
+      }
       if (event.type === 'message_update') {
         const messageEvent = event.assistantMessageEvent
         if (messageEvent.type === 'text_delta') {
@@ -752,8 +794,20 @@ export class BaseAgentService {
       const prompt = await this.injectPromptReferences(input, projectPath)
       this.throwIfStopped(session, input.requestId)
       await session.agent.prompt(prompt)
+      promptCompleted = true
     } finally {
       unsubscribe()
+      if (successfulCompactions > 0) {
+        logger.info('agent.compaction_request_outcome', {
+          operationId,
+          context: {
+            successfulCompactions,
+            assistantAfterLatestCompaction,
+            promptCompleted,
+            todoCount: session.todos?.length ?? 0,
+          },
+        })
+      }
     }
 
     this.throwIfStopped(session, input.requestId)

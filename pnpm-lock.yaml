@@ -62,9 +62,6 @@ importers:
       pi-cache-optimizer:
         specifier: 2.8.6
         version: 2.8.6(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))
-      pi-continue:
-        specifier: 0.9.3
-        version: 0.9.3(@earendil-works/pi-ai@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))
       pi-permission-system:
         specifier: 0.8.0
         version: 0.8.0(@earendil-works/pi-ai@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@sinclair/typebox@0.34.52)
@@ -3433,13 +3430,6 @@ packages:
     resolution: {integrity: sha512-QXKLJnukHn1ZQhywAu1O5SrOXoEMm/ZRrKO9pI5CERgmHrE2zgq/KH97Hs1RmVrszTlH9iVw2KTwndIguAvTVg==}
     peerDependencies:
       '@earendil-works/pi-coding-agent': '>=0.82.0'
-
-  pi-continue@0.9.3:
-    resolution: {integrity: sha512-VKerqq8DymzNcDPe6GjgFXWkweA9tX4XLIeJSWFj6SWk5KjU2JlDLRZfgLcY/65kSBNxvR3w16m1ym4aF4TaQg==}
-    peerDependencies:
-      '@earendil-works/pi-ai': '>=0.74.0'
-      '@earendil-works/pi-coding-agent': '>=0.74.0'
-      '@earendil-works/pi-tui': '>=0.74.0'
 
   pi-permission-system@0.8.0:
     resolution: {integrity: sha512-pGogaOxM5HQpjW4sVUkrJI7+6+HrENp0hBxUF3YYriNWesL5PqC5SECvfJvw0LRJAEMvOtM82gCk5A2gzpnh1w==}
@@ -7949,11 +7939,6 @@ snapshots:
 
   pi-cache-optimizer@2.8.6(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)):
     dependencies:
-      '@earendil-works/pi-coding-agent': 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
-
-  pi-continue@0.9.3(@earendil-works/pi-ai@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)):
-    dependencies:
-      '@earendil-works/pi-ai': 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
       '@earendil-works/pi-coding-agent': 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
 
   pi-permission-system@0.8.0(@earendil-works/pi-ai@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@sinclair/typebox@0.34.52):
