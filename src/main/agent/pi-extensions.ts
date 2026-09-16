@@ -13,7 +13,6 @@ function packageFile(packageName: string, ...segments: string[]): string {
 }
 
 export const PI_EXTENSION_PATHS = [
-  packageFile('pi-cache-optimizer', 'index.ts'),
   packageFile('pi-web-access', 'index.ts'),
 ] as const
 

@@ -12,7 +12,6 @@ SlideMind's PPTist bridge and integration changes are distributed as part of thi
 
 SlideMind bundles the following pinned Pi extensions:
 
-- [pi-cache-optimizer 2.8.6](https://github.com/jiangge/pi-cache-optimizer), licensed under the MIT License.
 - [pi-web-access 0.27.0](https://github.com/nicobailon/pi-web-access), licensed under the MIT License.
 
 The corresponding package license texts are distributed with the packaged dependencies.

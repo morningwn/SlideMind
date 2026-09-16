@@ -59,9 +59,6 @@ importers:
       pdfkit:
         specifier: 0.17.2
         version: 0.17.2
-      pi-cache-optimizer:
-        specifier: 2.8.6
-        version: 2.8.6(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))
       pi-permission-system:
         specifier: 0.8.0
         version: 0.8.0(@earendil-works/pi-ai@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@sinclair/typebox@0.34.52)
@@ -3425,11 +3422,6 @@ packages:
 
   perfect-debounce@1.0.0:
     resolution: {integrity: sha512-xCy9V055GLEqoFaHoC1SoLIaLmWctgCUaBaWxDZ7/Zx4CTyX7cJQLJOok/orfjZAh9kEYpjJa4d0KcJmCbctZA==}
-
-  pi-cache-optimizer@2.8.6:
-    resolution: {integrity: sha512-QXKLJnukHn1ZQhywAu1O5SrOXoEMm/ZRrKO9pI5CERgmHrE2zgq/KH97Hs1RmVrszTlH9iVw2KTwndIguAvTVg==}
-    peerDependencies:
-      '@earendil-works/pi-coding-agent': '>=0.82.0'
 
   pi-permission-system@0.8.0:
     resolution: {integrity: sha512-pGogaOxM5HQpjW4sVUkrJI7+6+HrENp0hBxUF3YYriNWesL5PqC5SECvfJvw0LRJAEMvOtM82gCk5A2gzpnh1w==}
@@ -7936,10 +7928,6 @@ snapshots:
   pe-library@0.4.1: {}
 
   perfect-debounce@1.0.0: {}
-
-  pi-cache-optimizer@2.8.6(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)):
-    dependencies:
-      '@earendil-works/pi-coding-agent': 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
 
   pi-permission-system@0.8.0(@earendil-works/pi-ai@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0))(@sinclair/typebox@0.34.52):
     dependencies:

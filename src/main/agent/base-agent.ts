@@ -52,13 +52,14 @@ import { createPresentationToolsExtension } from './presentation-tools'
 import { createProjectMutationToolsExtension } from './project-mutation-tools'
 import { createTemplateToolsExtension } from './template-tools'
 import { createDocumentToolsExtension } from './document-tools'
+import { createCacheOptimizationExtension } from './cache-optimization'
 import type { DocumentReadService } from '../document/document-reader'
 import { isDocumentPath } from '../../shared/document'
 
 const require = createRequire(import.meta.url)
 const MAX_AGENT_SESSIONS = 50
 const MAX_PROMPT_REFERENCES = 20
-const BUILT_IN_EXTENSION_FACTORY_COUNT = 5
+const BUILT_IN_EXTENSION_FACTORY_COUNT = 6
 const EXPECTED_AGENT_EXTENSION_COUNT =
   2 + PI_EXTENSION_PATHS.length + BUILT_IN_EXTENSION_FACTORY_COUNT
 const SESSION_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/
@@ -541,6 +542,10 @@ export class BaseAgentService {
       additionalSkillPaths: skillPaths,
       extensionFactories: [
         {
+          name: 'slidemind-cache-optimization',
+          factory: createCacheOptimizationExtension(projectPath),
+        },
+        {
           name: 'slidemind-web-access-guard',
           factory: createWebAccessGuardExtension,
         },
@@ -580,7 +585,7 @@ export class BaseAgentService {
       noPromptTemplates: true,
       noThemes: true,
       noContextFiles: true,
-      systemPrompt: `${SYSTEM_PROMPT}\n\n当前对话所属项目目录（JSON 字符串）：${JSON.stringify(projectPath)}`,
+      systemPrompt: SYSTEM_PROMPT,
     })
     await resourceLoader.reload()
     const extensions = resourceLoader.getExtensions()
@@ -674,6 +679,9 @@ export class BaseAgentService {
     let successfulCompactions = 0
     let assistantAfterLatestCompaction = false
     let promptCompleted = false
+    let cacheReadTokens = 0
+    let cacheWriteTokens = 0
+    let uncachedInputTokens = 0
     const operationId = diagnosticId(input.requestId)
     const unsubscribe = session.agent.subscribe((event) => {
       if (event.type === 'compaction_start') {
@@ -698,12 +706,11 @@ export class BaseAgentService {
           assistantAfterLatestCompaction = false
         }
       }
-      if (
-        event.type === 'message_end' &&
-        isAssistantMessage(event.message) &&
-        successfulCompactions > 0
-      ) {
-        assistantAfterLatestCompaction = true
+      if (event.type === 'message_end' && isAssistantMessage(event.message)) {
+        cacheReadTokens += event.message.usage.cacheRead
+        cacheWriteTokens += event.message.usage.cacheWrite
+        uncachedInputTokens += event.message.usage.input
+        if (successfulCompactions > 0) assistantAfterLatestCompaction = true
       }
       if (event.type === 'message_update') {
         const messageEvent = event.assistantMessageEvent
@@ -797,6 +804,17 @@ export class BaseAgentService {
       promptCompleted = true
     } finally {
       unsubscribe()
+      if (cacheReadTokens + cacheWriteTokens + uncachedInputTokens > 0) {
+        logger.info('agent.cache_usage', {
+          operationId,
+          context: {
+            cacheReadTokens,
+            cacheWriteTokens,
+            uncachedInputTokens,
+            promptCompleted,
+          },
+        })
+      }
       if (successfulCompactions > 0) {
         logger.info('agent.compaction_request_outcome', {
           operationId,

@@ -7,6 +7,7 @@ import {
   DEEPSEEK_PROVIDER_ID,
 } from '../../shared/agent'
 import { registerDeepSeekModels } from './deepseek-models'
+import { createCacheOptimizationExtension } from './cache-optimization'
 import {
   PI_AGENT_TOOL_NAMES,
   PI_EXTENSION_PATHS,
@@ -33,6 +34,11 @@ describe('Pi extension integration', () => {
       expect(runtime.getModel(DEEPSEEK_PROVIDER_ID, option.id)?.id).toBe(
         option.id,
       )
+      expect(
+        runtime.getModel(DEEPSEEK_PROVIDER_ID, option.id)?.compat,
+      ).toMatchObject({
+        supportsLongCacheRetention: false,
+      })
     }
   })
 
@@ -163,6 +169,10 @@ describe('Pi extension integration', () => {
       cwd: process.cwd(),
       agentDir: agentDirectory,
       extensionFactories: [
+        {
+          name: 'cache-optimization',
+          factory: createCacheOptimizationExtension('/project-a'),
+        },
         { name: 'web-guard', factory: createWebAccessGuardExtension },
       ],
       noExtensions: true,
@@ -190,6 +200,16 @@ describe('Pi extension integration', () => {
     })
 
     try {
+      const optimizedPrompt =
+        await session.extensionRunner.emitBeforeAgentStart(
+          'test',
+          undefined,
+          'Shared instructions\n\nFull Skill descriptions',
+          { cwd: '/project-a' },
+        )
+      expect(optimizedPrompt?.systemPrompt).toBe(
+        'Shared instructions\n\nFull Skill descriptions\n\n当前对话所属项目目录（JSON 字符串）："/project-a"',
+      )
       const localFile = await session.extensionRunner.emitToolCall({
         type: 'tool_call',
         toolCallId: 'local-file',
