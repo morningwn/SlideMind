@@ -53,6 +53,8 @@ let saves = 0
 let exportAttempt = 0
 const exportSnapshots: Array<{ path: string; content: string }> = []
 let finishExport: ((value: Awaited<ReturnType<Window['documentExport']['exportWord']>>) => void) | undefined
+const pdfSnapshots: Array<{ path: string; content: string }> = []
+let finishPdfExport: ((value: Awaited<ReturnType<Window['documentExport']['exportPdf']>>) => void) | undefined
 let persisted: ProjectConversationState | undefined
 const subscriptions = new Set<string>()
 const subscribe = (kind: string) => {
@@ -87,7 +89,10 @@ Object.assign(window, {
     }
   } satisfies Partial<Window['projects']>,
   documentExport: {
-    exportPdf: async () => ({ status: 'canceled' }),
+    exportPdf: (_handle, input) => {
+      pdfSnapshots.push(structuredClone(input))
+      return new Promise((resolve) => { finishPdfExport = resolve })
+    },
     exportWord: async (_handle, input) => {
       exportAttempt += 1
       exportSnapshots.push(structuredClone(input))
@@ -244,6 +249,20 @@ async function workspaceTests(): Promise<void> {
   document.title = 'SlideMind renderer tests - markdown export ready'
   await delay(50)
   passed.push('Markdown Word export: cancellation, click-time snapshot, concurrent editing, warnings and failure retry')
+  await editText('# PDF snapshot')
+  const savesBeforePdf = saves
+  button('导出 PDF').click()
+  await until(() => [...document.querySelectorAll<HTMLButtonElement>('button')].some((candidate) => (
+    candidate.textContent?.trim() === '导出中…' && candidate.disabled
+  )), 'PDF export started')
+  assert(button('导出 Word').disabled, 'Word export should be disabled while PDF export runs')
+  await editText('# Edited after PDF click')
+  assert(pdfSnapshots[0].content === '# PDF snapshot', 'PDF export did not capture the click-time snapshot')
+  assert(saves === savesBeforePdf, 'PDF export saved the Markdown source unexpectedly')
+  finishPdfExport?.({ status: 'exported', outputPath: '/tmp/guide.pdf', pageCount: 1 })
+  await until(() => document.querySelector('[role="status"]')?.textContent?.includes('/tmp/guide.pdf'), 'PDF export success')
+  assert(editor().state.doc.toString() === '# Edited after PDF click', 'PDF export replaced later edits')
+  passed.push('Markdown PDF export: click-time snapshot, concurrent editing and shared busy state')
   document.querySelector<HTMLButtonElement>('[aria-label="关闭 guide.md"]')!.click()
   await until(() => !document.querySelector('.cm-content'), 'markdown closed')
 

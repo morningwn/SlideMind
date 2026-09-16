@@ -27,6 +27,7 @@ export interface OpenTextDocument {
   hasBom: boolean
   isSaving: boolean
   isExporting: boolean
+  exportingFormat?: 'word' | 'pdf'
   conflict: boolean
   error: string
   exportError: string
@@ -247,6 +248,10 @@ export function DocumentEditor({
       {document.exportError ? (
         <div className="document-error" role="alert">
           <span>{document.exportError}</span>
+        </div>
+      ) : document.isExporting ? (
+        <div className="document-export-result" role="status">
+          正在将当前编辑内容快照导出为 {document.exportingFormat === 'pdf' ? 'PDF' : 'Word'}…
         </div>
       ) : document.lastExportPath ? (
         <div className="document-export-result" role="status">

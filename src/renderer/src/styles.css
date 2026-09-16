@@ -1973,6 +1973,12 @@ button.file-tree-item:not(.file-tree-directory) {
   cursor: default;
 }
 
+.workspace-export-note {
+  color: #7b8799;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
 .document-export-result {
   display: flex;
   align-items: baseline;

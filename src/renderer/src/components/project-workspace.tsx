@@ -669,6 +669,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const pptxImportInputRef = useRef<HTMLInputElement>(null)
   const openDocumentsRef = useRef<OpenTextDocument[]>([])
   const openPresentationsRef = useRef<OpenPresentationDocument[]>([])
+  const exportingPathsRef = useRef(new Set<string>())
   const openImagesRef = useRef<OpenImageDocument[]>([])
   const confirmedRestorePathsRef = useRef<Set<string>>(new Set())
   const stoppedRequestIdsRef = useRef<Set<string>>(new Set())
@@ -1927,25 +1928,25 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }
 
-  async function exportPresentation(path: string): Promise<void> {
-    const saved = await savePresentation(path)
-    if (!saved) return
+  async function exportPresentation(path: string, format: 'pptx' | 'pdf'): Promise<void> {
+    if (exportingPathsRef.current.has(path)) return
+    exportingPathsRef.current.add(path)
     setOpenPresentations((current) => current.map((candidate) =>
       candidate.path === path
-        ? { ...candidate, isExporting: true, error: '', lastExportPath: undefined }
+        ? { ...candidate, isExporting: true, exportingFormat: format, error: '', lastExportPath: undefined }
         : candidate
     ))
     try {
-      const result = await window.presentations.export(project.handle, { path })
-      if (!result) {
-        setOpenPresentations((current) => current.map((candidate) =>
-          candidate.path === path ? { ...candidate, isExporting: false } : candidate
-        ))
-        return
-      }
+      const saved = await savePresentation(path)
+      if (!saved) return
+      const result = format === 'pdf'
+        ? await window.presentations.exportPdf(project.handle, { path })
+        : await window.presentations.export(project.handle, { path })
+      if (!result || ('status' in result && result.status === 'canceled')) return
+      if ('status' in result && result.status === 'failed') throw new Error(result.message)
       setOpenPresentations((current) => current.map((candidate) =>
         candidate.path === path
-          ? { ...candidate, isExporting: false, lastExportPath: result.outputPath }
+          ? { ...candidate, lastExportPath: result.outputPath }
           : candidate
       ))
     } catch (error) {
@@ -1953,17 +1954,22 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         candidate.path === path
           ? {
               ...candidate,
-              isExporting: false,
-              error: error instanceof Error ? error.message : '无法导出 PowerPoint'
+              error: error instanceof Error ? error.message : `无法导出 ${format === 'pdf' ? 'PDF' : 'PowerPoint'}`
             }
           : candidate
+      ))
+    } finally {
+      exportingPathsRef.current.delete(path)
+      setOpenPresentations((current) => current.map((candidate) =>
+        candidate.path === path ? { ...candidate, isExporting: false, exportingFormat: undefined } : candidate
       ))
     }
   }
 
-  async function exportMarkdownWord(path: string): Promise<void> {
+  async function exportMarkdown(path: string, format: 'word' | 'pdf'): Promise<void> {
     const document = openDocuments.find((candidate) => candidate.path === path)
-    if (!document || document.kind !== 'markdown' || document.isExporting) return
+    if (!document || document.kind !== 'markdown' || exportingPathsRef.current.has(path)) return
+    exportingPathsRef.current.add(path)
 
     const content = document.content
     setOpenDocuments((current) => current.map((candidate) =>
@@ -1971,6 +1977,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         ? {
             ...candidate,
             isExporting: true,
+            exportingFormat: format,
             exportError: '',
             lastExportPath: undefined,
             exportWarnings: []
@@ -1978,18 +1985,19 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         : candidate
     ))
     try {
-      const result = await window.documentExport.exportWord(project.handle, { path, content })
+      const result = format === 'pdf'
+        ? await window.documentExport.exportPdf(project.handle, { path, content })
+        : await window.documentExport.exportWord(project.handle, { path, content })
       setOpenDocuments((current) => current.map((candidate) => {
         if (candidate.path !== path) return candidate
-        if (result.status === 'canceled') return { ...candidate, isExporting: false }
+        if (result.status === 'canceled') return candidate
         if (result.status === 'failed') {
-          return { ...candidate, isExporting: false, exportError: result.message }
+          return { ...candidate, exportError: result.message }
         }
         return {
           ...candidate,
-          isExporting: false,
           lastExportPath: result.outputPath,
-          exportWarnings: result.warnings
+          exportWarnings: 'warnings' in result ? result.warnings : []
         }
       }))
     } catch (error) {
@@ -1997,10 +2005,14 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         candidate.path === path
           ? {
               ...candidate,
-              isExporting: false,
-              exportError: error instanceof Error ? error.message : '无法导出 Word'
+              exportError: error instanceof Error ? error.message : `无法导出 ${format === 'pdf' ? 'PDF' : 'Word'}`
             }
           : candidate
+      ))
+    } finally {
+      exportingPathsRef.current.delete(path)
+      setOpenDocuments((current) => current.map((candidate) =>
+        candidate.path === path ? { ...candidate, isExporting: false, exportingFormat: undefined } : candidate
       ))
     }
   }
@@ -2377,14 +2389,23 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                       </button>
                     ))}
                   </div>
+                  <span className="workspace-export-note">当前编辑内容快照</span>
                   <button
                     className="workspace-export-button"
                     type="button"
                     title="导出当前编辑内容，不会保存源文件"
                     aria-label={`将 ${activeDocument.name} 的当前编辑内容导出为 Word`}
-                    onClick={() => void exportMarkdownWord(activeDocument.path)}
+                    onClick={() => void exportMarkdown(activeDocument.path, 'word')}
                     disabled={activeDocument.isExporting}
-                  >{activeDocument.isExporting ? '导出中…' : '导出 Word'}</button>
+                  >{activeDocument.exportingFormat === 'word' ? '导出中…' : '导出 Word'}</button>
+                  <button
+                    className="workspace-export-button"
+                    type="button"
+                    title="导出当前编辑内容快照，不会保存源文件"
+                    aria-label={`将 ${activeDocument.name} 的当前编辑内容快照导出为 PDF`}
+                    onClick={() => void exportMarkdown(activeDocument.path, 'pdf')}
+                    disabled={activeDocument.isExporting}
+                  >{activeDocument.exportingFormat === 'pdf' ? '导出中…' : '导出 PDF'}</button>
                 </>
               ) : null}
               <button
@@ -2405,9 +2426,18 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               <button
                 className="workspace-export-button"
                 type="button"
-                onClick={() => void exportPresentation(activePresentation.path)}
-                disabled={activePresentation.isExporting || activePresentation.conflict}
-              >{activePresentation.isExporting ? '导出中…' : '导出 PPTX'}</button>
+                title="先保存演示文稿，再导出 PPTX"
+                onClick={() => void exportPresentation(activePresentation.path, 'pptx')}
+                disabled={activePresentation.isSaving || activePresentation.isExporting || activePresentation.conflict}
+              >{activePresentation.exportingFormat === 'pptx' ? '导出中…' : '导出 PPTX'}</button>
+              <button
+                className="workspace-export-button"
+                type="button"
+                title="先保存演示文稿，再导出 PDF；动画和视频使用静态画面"
+                aria-label={`先保存 ${activePresentation.name}，再导出为 PDF`}
+                onClick={() => void exportPresentation(activePresentation.path, 'pdf')}
+                disabled={activePresentation.isSaving || activePresentation.isExporting || activePresentation.conflict}
+              >{activePresentation.exportingFormat === 'pdf' ? '导出中…' : '导出 PDF'}</button>
               <button
                 className="workspace-save-button"
                 type="button"
@@ -2417,6 +2447,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 disabled={
                   activePresentation.serializedDocument === activePresentation.savedSerializedDocument ||
                   activePresentation.isSaving ||
+                  activePresentation.isExporting ||
                   activePresentation.conflict
                 }
               >保存</button>

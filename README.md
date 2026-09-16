@@ -40,7 +40,7 @@ macOS 打包脚本和 CI 默认关闭签名自动发现；其他本地打包命�
 - [开发与验证](docs/development.md)：类型检查、渲染测试、构建产物与发布流程。
 - [本地 Word 读取](docs/document-reading.md)：工具契约、运行时准备、资源限制与打包。
 - [Markdown 导出 Word 方案](docs/markdown-word-export-plan.md)：Pandoc 接入、体积验证与实施计划；P1 核心服务和 P2 界面/打包实现已完成，P3 交付验收待进行。
-- [Markdown 与演示文稿导出 PDF 方案](docs/pdf-export-plan.md)：预览一致性、PPTist 逐页渲染、文件安全边界与验收计划；[P0 本机验证](docs/pdf-p0-validation.md)已完成，跨平台与安装态待测。
+- [Markdown 与演示文稿导出 PDF 方案](docs/pdf-export-plan.md)：核心服务及界面入口已实现；[P0 本机验证](docs/pdf-p0-validation.md)已完成，跨平台与安装态待测。
 - [Tika 验证记录](docs/tika-validation.md)：已记录结果和待完成的平台验收。
 - [工作区与 PPTist 性能记录](docs/p2-validation-2026-09-14.md)：2026-09-14 的渲染验证与测量。
 - [仓库指南](AGENTS.md)：开发规范与跨进程、演示文稿安全约束。
@@ -100,6 +100,7 @@ src/
 - 文本编辑限制为 2 MiB 的 UTF-8 文件，并保留 UTF-8 BOM 与原始换行风格。
 - 保存采用内容版本校验；文件被其他程序修改时停止写入并提示重新载入。
 - Markdown 操作栏可将当前编辑内容快照导出为 `.docx`；导出不要求先保存，也不会改变源文件的保存状态。转换期间仍可继续编辑，生成结果对应点击导出时的内容。
+- Markdown 操作栏也可将点击时的编辑内容快照导出为 A4 PDF，使用预览的正文样式和固定分页规则；项目内图片加载失败时导出会中止。
 - Word 导出支持标题、正文、列表、GFM 表格、代码和项目内 PNG/JPEG 图片；远程、越界、符号链接及不支持格式的图片会中止导出，Mermaid 和被移除的不支持链接会在完成后提示。
 - 打包应用按目标架构内置固定版本 Pandoc、中文参考样式、许可证通知和对应源码归档；运行转换不依赖系统 Pandoc、Word 或网络。
 - 本地开发首次使用 Word 导出前运行 `pnpm pandoc:prepare`，运行时写入 Git 忽略的 `out/.pandoc-package-runtime/`。
@@ -110,6 +111,7 @@ src/
 - 编辑器实例在输入过程中保持常驻，PPTist 状态通过受限消息桥同步；只有显式保存才写入项目文件。
 - `.slides.json` 使用 SlideMind v2 的 PPTist 数据格式，不兼容早期的 v1 快照。
 - 支持通过 `Cmd/Ctrl + S` 保存，并可由主进程导出基础文本、形状、图片和线条为 PPTX。外部 `.pptx` 仅支持只读内容提取，不支持无损导入或原位编辑。
+- 可先保存原生演示文稿，再通过 PPTist 实际渲染画面逐页导出 PDF；每页为栅格图像，动画和视频使用静态画面，PDF 文字不可复制或检索。
 
 ## PPT 制作工作流
 

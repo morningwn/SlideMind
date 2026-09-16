@@ -15,6 +15,7 @@ export interface OpenPresentationDocument {
   reloadKey: string
   isSaving: boolean
   isExporting: boolean
+  exportingFormat?: 'pptx' | 'pdf'
   lastExportPath?: string
   conflict: boolean
   error: string
@@ -118,8 +119,12 @@ export function PresentationEditor({
           {document.conflict ? <button type="button" onClick={onReload}>重新载入</button> : null}
         </div>
       ) : null}
-      <div className="presentation-statusbar">
-        <span>{document.lastExportPath ? `已导出：${document.lastExportPath}` : 'PPTist · 1000 × 562.5'}</span>
+      <div className="presentation-statusbar" role="status">
+        <span>{document.isExporting
+          ? `正在保存并导出 ${document.exportingFormat === 'pdf' ? 'PDF' : 'PPTX'}…`
+          : document.lastExportPath
+            ? `已导出：${document.lastExportPath}`
+            : 'PPTist · 1000 × 562.5'}</span>
       </div>
       <iframe
         className="presentation-pptist-frame"
