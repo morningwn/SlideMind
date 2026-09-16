@@ -37,6 +37,30 @@ function imageMimeType(
   return mimeType
 }
 
+function exportImageMimeType(path: string, bytes: Buffer): 'image/jpeg' | 'image/png' {
+  const extension = extname(path).toLocaleLowerCase()
+  if (extension === '.png') {
+    const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    if (!bytes.subarray(0, pngSignature.length).equals(pngSignature)) {
+      throw new Error('PNG 图片内容无效')
+    }
+    return 'image/png'
+  }
+  if (extension === '.jpg' || extension === '.jpeg') {
+    if (
+      bytes.byteLength < 4 ||
+      bytes[0] !== 0xff ||
+      bytes[1] !== 0xd8 ||
+      bytes[bytes.byteLength - 2] !== 0xff ||
+      bytes[bytes.byteLength - 1] !== 0xd9
+    ) {
+      throw new Error('JPEG 图片内容无效')
+    }
+    return 'image/jpeg'
+  }
+  throw new Error('Word 导出仅支持 PNG 和 JPEG 图片')
+}
+
 function validateString(value: unknown, label: string): string {
   if (
     typeof value !== 'string' ||
@@ -252,4 +276,39 @@ export async function readProjectImageFile(
     size: bytes.byteLength,
     revision: fileRevision(bytes)
   }
+}
+
+export async function readMarkdownExportImage(
+  projectPathInput: unknown,
+  documentPathInput: unknown,
+  assetPathInput: unknown
+): Promise<{ bytes: Buffer; mimeType: 'image/jpeg' | 'image/png' }> {
+  const documentPath = validateString(documentPathInput, '文档路径')
+  const documentFile = await resolveRegularProjectFile(projectPathInput, documentPath)
+  if (documentKind(documentFile.relativePath) !== 'markdown') {
+    throw new Error('只能从 Markdown 文档导出 Word')
+  }
+
+  const rawAssetPath = validateString(assetPathInput, '图片路径').split(/[?#]/, 1)[0]
+  let decodedAssetPath: string
+  try {
+    decodedAssetPath = decodeURIComponent(rawAssetPath)
+  } catch {
+    throw new Error('图片路径编码无效')
+  }
+  if (
+    isAbsolute(decodedAssetPath) ||
+    /^[\\/]/.test(decodedAssetPath) ||
+    /^[a-z]:[\\/]/i.test(decodedAssetPath) ||
+    /^[a-z][a-z0-9+.-]*:/i.test(decodedAssetPath)
+  ) {
+    throw new Error('图片路径必须位于当前项目内')
+  }
+
+  const relativeAssetPath = join(dirname(documentFile.relativePath), decodedAssetPath)
+  const assetFile = await resolveRegularProjectFile(projectPathInput, relativeAssetPath)
+  if (assetFile.size > MAX_PREVIEW_ASSET_BYTES) throw new Error('导出图片超过 5 MiB')
+  const bytes = await readFile(assetFile.targetPath)
+  if (bytes.byteLength > MAX_PREVIEW_ASSET_BYTES) throw new Error('导出图片超过 5 MiB')
+  return { bytes, mimeType: exportImageMimeType(assetFile.relativePath, bytes) }
 }

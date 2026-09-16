@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ProjectTextFileStore } from './project-text-files'
+import { ProjectTextFileStore, readMarkdownExportImage } from './project-text-files'
 
 describe('ProjectTextFileStore', () => {
   it('reads Markdown metadata and preserves CRLF plus a UTF-8 BOM when saving', async () => {
@@ -125,5 +125,50 @@ describe('ProjectTextFileStore', () => {
     await expect(store.readImage(projectPath, 'vector.svg')).rejects.toThrow('仅支持 PNG')
     await expect(store.readImage(projectPath, 'large.png')).rejects.toThrow('超过 20 MiB')
     await expect(store.readImage(projectPath, 'linked.png')).rejects.toThrow('符号链接')
+  })
+
+  it('loads only real PNG and JPEG bytes for Markdown Word export', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-export-images-'))
+    await mkdir(join(projectPath, 'docs'))
+    await mkdir(join(projectPath, 'images'))
+    await writeFile(join(projectPath, 'docs', 'notes.md'), '# Notes')
+    const png = Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      Buffer.from('content')
+    ])
+    await writeFile(join(projectPath, 'images', 'valid.png'), png)
+    await writeFile(join(projectPath, 'images', 'fake.png'), 'not a png')
+    await writeFile(join(projectPath, 'images', 'graphic.webp'), 'webp')
+
+    await expect(
+      readMarkdownExportImage(projectPath, 'docs/notes.md', '../images/valid.png?cache=1')
+    ).resolves.toEqual({ bytes: png, mimeType: 'image/png' })
+    await expect(
+      readMarkdownExportImage(projectPath, 'docs/notes.md', '../images/fake.png')
+    ).rejects.toThrow('内容无效')
+    await expect(
+      readMarkdownExportImage(projectPath, 'docs/notes.md', '../images/graphic.webp')
+    ).rejects.toThrow('仅支持 PNG 和 JPEG')
+  })
+
+  it('rejects remote, absolute, escaping and symbolic-link export images', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-export-images-'))
+    const outsidePath = await mkdtemp(join(tmpdir(), 'slidemind-export-images-outside-'))
+    await writeFile(join(projectPath, 'notes.md'), '# Notes')
+    await writeFile(join(outsidePath, 'outside.png'), 'outside')
+    await symlink(join(outsidePath, 'outside.png'), join(projectPath, 'linked.png'))
+
+    await expect(
+      readMarkdownExportImage(projectPath, 'notes.md', 'https://example.com/a.png')
+    ).rejects.toThrow('当前项目内')
+    await expect(readMarkdownExportImage(projectPath, 'notes.md', '/etc/passwd')).rejects.toThrow(
+      '当前项目内'
+    )
+    await expect(
+      readMarkdownExportImage(projectPath, 'notes.md', '../outside.png')
+    ).rejects.toThrow('超出项目范围')
+    await expect(readMarkdownExportImage(projectPath, 'notes.md', 'linked.png')).rejects.toThrow(
+      '符号链接'
+    )
   })
 })

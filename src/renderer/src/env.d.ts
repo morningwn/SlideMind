@@ -8,6 +8,7 @@ declare module '*.vue' {
 
 import type { AgentApi } from '../../shared/agent'
 import type { DesktopApi } from '../../shared/desktop'
+import type { DocumentExportApi } from '../../shared/document-export'
 import type { PresentationApi } from '../../shared/presentation'
 import type { ProjectApi } from '../../shared/project'
 import type { ProjectVersionApi } from '../../shared/project-version'
@@ -17,6 +18,7 @@ export {}
 declare global {
   interface Window {
     desktop: Readonly<DesktopApi>
+    documentExport: Readonly<DocumentExportApi>
     agent: Readonly<AgentApi>
     presentations: Readonly<PresentationApi>
     projects: Readonly<ProjectApi>

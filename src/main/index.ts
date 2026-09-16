@@ -29,6 +29,9 @@ import {
 import { getLogger, initializeApplicationLogging } from './logging/logger'
 import { createTikaDocumentReadService } from './document/document-reader'
 import { resolveTikaRuntimeOptions } from './document/tika-runtime'
+import { registerDocumentExportIpc } from './document-export/ipc'
+import { MarkdownWordExportService } from './document-export/markdown-word-export-service'
+import { PandocRuntime, resolvePandocRuntimeOptions } from './document-export/pandoc-runtime'
 
 const APP_URL_PROTOCOLS = new Set(['http:', 'https:'])
 const applicationStartedAt = Date.now()
@@ -240,12 +243,26 @@ app.whenReady().then(() => {
   const mutationService = new ProjectMutationService(versionService)
   const externalChangeMonitor = new ExternalChangeMonitor(mutationService)
   const presentationService = new PresentationService(mutationService)
-  const documentReadService = createTikaDocumentReadService(resolveTikaRuntimeOptions({
-    appPath: app.getAppPath(),
-    isPackaged: app.isPackaged,
-    resourcesPath: process.resourcesPath
-  }))
-  closeDocumentReadService = () => documentReadService.close()
+  const documentReadService = createTikaDocumentReadService(
+    resolveTikaRuntimeOptions({
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath
+    })
+  )
+  const documentExportService = new MarkdownWordExportService(
+    new PandocRuntime(
+      resolvePandocRuntimeOptions({
+        appPath: app.getAppPath(),
+        isPackaged: app.isPackaged,
+        resourcesPath: process.resourcesPath
+      })
+    ),
+    mutationService
+  )
+  closeDocumentReadService = async () => {
+    await Promise.all([documentReadService.close(), documentExportService.close()])
+  }
   const agentService = new BaseAgentService(
     configStore,
     projectRoots,
@@ -293,6 +310,7 @@ app.whenReady().then(() => {
     externalChangeMonitor
   )
   registerPresentationIpc(presentationService, projectRoots)
+  registerDocumentExportIpc(documentExportService, projectRoots)
   registerProjectVersionIpc(projectRoots, versionService, mutationService)
   installApplicationMenu()
   createWindow()

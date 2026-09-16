@@ -34,6 +34,7 @@ import type {
 } from '../shared/project-version'
 import type { DesktopApi, DesktopCloseResponse } from '../shared/desktop'
 import type { RendererDiagnosticEvent } from '../shared/logging'
+import type { DocumentExportApi, ExportMarkdownWordInput } from '../shared/document-export'
 
 const desktopApi: Readonly<DesktopApi> = Object.freeze({
   platform: process.platform,
@@ -182,3 +183,10 @@ const presentationApi: Readonly<PresentationApi> = Object.freeze({
 })
 
 contextBridge.exposeInMainWorld('presentations', presentationApi)
+
+const documentExportApi: Readonly<DocumentExportApi> = Object.freeze({
+  exportWord: (projectHandle: string, input: ExportMarkdownWordInput) =>
+    ipcRenderer.invoke('document-export:word', projectHandle, input)
+})
+
+contextBridge.exposeInMainWorld('documentExport', documentExportApi)
