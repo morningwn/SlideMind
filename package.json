@@ -14,6 +14,8 @@
     "postinstall": "install-electron",
     "dev": "electron-vite dev",
     "test": "vitest run && tsc --noEmit -p tsconfig.web.json && node scripts/test-renderer.mjs",
+    "pandoc:p0:prepare": "node scripts/pandoc-p0/prepare-runtime.mjs",
+    "pandoc:p0:probe": "node scripts/pandoc-p0/run-probe.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "package": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && node scripts/typecheck-pptist.cjs && pnpm test && electron-vite build && node scripts/tika-package/prepare.mjs && electron-builder && node scripts/tika-package/verify.mjs",

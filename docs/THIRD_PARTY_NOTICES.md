@@ -26,3 +26,9 @@ SlideMind bundles Apache Tika Server Standard 4.0.0 and its adjacent runtime dep
 ## Eclipse Temurin
 
 SlideMind bundles a custom Java runtime linked from Eclipse Temurin JDK 21.0.12.1+1 to run Apache Tika without relying on a system Java installation. The default image uses jlink resource compression and debug-information removal with a reduced module set; a full upstream JRE fallback is available. The complete upstream `NOTICE` and per-module `legal` directory are preserved in each packaged JRE. Temurin/OpenJDK is distributed under GPL-2.0-only with the Classpath Exception and includes components under additional licenses documented in that directory.
+
+## Pandoc
+
+SlideMind is evaluating a pinned Pandoc 3.11 executable for local Markdown-to-DOCX conversion. Pandoc is copyright © 2006–2024 John MacFarlane and is distributed under GPL-2.0-or-later; embedded components and templates carry the additional compatible notices recorded in Pandoc's `COPYRIGHT` file. The P0 runtime preparation preserves the upstream `COPYING.md` and `COPYRIGHT` files beside the executable.
+
+Pandoc is not yet part of a released SlideMind package. Before distribution, the packaging work must include a compliant corresponding-source mechanism or written offer; an upstream link alone is not treated as sufficient.

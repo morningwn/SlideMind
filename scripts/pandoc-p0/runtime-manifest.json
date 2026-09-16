@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "pandocVersion": "3.11",
+  "releaseUrl": "https://github.com/jgm/pandoc/releases/tag/3.11",
+  "licenses": [
+    {
+      "archive": "COPYING.md",
+      "url": "https://raw.githubusercontent.com/jgm/pandoc/3.11/COPYING.md",
+      "sha256": "3ebfbf9235b049d384cdba5a66a1a3434bb544391e720b76faa8e1b3ee61a4e5",
+      "size": 17763
+    },
+    {
+      "archive": "COPYRIGHT",
+      "url": "https://raw.githubusercontent.com/jgm/pandoc/3.11/COPYRIGHT",
+      "sha256": "842e33ef01625e93f85bebb8bac83aa570186b7aa77a09971257cc29f8f60740",
+      "size": 9598
+    }
+  ],
+  "artifacts": {
+    "darwin-arm64": {
+      "archive": "pandoc-3.11-arm64-macOS.zip",
+      "url": "https://github.com/jgm/pandoc/releases/download/3.11/pandoc-3.11-arm64-macOS.zip",
+      "sha256": "15806bedf9517bfead72e88fe6a6696635c3691efbb6e152173440e9c5bb50b4",
+      "size": 41832712,
+      "binary": "pandoc",
+      "fileDescription": "Mach-O 64-bit executable arm64"
+    },
+    "darwin-x64": {
+      "archive": "pandoc-3.11-x86_64-macOS.zip",
+      "url": "https://github.com/jgm/pandoc/releases/download/3.11/pandoc-3.11-x86_64-macOS.zip",
+      "sha256": "3b1c1b57f160112c821d02f23d946ede8b7f57a6ccf4632a25a512d334a9291f",
+      "size": 26145603,
+      "binary": "pandoc",
+      "fileDescription": "Mach-O 64-bit executable x86_64"
+    },
+    "win32-x64": {
+      "archive": "pandoc-3.11-windows-x86_64.zip",
+      "url": "https://github.com/jgm/pandoc/releases/download/3.11/pandoc-3.11-windows-x86_64.zip",
+      "sha256": "2ab72baf2399450e148ddf7a2a8689806c42e1bba71862b57e220fd9b8456d3d",
+      "size": 41761100,
+      "binary": "pandoc.exe",
+      "fileDescription": "PE32+ executable x86-64, for MS Windows"
+    }
+  }
+}
