@@ -11,8 +11,12 @@ SlideMind 是一个面向 macOS 与 Windows 的演示文稿创作桌面工作区
 
 ```bash
 pnpm install --frozen-lockfile
+pnpm tika:prepare       # 首次读取 Word/Excel/PDF 前准备本机运行时
+pnpm pandoc:prepare     # 首次导出 Word 前准备本机运行时
 pnpm dev
 ```
+
+Tika 和 Pandoc 运行时体积较大，仅使用对应功能时需要准备，因此 `pnpm dev` 不会自动下载。
 
 ## 验证与构建
 

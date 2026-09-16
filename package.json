@@ -14,6 +14,8 @@
     "postinstall": "install-electron",
     "dev": "electron-vite dev",
     "test": "vitest run && tsc --noEmit -p tsconfig.web.json && node scripts/test-renderer.mjs",
+    "tika:prepare": "node scripts/tika-p0/prepare-runtime.mjs",
+    "tika:probe": "node scripts/tika-p0/run-probe.mjs",
     "pandoc:p0:prepare": "node scripts/pandoc-p0/prepare-runtime.mjs",
     "pandoc:p0:probe": "node scripts/pandoc-p0/run-probe.mjs",
     "pandoc:prepare": "node scripts/pandoc-package/prepare.mjs",

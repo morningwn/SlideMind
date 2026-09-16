@@ -17,6 +17,7 @@ export interface TikaRuntimeOptions {
   configPath: string
   idleTimeoutMs?: number
   javaBinary: string
+  missingRuntimeMessage?: string
   startupTimeoutMs?: number
   tikaJar: string
   tikaVersion: string
@@ -77,6 +78,9 @@ export function resolveTikaRuntimeOptions(
     return {
       configPath,
       javaBinary: resourcePath(value.javaBinary),
+      missingRuntimeMessage: options.isPackaged
+        ? '内置 Tika 运行时不完整，请重新安装应用'
+        : 'Tika 开发运行时未准备，请先运行 pnpm tika:prepare',
       tikaJar: resourcePath(value.tikaJar),
       tikaVersion: value.tikaVersion
     }
@@ -88,6 +92,9 @@ export function resolveTikaRuntimeOptions(
   return {
     configPath,
     javaBinary,
+    missingRuntimeMessage: options.isPackaged
+      ? '内置 Tika 运行时不完整，请重新安装应用'
+      : 'Tika 开发运行时未准备，请先运行 pnpm tika:prepare',
     tikaJar: join(runtimeRoot, 'runtime/tika/tika-server-standard-4.0.0.jar'),
     tikaVersion: '4.0.0'
   }
@@ -245,6 +252,21 @@ export class TikaRuntime {
   private async spawnRuntime(): Promise<string> {
     this.runtimeState = 'starting'
     const startedAt = Date.now()
+    const missingResources = [
+      ['config', this.options.configPath],
+      ['java', this.options.javaBinary],
+      ['tika', this.options.tikaJar]
+    ].filter(([, path]) => !existsSync(path))
+    if (missingResources.length > 0) {
+      this.runtimeState = 'failed'
+      logger.error('runtime.resources_missing', {
+        context: { resources: missingResources.map(([name]) => name).join(',') }
+      })
+      throw new DocumentReadError(
+        'runtime_unavailable',
+        this.options.missingRuntimeMessage ?? 'Tika 运行时文件缺失'
+      )
+    }
     const workDirectory = await mkdtemp(join(tmpdir(), 'slidemind-tika-'))
     const port = await reservePort()
     const serverId = `slidemind-${randomUUID()}`

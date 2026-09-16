@@ -10,7 +10,7 @@ vi.mock('node:fs', async (importOriginal) => ({
   readFileSync
 }))
 
-import { resolveTikaRuntimeOptions } from './tika-runtime'
+import { resolveTikaRuntimeOptions, TikaRuntime } from './tika-runtime'
 
 describe('resolveTikaRuntimeOptions', () => {
   afterEach(() => {
@@ -76,5 +76,33 @@ describe('resolveTikaRuntimeOptions', () => {
       isPackaged: true,
       resourcesPath: '/resources'
     })).toThrow('Tika 运行时清单无效')
+  })
+
+  it('reports how to prepare a missing development runtime', async () => {
+    existsSync.mockReturnValue(false)
+    const options = resolveTikaRuntimeOptions({
+      appPath: '/application',
+      isPackaged: false,
+      resourcesPath: '/resources'
+    })
+    const runtime = new TikaRuntime(options)
+
+    await expect(runtime.run(async () => undefined)).rejects.toThrow(
+      'Tika 开发运行时未准备，请先运行 pnpm tika:prepare'
+    )
+    expect(runtime.state).toBe('failed')
+  })
+
+  it('reports missing packaged resources without suggesting developer commands', async () => {
+    existsSync.mockReturnValue(false)
+    const runtime = new TikaRuntime(resolveTikaRuntimeOptions({
+      appPath: '/application',
+      isPackaged: true,
+      resourcesPath: '/resources'
+    }))
+
+    await expect(runtime.run(async () => undefined)).rejects.toThrow(
+      '内置 Tika 运行时不完整，请重新安装应用'
+    )
   })
 })

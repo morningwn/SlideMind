@@ -64,8 +64,8 @@ Agent document_read
 运行时固定为 Apache Tika Server Standard 4.0.0 和 Eclipse Temurin JRE 21.0.12.1+1，下载地址、摘要与签名信息以[版本清单](../scripts/tika-p0/runtime-manifest.json)为准。资源准备需要联网；解析本身不需要联网、系统 Java 或 Docker。
 
 ```bash
-node scripts/tika-p0/prepare-runtime.mjs
-node scripts/tika-p0/run-probe.mjs
+pnpm tika:prepare
+pnpm tika:probe
 SLIDEMIND_TIKA_INTEGRATION=1 pnpm exec vitest run src/main/document/tika-integration.test.ts
 ```
 
