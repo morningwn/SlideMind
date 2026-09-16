@@ -38,6 +38,7 @@ macOS 打包脚本和 CI 默认关闭签名自动发现；其他本地打包命�
 ## 文档导航
 
 - [开发与验证](docs/development.md)：类型检查、渲染测试、构建产物与发布流程。
+- [Pi Agent 配置统一管理方案](docs/pi-managed-configuration-plan.md)：关闭外部配置发现、移除非必要扩展与优先自研简单能力的分阶段方案，尚未实施。
 - [本地 Word 读取](docs/document-reading.md)：工具契约、运行时准备、资源限制与打包。
 - [Markdown 导出 Word 方案](docs/markdown-word-export-plan.md)：Pandoc 接入、体积验证与实施计划；P1 核心服务和 P2 界面/打包实现已完成，P3 交付验收待进行。
 - [Markdown 与演示文稿导出 PDF 方案](docs/pdf-export-plan.md)：核心服务及界面入口已实现；[P0 本机验证](docs/pdf-p0-validation.md)和[P3 本机验收进度](docs/pdf-p3-validation.md)已有记录，跨平台与真实安装态待测。
