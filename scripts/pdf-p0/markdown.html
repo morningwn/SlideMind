@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="/src/renderer/src/styles.css" />
+    <style>
+      :root {
+        --blue: #2f61e9;
+        background: #fff;
+      }
+      body {
+        margin: 0;
+        background: #fff;
+      }
+      .markdown-preview {
+        width: auto;
+        margin: 0;
+      }
+      @page {
+        size: A4;
+        margin: 18mm;
+      }
+      @media print {
+        h1,
+        h2,
+        h3 {
+          break-after: avoid;
+        }
+        tr,
+        img,
+        blockquote {
+          break-inside: avoid;
+        }
+        .markdown-preview pre {
+          overflow: visible;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+          box-decoration-break: clone;
+          -webkit-box-decoration-break: clone;
+        }
+        table {
+          table-layout: fixed;
+          overflow-wrap: anywhere;
+        }
+        a {
+          overflow-wrap: anywhere;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <article class="markdown-preview"></article>
+    <script type="module">
+      import DOMPurify from 'dompurify'
+      import { marked } from 'marked'
+
+      const image = async (type, color) => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 320
+        canvas.height = 100
+        const context = canvas.getContext('2d')
+        context.fillStyle = color
+        context.fillRect(0, 0, 320, 100)
+        context.fillStyle = '#fff'
+        context.font = 'bold 28px Arial'
+        context.fillText(type.toUpperCase(), 22, 62)
+        return canvas.toDataURL(`image/${type}`)
+      }
+      const sources = {
+        png: await image('png', '#2962b7'),
+        jpeg: await image('jpeg', '#a64444'),
+        webp: await image('webp', '#38825a'),
+        gif: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=',
+      }
+      if (new URLSearchParams(location.search).has('missing'))
+        sources.jpeg = 'data:image/jpeg;base64,broken'
+      const rows = Array.from(
+        { length: 16 },
+        (_, index) =>
+          `| 第 ${index + 1} 行 | 中文与 English 交错内容 | 很长的链接 https://example.invalid/a/very/long/path/that/should/wrap |`,
+      ).join('\n')
+      const source = `# PDF 导出中文样本\n\n## 标题层级和正文\n\n中文字体、**强调**、[链接](https://example.invalid/)与背景色。\n\n- 第一层\n  - 嵌套列表\n    - 第三层\n\n### 长表格\n\n| 序号 | 内容 | 长链接 |\n|---|---|---|\n${rows}\n\n### 长代码\n\n\`\`\`ts\n${Array.from({ length: 28 }, (_, i) => `const line${i} = '中文 English very-long-unbroken-token-${'x'.repeat(70)}'`).join('\n')}\n\`\`\`\n\n### 图片\n\n![PNG](images/sample.png)\n\n![JPEG](images/sample.jpeg)\n\n![GIF](images/sample.gif)\n\n![WebP](images/sample.webp)\n\n## 跨页段落\n\n${'这是需要跨页的中文段落，保留阅读顺序和分页。'.repeat(70)}\n`
+      const article = document.querySelector('article')
+      const sanitized = DOMPurify.sanitize(
+        marked.parse(source, { async: false, gfm: true }),
+        {
+          USE_PROFILES: { html: true },
+          FORBID_TAGS: [
+            'style',
+            'iframe',
+            'object',
+            'embed',
+            'audio',
+            'video',
+            'source',
+            'track',
+            'picture',
+          ],
+        },
+      )
+      const parsed = new DOMParser().parseFromString(sanitized, 'text/html')
+      for (const node of parsed.querySelectorAll('img')) {
+        const key = node.getAttribute('src')?.split('.').at(-1)
+        node.removeAttribute('src')
+        node.removeAttribute('srcset')
+        if (!sources[key]) throw new Error(`Missing image: ${key}`)
+        node.src = sources[key]
+      }
+      article.innerHTML = parsed.body.innerHTML
+      window.pdfProbeReady = Promise.all([
+        document.fonts.ready,
+        ...[...article.querySelectorAll('img')].map((img) => img.decode()),
+      ]).then(() => ({
+        images: article.querySelectorAll('img').length,
+        sourceLength: source.length,
+      }))
+    </script>
+  </body>
+</html>

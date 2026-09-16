@@ -40,7 +40,7 @@ macOS 打包脚本和 CI 默认关闭签名自动发现；其他本地打包命�
 - [开发与验证](docs/development.md)：类型检查、渲染测试、构建产物与发布流程。
 - [本地 Word 读取](docs/document-reading.md)：工具契约、运行时准备、资源限制与打包。
 - [Markdown 导出 Word 方案](docs/markdown-word-export-plan.md)：Pandoc 接入、体积验证与实施计划；P1 核心服务和 P2 界面/打包实现已完成，P3 交付验收待进行。
-- [Markdown 与演示文稿导出 PDF 方案](docs/pdf-export-plan.md)：预览一致性、PPTist 逐页渲染、文件安全边界与验收计划；尚未实施。
+- [Markdown 与演示文稿导出 PDF 方案](docs/pdf-export-plan.md)：预览一致性、PPTist 逐页渲染、文件安全边界与验收计划；[P0 本机验证](docs/pdf-p0-validation.md)已完成，跨平台与安装态待测。
 - [Tika 验证记录](docs/tika-validation.md)：已记录结果和待完成的平台验收。
 - [工作区与 PPTist 性能记录](docs/p2-validation-2026-09-14.md)：2026-09-14 的渲染验证与测量。
 - [仓库指南](AGENTS.md)：开发规范与跨进程、演示文稿安全约束。
