@@ -12,7 +12,6 @@ function packageFile(packageName: string, ...segments: string[]): string {
 
 export const PI_EXTENSION_PATHS = [
   packageFile('pi-continue', 'extensions', 'continue', 'index.ts'),
-  require.resolve('pi-free'),
   packageFile('pi-cache-optimizer', 'index.ts'),
   packageFile('pi-web-access', 'index.ts')
 ] as const
@@ -115,7 +114,6 @@ async function writeManagedJson(path: string, value: Record<string, unknown>): P
 
 export async function preparePiExtensions(agentDirectory: string): Promise<void> {
   process.env.PI_CODING_AGENT_DIR = agentDirectory
-  process.env.PI_FREE_FILE_LOG = 'false'
 
   await Promise.all([
     writeJsonIfMissing(join(agentDirectory, 'extensions', 'pi-continue.json'), {

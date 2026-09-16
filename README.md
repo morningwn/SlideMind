@@ -65,8 +65,8 @@ src/
 - API Key 通过 Electron 系统安全存储加密，并写入应用的 `userData/agent-config.json`。渲染进程只能读取非敏感配置状态，无法读取已保存的 Key。
 - preload 通过受限、类型化接口提供模型配置、Skill 列表、对话调用、停止、用量、任务清单和活动流；Agent 的文件访问与项目修改仍由主进程边界校验。
 - 应用内置 PPT 制作总控 Skill，并按阶段调度演示策略、页面文案、视觉设计、数据表达、流程图、模板和成稿审查 Skill；开发态从 `skills/` 加载，打包后作为只读资源注入 Pi Agent。
-- Pi Agent 固定集成 `pi-continue`、`pi-free`、`pi-cache-optimizer` 与 `pi-web-access`。这些扩展不引入原生模块；Web 能力按白名单启用。
-- 插件配置位于应用 `userData/pi-agent/`；首次启动会写入无浏览器弹窗、禁止读取浏览器 Cookie 的 Web 安全默认值，并关闭依赖 `git`、`gh`、`curl`、`yt-dlp` 或 `ffmpeg` 的能力。`pi-free` 上游仍使用用户的 `~/.pi/free.json` 保存其提供商配置。
+- Pi Agent 固定集成 `pi-continue`、`pi-cache-optimizer` 与 `pi-web-access`。DeepSeek 模型由应用注册；Web 能力按白名单启用。
+- 插件配置位于应用 `userData/pi-agent/`；首次启动会写入无浏览器弹窗、禁止读取浏览器 Cookie 的 Web 安全默认值，并关闭依赖 `git`、`gh`、`curl`、`yt-dlp` 或 `ffmpeg` 的能力。
 - 当前项目仍可通过 `.pi/skills/` 增加或覆盖同名 Skill，用户级 Skill 位于应用 `userData/pi-agent/skills/`。
 
 ## 设置与本地诊断

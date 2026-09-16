@@ -2,6 +2,8 @@ import { access, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { DEEPSEEK_MODEL_OPTIONS, DEEPSEEK_PROVIDER_ID } from '../../shared/agent'
+import { registerDeepSeekModels } from './deepseek-models'
 import {
   PI_AGENT_TOOL_NAMES,
   PI_EXTENSION_PATHS,
@@ -11,10 +13,24 @@ import {
 } from './pi-extensions'
 
 describe('Pi extension integration', () => {
+  it('keeps application DeepSeek models available without pi-free', async () => {
+    const agentDirectory = join(tmpdir(), `slidemind-pi-models-${crypto.randomUUID()}`)
+    const { ModelRuntime } = await import('@earendil-works/pi-coding-agent')
+    const runtime = await ModelRuntime.create({
+      authPath: join(agentDirectory, 'auth.json'),
+      modelsPath: null,
+      refreshOnCreate: false
+    })
+
+    registerDeepSeekModels(runtime)
+    for (const option of DEEPSEEK_MODEL_OPTIONS) {
+      expect(runtime.getModel(DEEPSEEK_PROVIDER_ID, option.id)?.id).toBe(option.id)
+    }
+  })
+
   it('loads every pinned extension without native context-mode dependencies', async () => {
     const agentDirectory = join(tmpdir(), `slidemind-pi-extensions-${crypto.randomUUID()}`)
     const previousAgentDirectory = process.env.PI_CODING_AGENT_DIR
-    const previousPiFreeFileLog = process.env.PI_FREE_FILE_LOG
 
     try {
       await preparePiExtensions(agentDirectory)
@@ -35,6 +51,7 @@ describe('Pi extension integration', () => {
       const extensions = loader.getExtensions()
       expect(extensions.errors).toEqual([])
       expect(extensions.extensions).toHaveLength(PI_EXTENSION_PATHS.length)
+      expect(extensions.extensions.some((extension) => extension.path?.includes('pi-free'))).toBe(false)
       const registeredToolNames = new Set(
         extensions.extensions.flatMap((extension) => [...extension.tools.keys()])
       )
@@ -43,7 +60,6 @@ describe('Pi extension integration', () => {
       }
     } finally {
       restoreEnvironment('PI_CODING_AGENT_DIR', previousAgentDirectory)
-      restoreEnvironment('PI_FREE_FILE_LOG', previousPiFreeFileLog)
     }
   }, 15_000)
 
