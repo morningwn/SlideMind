@@ -1,28 +1,26 @@
 import { mkdir, readFile } from 'node:fs/promises'
-import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { todosFromToolResult } from './agent-todo'
+import { createTodoToolsExtension } from './todo-tools'
 import {
   createManagedPermissionPolicy,
-  preparePermissionSystem
+  preparePermissionSystem,
 } from './permission-policy'
-
-const require = createRequire(import.meta.url)
-const todoExtensionPath = join(
-  dirname(require.resolve('@juicesharp/rpiv-todo/package.json')),
-  'index.ts'
-)
 
 function permissionPath(path: string): string {
   const normalizedPath = path.replaceAll('\\', '/')
-  return process.platform === 'win32' ? normalizedPath.toLowerCase() : normalizedPath
+  return process.platform === 'win32'
+    ? normalizedPath.toLowerCase()
+    : normalizedPath
 }
 
 describe('createManagedPermissionPolicy', () => {
   it('allows project file tools while denying unknown tools and bash', () => {
-    const policy = createManagedPermissionPolicy(join(tmpdir(), 'slidemind-agent')) as {
+    const policy = createManagedPermissionPolicy(
+      join(tmpdir(), 'slidemind-agent'),
+    ) as {
       tools: Record<string, string>
       bash: Record<string, string>
       defaultPolicy: Record<string, string>
@@ -47,7 +45,7 @@ describe('createManagedPermissionPolicy', () => {
       source_check: 'allow',
       fetch_content: 'allow',
       get_search_content: 'allow',
-      download_asset: 'allow'
+      download_asset: 'allow',
     })
     expect(policy.bash['*']).toBe('deny')
   })
@@ -55,8 +53,12 @@ describe('createManagedPermissionPolicy', () => {
   it('allows reading the managed skills directory but denies mutations there', () => {
     const agentDirectory = join(tmpdir(), 'slidemind-agent')
     const skillsDirectory = permissionPath(join(agentDirectory, 'skills'))
-    const bundledSkillsDirectory = permissionPath(join(tmpdir(), 'slidemind-resources', 'skills'))
-    const policy = createManagedPermissionPolicy(agentDirectory, [bundledSkillsDirectory]) as {
+    const bundledSkillsDirectory = permissionPath(
+      join(tmpdir(), 'slidemind-resources', 'skills'),
+    )
+    const policy = createManagedPermissionPolicy(agentDirectory, [
+      bundledSkillsDirectory,
+    ]) as {
       tools: Record<string, string>
       skills: Record<string, string>
       special: Record<string, string>
@@ -64,10 +66,14 @@ describe('createManagedPermissionPolicy', () => {
 
     expect(policy.skills['*']).toBe('allow')
     expect(policy.special.external_directory).toBe('deny')
-    expect(policy.special[`external_directory:${skillsDirectory}/*`]).toBe('allow')
+    expect(policy.special[`external_directory:${skillsDirectory}/*`]).toBe(
+      'allow',
+    )
     expect(policy.tools[`write:${skillsDirectory}/*`]).toBe('deny')
     expect(policy.tools[`edit:${skillsDirectory}/*`]).toBe('deny')
-    expect(policy.special[`external_directory:${bundledSkillsDirectory}/*`]).toBe('allow')
+    expect(
+      policy.special[`external_directory:${bundledSkillsDirectory}/*`],
+    ).toBe('allow')
     expect(policy.tools[`write:${bundledSkillsDirectory}/*`]).toBe('deny')
     expect(policy.tools[`edit:${bundledSkillsDirectory}/*`]).toBe('deny')
   })
@@ -75,50 +81,58 @@ describe('createManagedPermissionPolicy', () => {
 
 describe('preparePermissionSystem', () => {
   it('writes an application-managed policy and disables yolo mode', async () => {
-    const agentDirectory = join(tmpdir(), `slidemind-permissions-${crypto.randomUUID()}`)
+    const agentDirectory = join(
+      tmpdir(),
+      `slidemind-permissions-${crypto.randomUUID()}`,
+    )
     const setup = await preparePermissionSystem(agentDirectory)
     const policy = JSON.parse(await readFile(setup.policyPath, 'utf8')) as {
       defaultPolicy: Record<string, string>
     }
-    const config = JSON.parse(await readFile(
-      join(agentDirectory, 'permission-system', 'config.json'),
-      'utf8'
-    )) as Record<string, unknown>
+    const config = JSON.parse(
+      await readFile(
+        join(agentDirectory, 'permission-system', 'config.json'),
+        'utf8',
+      ),
+    ) as Record<string, unknown>
 
     expect(setup.extensionPath).toMatch(/pi-permission-system[/\\]index\.ts$/)
     expect(policy.defaultPolicy).toMatchObject({
       tools: 'deny',
       bash: 'deny',
       mcp: 'deny',
-      special: 'deny'
+      special: 'deny',
     })
     expect(config).toMatchObject({
       enabled: true,
       debug: false,
-      yoloMode: false
+      yoloMode: false,
     })
   })
 
   it('blocks project-external file calls and skill mutations with Pi 0.84', async () => {
-    const testDirectory = join(tmpdir(), `slidemind-permissions-${crypto.randomUUID()}`)
+    const testDirectory = join(
+      tmpdir(),
+      `slidemind-permissions-${crypto.randomUUID()}`,
+    )
     const agentDirectory = join(testDirectory, 'agent')
     const projectDirectory = join(testDirectory, 'project')
     const skillsDirectory = join(agentDirectory, 'skills')
     await Promise.all([
       mkdir(projectDirectory, { recursive: true }),
-      mkdir(skillsDirectory, { recursive: true })
+      mkdir(skillsDirectory, { recursive: true }),
     ])
     const setup = await preparePermissionSystem(agentDirectory)
     const {
       createAgentSession,
       DefaultResourceLoader,
       ModelRuntime,
-      SessionManager
+      SessionManager,
     } = await import('@earendil-works/pi-coding-agent')
     const modelRuntime = await ModelRuntime.create({
       authPath: join(agentDirectory, 'auth.json'),
       modelsPath: null,
-      refreshOnCreate: false
+      refreshOnCreate: false,
     })
     const model = modelRuntime.getModels()[0]
     expect(model).toBeDefined()
@@ -126,17 +140,20 @@ describe('preparePermissionSystem', () => {
     const resourceLoader = new DefaultResourceLoader({
       cwd: projectDirectory,
       agentDir: agentDirectory,
-      additionalExtensionPaths: [setup.extensionPath, todoExtensionPath],
+      additionalExtensionPaths: [setup.extensionPath],
+      extensionFactories: [
+        { name: 'slidemind-todo', factory: createTodoToolsExtension() },
+      ],
       noExtensions: true,
       noSkills: true,
       noPromptTemplates: true,
       noThemes: true,
-      noContextFiles: true
+      noContextFiles: true,
     })
     await resourceLoader.reload()
     expect(resourceLoader.getExtensions()).toMatchObject({
       errors: [],
-      extensions: [{}, {}]
+      extensions: [{}, {}],
     })
     const { session } = await createAgentSession({
       cwd: projectDirectory,
@@ -145,48 +162,53 @@ describe('preparePermissionSystem', () => {
       model,
       tools: ['read', 'write', 'edit', 'grep', 'find', 'ls', 'todo'],
       resourceLoader,
-      sessionManager: SessionManager.inMemory(projectDirectory)
+      sessionManager: SessionManager.inMemory(projectDirectory),
     })
 
     try {
       expect(session.getActiveToolNames()).toContain('todo')
-      expect(session.systemPrompt).toContain('Use `todo` for complex work with 3+ steps')
+      expect(session.systemPrompt).toContain(
+        'Use todo for complex work with 3+ steps',
+      )
       const todoTool = session.getToolDefinition('todo')
       expect(todoTool).toBeDefined()
       const todoResult = await todoTool!.execute(
-        'create-todo',
-        { action: 'create', subject: '梳理演示结构' },
+        'add-todo',
+        { action: 'add', subject: '梳理演示结构' },
         undefined,
         undefined,
-        session.extensionRunner.createContext()
+        session.extensionRunner.createContext(),
       )
       expect(todosFromToolResult(todoResult)).toEqual([
-        { id: 1, subject: '梳理演示结构', status: 'pending' }
+        { id: 1, subject: '梳理演示结构', status: 'pending' },
       ])
 
       const insideRead = await session.extensionRunner.emitToolCall({
         type: 'tool_call',
         toolCallId: 'inside-read',
         toolName: 'read',
-        input: { path: join(projectDirectory, 'notes.md') }
+        input: { path: join(projectDirectory, 'notes.md') },
       })
       const outsideRead = await session.extensionRunner.emitToolCall({
         type: 'tool_call',
         toolCallId: 'outside-read',
         toolName: 'read',
-        input: { path: join(testDirectory, 'outside.md') }
+        input: { path: join(testDirectory, 'outside.md') },
       })
       const skillRead = await session.extensionRunner.emitToolCall({
         type: 'tool_call',
         toolCallId: 'skill-read',
         toolName: 'read',
-        input: { path: join(skillsDirectory, 'demo', 'SKILL.md') }
+        input: { path: join(skillsDirectory, 'demo', 'SKILL.md') },
       })
       const skillWrite = await session.extensionRunner.emitToolCall({
         type: 'tool_call',
         toolCallId: 'skill-write',
         toolName: 'write',
-        input: { path: join(skillsDirectory, 'demo', 'SKILL.md'), content: 'changed' }
+        input: {
+          path: join(skillsDirectory, 'demo', 'SKILL.md'),
+          content: 'changed',
+        },
       })
 
       expect(insideRead?.block).not.toBe(true)

@@ -33,7 +33,6 @@
     "@earendil-works/pi-agent-core": "0.85.1",
     "@earendil-works/pi-ai": "0.85.1",
     "@earendil-works/pi-coding-agent": "0.85.1",
-    "@juicesharp/rpiv-todo": "2.8.0",
     "@microsoft/antissrf": "1.0.0",
     "animate.css": "^4.1.1",
     "chokidar": "5.0.0",

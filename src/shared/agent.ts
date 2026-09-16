@@ -4,30 +4,33 @@ export const AGENT_THINKING_LEVEL_OPTIONS = [
   {
     id: 'off',
     name: '关闭',
-    description: '不启用额外推理，响应最快'
+    description: '不启用额外推理，响应最快',
   },
   {
     id: 'low',
     name: '轻量',
-    description: '少量推理，适合简单问题'
+    description: '少量推理，适合简单问题',
   },
   {
     id: 'high',
     name: '深入',
-    description: '充分推理，适合大多数创作任务'
+    description: '充分推理，适合大多数创作任务',
   },
   {
     id: 'max',
     name: '极致',
-    description: '使用最大推理深度，适合复杂任务'
-  }
+    description: '使用最大推理深度，适合复杂任务',
+  },
 ] as const
 
-export type AgentThinkingLevel = typeof AGENT_THINKING_LEVEL_OPTIONS[number]['id']
+export type AgentThinkingLevel =
+  (typeof AGENT_THINKING_LEVEL_OPTIONS)[number]['id']
 
 export const DEFAULT_AGENT_THINKING_LEVEL: AgentThinkingLevel = 'high'
 
-export function isAgentThinkingLevel(value: unknown): value is AgentThinkingLevel {
+export function isAgentThinkingLevel(
+  value: unknown,
+): value is AgentThinkingLevel {
   return AGENT_THINKING_LEVEL_OPTIONS.some((option) => option.id === value)
 }
 
@@ -36,14 +39,24 @@ export const DEEPSEEK_MODEL_OPTIONS = [
     id: 'deepseek-flash',
     name: 'DeepSeek V4.1 Flash',
     description: '支持图片理解，适合日常构思、截图分析与图表解读',
-    thinkingLevels: ['off', 'low', 'high', 'max'] satisfies AgentThinkingLevel[]
+    thinkingLevels: [
+      'off',
+      'low',
+      'high',
+      'max',
+    ] satisfies AgentThinkingLevel[],
   },
   {
     id: 'deepseek-v4-pro',
     name: 'DeepSeek V4 Pro',
     description: '推理能力更强，适合复杂叙事与内容打磨',
-    thinkingLevels: ['off', 'low', 'high', 'max'] satisfies AgentThinkingLevel[]
-  }
+    thinkingLevels: [
+      'off',
+      'low',
+      'high',
+      'max',
+    ] satisfies AgentThinkingLevel[],
+  },
 ] as const
 
 export const DEFAULT_DEEPSEEK_MODEL_ID = DEEPSEEK_MODEL_OPTIONS[0].id
@@ -125,7 +138,6 @@ export interface AgentTodo {
   subject: string
   activeForm?: string
   status: AgentTodoStatus
-  blockedBy?: number[]
 }
 
 export interface AgentStreamEvent {
@@ -158,7 +170,12 @@ export type AgentActivityEvent = {
 } & (
   | { type: 'start'; activity: AgentActivity }
   | { type: 'append'; activityId: string; delta: string }
-  | { type: 'finish'; activityId: string; status: Exclude<AgentActivityStatus, 'running'>; detail?: string }
+  | {
+      type: 'finish'
+      activityId: string
+      status: Exclude<AgentActivityStatus, 'running'>
+      detail?: string
+    }
 )
 
 export interface AgentApi {

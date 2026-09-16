@@ -38,7 +38,7 @@ macOS 打包脚本和 CI 默认关闭签名自动发现；其他本地打包命�
 ## 文档导航
 
 - [开发与验证](docs/development.md)：类型检查、渲染测试、构建产物与发布流程。
-- [Pi Agent 配置统一管理方案](docs/pi-managed-configuration-plan.md)：关闭外部配置发现、移除非必要扩展与优先自研简单能力的分阶段方案，尚未实施。
+- [Pi Agent 配置统一管理方案](docs/pi-managed-configuration-plan.md)：关闭外部配置发现、移除非必要扩展与优先自研简单能力的分阶段方案，部分实施。
 - [本地 Word 读取](docs/document-reading.md)：工具契约、运行时准备、资源限制与打包。
 - [Markdown 导出 Word 方案](docs/markdown-word-export-plan.md)：Pandoc 接入、体积验证与实施计划；P1 核心服务和 P2 界面/打包实现已完成，P3 交付验收待进行。
 - [Markdown 与演示文稿导出 PDF 方案](docs/pdf-export-plan.md)：核心服务及界面入口已实现；[P0 本机验证](docs/pdf-p0-validation.md)和[P3 本机验收进度](docs/pdf-p3-validation.md)已有记录，跨平台与真实安装态待测。
@@ -64,6 +64,7 @@ src/
 - 应用启动时会先检查模型配置；首次使用必须选择受支持的 DeepSeek 模型并保存 API Key，完成后才能进入项目启动台。后续可从启动台右上角再次打开设置。
 - API Key 通过 Electron 系统安全存储加密，并写入应用的 `userData/agent-config.json`。渲染进程只能读取非敏感配置状态，无法读取已保存的 Key。
 - preload 通过受限、类型化接口提供模型配置、Skill 列表、对话调用、停止、用量、任务清单和活动流；Agent 的文件访问与项目修改仍由主进程边界校验。
+- 工作清单由应用内置 `todo` 工具管理，支持 `replace`、`add`、`update`、`list`；清单随会话分支恢复，旧会话的任务快照可只读显示。
 - 应用内置 PPT 制作总控 Skill，并按阶段调度演示策略、页面文案、视觉设计、数据表达、流程图、模板和成稿审查 Skill；开发态从 `skills/` 加载，打包后作为只读资源注入 Pi Agent。
 - Pi Agent 使用应用内的缓存前缀整理逻辑与 `pi-web-access`，并使用 Pi 原生压缩。DeepSeek 模型由应用注册；Web 能力按白名单启用。缓存 token 用量、压缩事件与历史会话重新加载的结构性信号记录在本地诊断日志中，不自动上传。
 - 插件配置位于应用 `userData/pi-agent/`；首次启动会写入无浏览器弹窗、禁止读取浏览器 Cookie 的 Web 安全默认值，并关闭依赖 `git`、`gh`、`curl`、`yt-dlp` 或 `ffmpeg` 的能力。

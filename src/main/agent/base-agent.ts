@@ -5,8 +5,7 @@ import type {
   AgentSession as PiAgentSession,
   ModelRuntime,
 } from '@earendil-works/pi-coding-agent'
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import {
   DEFAULT_AGENT_THINKING_LEVEL,
   DEEPSEEK_MODEL_OPTIONS,
@@ -38,6 +37,7 @@ import type { AgentConfigStore, AgentConfiguration } from './config-store'
 import { createToolActivity, toolErrorDetail } from './agent-activity'
 import { conversationUsageFromSession } from './agent-usage'
 import { todosFromSessionEntries, todosFromToolResult } from './agent-todo'
+import { createTodoToolsExtension } from './todo-tools'
 import {
   preparePermissionSystem,
   type PermissionSystemSetup,
@@ -56,17 +56,12 @@ import { createCacheOptimizationExtension } from './cache-optimization'
 import type { DocumentReadService } from '../document/document-reader'
 import { isDocumentPath } from '../../shared/document'
 
-const require = createRequire(import.meta.url)
 const MAX_AGENT_SESSIONS = 50
 const MAX_PROMPT_REFERENCES = 20
-const BUILT_IN_EXTENSION_FACTORY_COUNT = 6
+const BUILT_IN_EXTENSION_FACTORY_COUNT = 7
 const EXPECTED_AGENT_EXTENSION_COUNT =
-  2 + PI_EXTENSION_PATHS.length + BUILT_IN_EXTENSION_FACTORY_COUNT
+  1 + PI_EXTENSION_PATHS.length + BUILT_IN_EXTENSION_FACTORY_COUNT
 const SESSION_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/
-const TODO_EXTENSION_PATH = join(
-  dirname(require.resolve('@juicesharp/rpiv-todo/package.json')),
-  'index.ts',
-)
 const SYSTEM_PROMPT = `你是 SlideMind 的基础演示创作 agent。
 你的职责是帮助用户梳理材料、建立清晰叙事、规划演示结构并打磨表达。
 信息不足时先指出缺口；不要虚构事实；输出应简洁、可执行。
@@ -490,6 +485,7 @@ export class BaseAgentService {
     projectHandle: string,
     conversationId: string,
     thinkingLevel: AgentThinkingLevel,
+    onTodoRestore?: (todos: AgentTodo[]) => void,
   ): Promise<{ agent: PiAgentSession; todos: AgentTodo[] }> {
     const { createAgentSession, DefaultResourceLoader, SessionManager } =
       await loadPiRuntime()
@@ -536,11 +532,16 @@ export class BaseAgentService {
       agentDir: this.agentDirectory,
       additionalExtensionPaths: [
         permissionSystem.extensionPath,
-        TODO_EXTENSION_PATH,
         ...PI_EXTENSION_PATHS,
       ],
       additionalSkillPaths: skillPaths,
       extensionFactories: [
+        {
+          name: 'slidemind-todo',
+          factory: createTodoToolsExtension(onTodoRestore, () =>
+            sessionManager.getBranch(),
+          ),
+        },
         {
           name: 'slidemind-cache-optimization',
           factory: createCacheOptimizationExtension(projectPath),
@@ -665,6 +666,10 @@ export class BaseAgentService {
         input.projectHandle,
         input.conversationId,
         input.thinkingLevel,
+        (todos) => {
+          session.todos = todos
+          if (session.agent) onTodos?.(input, structuredClone(todos))
+        },
       )
       session.agent = created.agent
       session.todos = created.todos
