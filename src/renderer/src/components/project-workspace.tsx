@@ -51,8 +51,8 @@ import { WorkspaceExportMenu } from './workspace-export-menu'
 import {
   findComposerReferenceTrigger,
   promptReferenceKey,
-  promptReferenceLabel,
-  removeComposerReferenceTrigger,
+  collectComposerReferences,
+  insertComposerReference,
   type ComposerReferenceTrigger
 } from '../lib/composer-references'
 import { reportDiagnosticEvent } from '../lib/logger'
@@ -616,7 +616,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const effectiveSidebarWidth = Math.min(sidebarWidth, sidebarMaxWidth)
   const effectiveConversationHeight = Math.min(conversationHeight, sidebarMaxHeight)
   const [thinkingLevel, setThinkingLevel] = useState<AgentThinkingLevel>(loadThinkingLevel)
-  const [promptReferences, setPromptReferences] = useState<AgentPromptReference[]>([])
+  const [knownReferences, setKnownReferences] = useState<AgentPromptReference[]>([])
+  const promptReferences = collectComposerReferences(draft, knownReferences)
   const [referenceFiles, setReferenceFiles] = useState<ProjectFileEntry[]>([])
   const [skillOptions, setSkillOptions] = useState<AgentSkillOption[]>([])
   const [referenceTrigger, setReferenceTrigger] = useState<ComposerReferenceTrigger | null>(null)
@@ -824,7 +825,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     let active = true
     setIsReferenceOptionsLoading(true)
     setReferenceOptionsError('')
-    setPromptReferences([])
+    setKnownReferences([])
     setReferenceTrigger(null)
 
     void Promise.all([
@@ -1094,7 +1095,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     if (existingDraft) {
       setSelectedConversationId(existingDraft.id)
       setDraft('')
-      setPromptReferences([])
+      setKnownReferences([])
       setReferenceTrigger(null)
       setChatError('')
       return
@@ -1106,7 +1107,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setLoadedConversationIds((current) => new Set(current).add(conversation.id))
     setChatError('')
     setDraft('')
-    setPromptReferences([])
+    setKnownReferences([])
     setReferenceTrigger(null)
   }
 
@@ -1114,7 +1115,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setActiveDocumentPath(null)
     setSelectedConversationId(conversationId)
     setChatError('')
-    setPromptReferences([])
+    setKnownReferences([])
     setReferenceTrigger(null)
     if (loadedConversationIds.has(conversationId) || loadingConversationIds.has(conversationId)) {
       return
@@ -2145,15 +2146,18 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   async function sendMessage(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault()
-    const promptBody = draft.trim()
-    const referenceLine = promptReferences.map(promptReferenceLabel).join(' ')
-    const prompt = [referenceLine, promptBody].filter(Boolean).join('\n')
+    const prompt = draft.trim()
     if (
       !prompt ||
       isSending ||
       isConversationLoading ||
       loadingConversationIds.has(selectedConversation.id)
     ) return
+
+    if (promptReferences.length > 20) {
+      setChatError('单条消息最多引用 20 个文件或 skill')
+      return
+    }
 
     const conversationId = selectedConversation.id
     const requestId = crypto.randomUUID()
@@ -2165,7 +2169,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       isStreaming: true
     }
     setDraft('')
-    setPromptReferences([])
+    setKnownReferences([])
     setReferenceTrigger(null)
     setChatError('')
     setActiveAgentRequest({ requestId, conversationId })
@@ -2314,9 +2318,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       return
     }
 
-    const next = removeComposerReferenceTrigger(draft, referenceTrigger)
+    const next = insertComposerReference(draft, referenceTrigger, option.reference)
     setDraft(next.value)
-    setPromptReferences((current) => [...current, option.reference])
+    setKnownReferences((current) => [
+      ...current.filter((reference) => promptReferenceKey(reference) !== option.key),
+      option.reference
+    ])
     setReferenceTrigger(null)
     setChatError('')
     window.requestAnimationFrame(() => {
@@ -2941,26 +2948,6 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                   </div>
                 ) : null}
                 <div className="composer-box">
-                  {promptReferences.length > 0 ? (
-                    <div className="composer-reference-chips" aria-label="已引用上下文">
-                      {promptReferences.map((reference) => (
-                        <span
-                          className={`composer-reference-chip composer-reference-${reference.type}`}
-                          key={promptReferenceKey(reference)}
-                        >
-                          <i>{reference.type === 'file' ? '@' : '/'}</i>
-                          <span>{reference.type === 'file' ? reference.path : reference.name}</span>
-                          <button
-                            type="button"
-                            aria-label={`移除引用 ${promptReferenceLabel(reference)}`}
-                            onClick={() => setPromptReferences((current) => current.filter(
-                              (candidate) => promptReferenceKey(candidate) !== promptReferenceKey(reference)
-                            ))}
-                          >×</button>
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
                   <textarea
                     ref={composerTextareaRef}
                     value={draft}

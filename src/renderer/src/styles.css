@@ -4007,68 +4007,6 @@ button.file-tree-item:not(.file-tree-directory) {
   background: #f6f1ff;
 }
 
-.composer-reference-chips {
-  display: flex;
-  gap: 6px;
-  padding: 9px 11px 0;
-  overflow-x: auto;
-}
-
-.composer-reference-chip {
-  display: inline-flex;
-  min-width: 0;
-  max-width: 280px;
-  flex: 0 0 auto;
-  align-items: center;
-  border: 1px solid #d2ddec;
-  border-radius: 7px;
-  color: #4a5d78;
-  background: #f3f7fc;
-  font-size: 9px;
-}
-
-.composer-reference-chip.composer-reference-skill {
-  border-color: #d9cff0;
-  color: #624d85;
-  background: #f7f3ff;
-}
-
-.composer-reference-chip > i {
-  display: grid;
-  width: 24px;
-  height: 23px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-right: 1px solid currentColor;
-  font-style: normal;
-  font-weight: 800;
-  opacity: 0.7;
-}
-
-.composer-reference-chip > span {
-  min-width: 0;
-  padding: 0 7px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.composer-reference-chip > button {
-  width: 23px;
-  height: 23px;
-  flex: 0 0 auto;
-  padding: 0;
-  border: 0;
-  color: #8390a3;
-  background: transparent;
-  cursor: pointer;
-  font-size: 13px;
-}
-
-.composer-reference-chip > button:hover {
-  color: #be4a45;
-}
-
 .composer-box {
   width: min(760px, 100%);
   margin: 0 auto;
