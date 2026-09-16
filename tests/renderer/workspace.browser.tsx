@@ -49,6 +49,8 @@ let finishPrompt: ((value: AgentPromptResult) => void) | undefined
 let content = 'original document'
 let revision = 'r1'
 let externalFileVisible = false
+let exportedPdfVisible = false
+let collapsedFolderFileVisible = false
 let saves = 0
 let exportAttempt = 0
 const exportSnapshots: Array<{ path: string; content: string }> = []
@@ -65,7 +67,11 @@ Object.assign(window, {
   desktop: { platform: 'darwin', reportDiagnosticEvent: () => {} },
   projects: {
     listDirectory: async (_handle, path) => path === 'assets'
-      ? [{ kind: 'file', path: 'assets/child.txt', name: 'child.txt' }]
+      ? [
+        { kind: 'file', path: 'assets/child.txt', name: 'child.txt' },
+        ...(exportedPdfVisible ? [{ kind: 'file' as const, path: 'assets/guide.pdf', name: 'guide.pdf' }] : []),
+        ...(collapsedFolderFileVisible ? [{ kind: 'file' as const, path: 'assets/later.pdf', name: 'later.pdf' }] : [])
+      ]
       : [
         { kind: 'file', path: 'notes.txt', name: 'notes.txt' },
         { kind: 'directory', path: 'assets', name: 'assets' },
@@ -250,6 +256,10 @@ async function workspaceTests(): Promise<void> {
   await delay(50)
   passed.push('Markdown Word export: cancellation, click-time snapshot, concurrent editing, warnings and failure retry')
   await editText('# PDF snapshot')
+  const exportFolder = [...document.querySelectorAll<HTMLButtonElement>('[role="treeitem"]')]
+    .find((item) => item.textContent?.includes('assets'))!
+  exportFolder.click()
+  await until(() => exportFolder.getAttribute('aria-expanded') === 'true', 'PDF export folder expanded')
   const savesBeforePdf = saves
   button('导出 PDF').click()
   await until(() => [...document.querySelectorAll<HTMLButtonElement>('button')].some((candidate) => (
@@ -259,10 +269,19 @@ async function workspaceTests(): Promise<void> {
   await editText('# Edited after PDF click')
   assert(pdfSnapshots[0].content === '# PDF snapshot', 'PDF export did not capture the click-time snapshot')
   assert(saves === savesBeforePdf, 'PDF export saved the Markdown source unexpectedly')
-  finishPdfExport?.({ status: 'exported', outputPath: '/tmp/guide.pdf', pageCount: 1 })
-  await until(() => document.querySelector('[role="status"]')?.textContent?.includes('/tmp/guide.pdf'), 'PDF export success')
+  exportedPdfVisible = true
+  finishPdfExport?.({ status: 'exported', outputPath: '/test/assets/guide.pdf', pageCount: 1 })
+  await until(() => document.querySelector('[role="status"]')?.textContent?.includes('/test/assets/guide.pdf'), 'PDF export success')
+  await until(() => [...document.querySelectorAll('[role="treeitem"]')]
+    .some((item) => item.textContent?.includes('guide.pdf')), 'exported PDF appears in folder')
+  exportFolder.click()
+  await until(() => exportFolder.getAttribute('aria-expanded') === 'false', 'PDF export folder collapsed')
+  collapsedFolderFileVisible = true
+  exportFolder.click()
+  await until(() => [...document.querySelectorAll('[role="treeitem"]')]
+    .some((item) => item.textContent?.includes('later.pdf')), 'collapsed folder refreshes when reopened')
   assert(editor().state.doc.toString() === '# Edited after PDF click', 'PDF export replaced later edits')
-  passed.push('Markdown PDF export: click-time snapshot, concurrent editing and shared busy state')
+  passed.push('Markdown PDF export: click-time snapshot, concurrent editing, busy state and folder refresh')
   document.querySelector<HTMLButtonElement>('[aria-label="关闭 guide.md"]')!.click()
   await until(() => !document.querySelector('.cm-content'), 'markdown closed')
 

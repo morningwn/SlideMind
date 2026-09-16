@@ -671,6 +671,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   const openPresentationsRef = useRef<OpenPresentationDocument[]>([])
   const exportingPathsRef = useRef(new Set<string>())
   const openImagesRef = useRef<OpenImageDocument[]>([])
+  const expandedPathsRef = useRef(expandedPaths)
   const confirmedRestorePathsRef = useRef<Set<string>>(new Set())
   const stoppedRequestIdsRef = useRef<Set<string>>(new Set())
 
@@ -715,6 +716,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   openDocumentsRef.current = openDocuments
   openPresentationsRef.current = openPresentations
   openImagesRef.current = openImages
+  expandedPathsRef.current = expandedPaths
   useLayoutEffect(() => {
     const element = workspaceRef.current!
     const observer = new ResizeObserver(() => {
@@ -1147,6 +1149,15 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }
 
+  async function refreshVisibleFileTree(): Promise<void> {
+    await Promise.all([
+      ...['', ...expandedPathsRef.current].map(refreshDirectory),
+      window.projects.listFiles(project.handle).then(setReferenceFiles).catch((error: unknown) => {
+        setFileError(error instanceof Error ? error.message : '无法刷新项目文件')
+      })
+    ])
+  }
+
   async function handleProjectFileChanged(event: ProjectFileChangedEvent): Promise<void> {
     if (event.source === 'text-editor' || event.source === 'presentation-editor') return
     const directory = parentDirectory(event.path)
@@ -1308,8 +1319,6 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
 
     setExpandedPaths((current) => new Set(current).add(entry.path))
-    if (entriesByDirectory[entry.path]) return
-
     setLoadingPaths((current) => new Set(current).add(entry.path))
     setFileError('')
     try {
@@ -1949,6 +1958,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           ? { ...candidate, lastExportPath: result.outputPath }
           : candidate
       ))
+      await refreshVisibleFileTree()
     } catch (error) {
       setOpenPresentations((current) => current.map((candidate) =>
         candidate.path === path
@@ -2000,6 +2010,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           exportWarnings: 'warnings' in result ? result.warnings : []
         }
       }))
+      if (result.status === 'exported') await refreshVisibleFileTree()
     } catch (error) {
       setOpenDocuments((current) => current.map((candidate) =>
         candidate.path === path
