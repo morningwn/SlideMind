@@ -87,6 +87,7 @@ Object.assign(window, {
     }
   } satisfies Partial<Window['projects']>,
   documentExport: {
+    exportPdf: async () => ({ status: 'canceled' }),
     exportWord: async (_handle, input) => {
       exportAttempt += 1
       exportSnapshots.push(structuredClone(input))

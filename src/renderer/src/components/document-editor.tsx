@@ -1,8 +1,6 @@
 import { markdown } from '@codemirror/lang-markdown'
 import { EditorState } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import DOMPurify from 'dompurify'
-import { marked } from 'marked'
 import {
   useDeferredValue,
   useEffect,
@@ -14,6 +12,7 @@ import {
 import { basicSetup } from 'codemirror'
 import type { ProjectTextFileKind } from '../../../shared/project'
 import type { DocumentExportWarning } from '../../../shared/document-export'
+import { renderMarkdownHtml } from '../lib/markdown-html'
 
 export type MarkdownViewMode = 'edit' | 'split' | 'preview'
 
@@ -146,31 +145,7 @@ function MarkdownPreview({
 }): React.JSX.Element {
   const deferredSource = useDeferredValue(source)
   const previewRef = useRef<HTMLDivElement>(null)
-  const html = useMemo(() => {
-    const rendered = marked.parse(deferredSource, { async: false, gfm: true })
-    const sanitized = DOMPurify.sanitize(rendered, {
-      USE_PROFILES: { html: true },
-      FORBID_TAGS: [
-        'style',
-        'iframe',
-        'object',
-        'embed',
-        'audio',
-        'video',
-        'source',
-        'track',
-        'picture'
-      ]
-    })
-    const parsed = new DOMParser().parseFromString(sanitized, 'text/html')
-    for (const image of parsed.querySelectorAll('img')) {
-      const sourcePath = image.getAttribute('src')
-      image.removeAttribute('src')
-      image.removeAttribute('srcset')
-      if (sourcePath) image.dataset.projectSource = sourcePath
-    }
-    return parsed.body.innerHTML
-  }, [deferredSource])
+  const html = useMemo(() => renderMarkdownHtml(deferredSource), [deferredSource])
 
   useEffect(() => {
     let active = true

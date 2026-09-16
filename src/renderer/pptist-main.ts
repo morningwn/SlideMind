@@ -31,6 +31,7 @@ type RenderHostMessage = {
   requestId: string
   presentation?: PresentationState
   slideNumber: number
+  strictImages?: boolean
 }
 
 type HostMessage = LoadHostMessage | ImportHostMessage | RenderHostMessage
@@ -176,15 +177,26 @@ function nextFrame(): Promise<void> {
   return new Promise((resolve) => window.requestAnimationFrame(() => resolve()))
 }
 
-async function waitForSlideImages(): Promise<void> {
+async function waitForSlideImages(strict: boolean): Promise<void> {
   const images = [...document.querySelectorAll<HTMLImageElement>('.viewport img')]
   await Promise.all(images.map((image) => {
-    if (image.complete) return Promise.resolve()
-    return new Promise<void>((resolve) => {
-      const finish = (): void => resolve()
-      image.addEventListener('load', finish, { once: true })
-      image.addEventListener('error', finish, { once: true })
-      window.setTimeout(finish, 3_000)
+    if (image.complete) {
+      if (strict && image.naturalWidth === 0) return Promise.reject(new Error('幻灯片图片加载失败'))
+      return Promise.resolve()
+    }
+    return new Promise<void>((resolve, reject) => {
+      const finish = (error?: Error): void => {
+        window.clearTimeout(timeout)
+        image.removeEventListener('load', onLoad)
+        image.removeEventListener('error', onError)
+        if (error && strict) reject(error)
+        else resolve()
+      }
+      const onLoad = (): void => finish()
+      const onError = (): void => finish(new Error('幻灯片图片加载失败'))
+      const timeout = window.setTimeout(() => finish(new Error('幻灯片图片加载超时')), 3_000)
+      image.addEventListener('load', onLoad, { once: true })
+      image.addEventListener('error', onError, { once: true })
     })
   }))
 }
@@ -219,7 +231,7 @@ async function renderPresentation(message: RenderHostMessage): Promise<void> {
     slidesStore.updateSlideIndex(message.slideNumber - 1)
     await nextTick()
     await document.fonts.ready
-    await waitForSlideImages()
+    await waitForSlideImages(message.strictImages === true)
     await nextFrame()
     await nextFrame()
     const viewport = document.querySelector<HTMLElement>('.viewport-wrapper')

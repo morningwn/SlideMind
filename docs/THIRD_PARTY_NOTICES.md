@@ -32,3 +32,7 @@ SlideMind bundles a custom Java runtime linked from Eclipse Temurin JDK 21.0.12.
 SlideMind bundles a pinned Pandoc 3.11 executable for local Markdown-to-DOCX conversion. Pandoc is copyright © 2006–2024 John MacFarlane and is distributed under GPL-2.0-or-later; embedded components and templates carry the additional compatible notices recorded in Pandoc's `COPYRIGHT` file.
 
 Each packaged runtime preserves the upstream `COPYING.md` and `COPYRIGHT` files beside the executable and includes the checksum-verified `pandoc-3.11.tar.gz` corresponding-source archive. The packaging gate rejects a missing or modified source archive.
+
+## PDFKit
+
+SlideMind uses [PDFKit 0.17.2](https://github.com/foliojs/pdfkit) to assemble rendered presentation slides into PDF files. PDFKit is licensed under the MIT License. Its package license text is distributed with the packaged dependency.

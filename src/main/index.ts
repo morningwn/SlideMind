@@ -32,6 +32,8 @@ import { resolveTikaRuntimeOptions } from './document/tika-runtime'
 import { registerDocumentExportIpc } from './document-export/ipc'
 import { MarkdownWordExportService } from './document-export/markdown-word-export-service'
 import { PandocRuntime, resolvePandocRuntimeOptions } from './document-export/pandoc-runtime'
+import { PdfExportService } from './pdf-export/pdf-export-service'
+import { registerPdfExportIpc } from './pdf-export/ipc'
 
 const APP_URL_PROTOCOLS = new Set(['http:', 'https:'])
 const applicationStartedAt = Date.now()
@@ -260,8 +262,9 @@ app.whenReady().then(() => {
     ),
     mutationService
   )
+  const pdfExportService = new PdfExportService(mutationService)
   closeDocumentReadService = async () => {
-    await Promise.all([documentReadService.close(), documentExportService.close()])
+    await Promise.all([documentReadService.close(), documentExportService.close(), pdfExportService.close()])
   }
   const agentService = new BaseAgentService(
     configStore,
@@ -311,6 +314,7 @@ app.whenReady().then(() => {
   )
   registerPresentationIpc(presentationService, projectRoots)
   registerDocumentExportIpc(documentExportService, projectRoots)
+  registerPdfExportIpc(pdfExportService, projectRoots)
   registerProjectVersionIpc(projectRoots, versionService, mutationService)
   installApplicationMenu()
   createWindow()

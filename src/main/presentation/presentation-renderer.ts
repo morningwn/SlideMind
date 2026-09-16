@@ -1,6 +1,7 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, session } from 'electron'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { PptistPresentation } from '../../shared/presentation'
 
 export interface RenderedPresentationSlide {
@@ -21,37 +22,49 @@ const RENDER_WIDTH = 1280
 const MAX_RENDER_HEIGHT = 960
 const RENDER_TIMEOUT_MS = 30_000
 
-function renderWindowSize(presentation: PptistPresentation): { height: number; width: number } {
+function renderWindowSize(
+  presentation: PptistPresentation,
+  width = RENDER_WIDTH,
+  maxHeight = MAX_RENDER_HEIGHT,
+): { height: number; width: number } {
   return {
-    height: Math.max(360, Math.min(
-      MAX_RENDER_HEIGHT,
-      Math.round(RENDER_WIDTH * presentation.viewportRatio)
-    )),
-    width: RENDER_WIDTH
+    height: Math.max(
+      360,
+      Math.min(maxHeight, Math.round(width * presentation.viewportRatio)),
+    ),
+    width,
   }
 }
 
 async function loadPptistRenderer(window: BrowserWindow): Promise<void> {
   const developmentUrl = process.env.ELECTRON_RENDERER_URL
   if (developmentUrl) {
-    const baseUrl = developmentUrl.endsWith('/') ? developmentUrl : `${developmentUrl}/`
+    const baseUrl = developmentUrl.endsWith('/')
+      ? developmentUrl
+      : `${developmentUrl}/`
     await window.loadURL(new URL('pptist.html', baseUrl).toString())
     return
   }
   await window.loadFile(join(app.getAppPath(), 'out/renderer/pptist.html'))
 }
 
-function assertReadyResult(value: unknown): asserts value is RendererReadyResult {
+function assertReadyResult(
+  value: unknown,
+): asserts value is RendererReadyResult {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error('幻灯片渲染结果无效')
   }
   const candidate = value as Record<string, unknown>
   const { height, left, top, width } = candidate
   if (
-    typeof height !== 'number' || !Number.isFinite(height) ||
-    typeof left !== 'number' || !Number.isFinite(left) ||
-    typeof top !== 'number' || !Number.isFinite(top) ||
-    typeof width !== 'number' || !Number.isFinite(width)
+    typeof height !== 'number' ||
+    !Number.isFinite(height) ||
+    typeof left !== 'number' ||
+    !Number.isFinite(left) ||
+    typeof top !== 'number' ||
+    !Number.isFinite(top) ||
+    typeof width !== 'number' ||
+    !Number.isFinite(width)
   ) {
     throw new Error('幻灯片渲染区域无效')
   }
@@ -63,14 +76,16 @@ function assertReadyResult(value: unknown): asserts value is RendererReadyResult
 async function prepareSlide(
   window: BrowserWindow,
   slideNumber: number,
-  presentation?: PptistPresentation
+  presentation?: PptistPresentation,
+  strictImages = false,
 ): Promise<RendererReadyResult> {
   const requestId = randomUUID()
   const message = JSON.stringify({
     type: 'slidemind:pptist:render',
     requestId,
     presentation,
-    slideNumber
+    slideNumber,
+    strictImages,
   })
   const requestIdValue = JSON.stringify(requestId)
   const timeoutMs = RENDER_TIMEOUT_MS
@@ -99,7 +114,7 @@ async function prepareSlide(
 
 function captureRectangle(
   window: BrowserWindow,
-  rect: RendererReadyResult
+  rect: RendererReadyResult,
 ): Electron.Rectangle {
   const [contentWidth, contentHeight] = window.getContentSize()
   const x = Math.max(0, Math.floor(rect.left))
@@ -108,7 +123,7 @@ function captureRectangle(
     x,
     y,
     width: Math.max(1, Math.min(contentWidth - x, Math.ceil(rect.width))),
-    height: Math.max(1, Math.min(contentHeight - y, Math.ceil(rect.height)))
+    height: Math.max(1, Math.min(contentHeight - y, Math.ceil(rect.height))),
   }
 }
 
@@ -116,8 +131,34 @@ export async function renderPresentationSlides(
   presentation: PptistPresentation,
   startSlide: number,
   endSlide: number,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<RenderedPresentationSlide[]> {
+  const rendered: RenderedPresentationSlide[] = []
+  await renderPresentationSlidesIncrementally(
+    presentation,
+    startSlide,
+    endSlide,
+    (slide) => {
+      rendered.push(slide)
+    },
+    signal,
+  )
+  return rendered
+}
+
+export async function renderPresentationSlidesIncrementally(
+  presentation: PptistPresentation,
+  startSlide: number,
+  endSlide: number,
+  consume: (slide: RenderedPresentationSlide) => Promise<void> | void,
+  signal?: AbortSignal,
+  options: {
+    width?: number
+    targetPixelWidth?: number
+    strictImages?: boolean
+    restrictRequests?: boolean
+  } = {},
+): Promise<void> {
   if (
     !Number.isInteger(startSlide) ||
     !Number.isInteger(endSlide) ||
@@ -129,7 +170,42 @@ export async function renderPresentationSlides(
   }
   if (signal?.aborted) throw new Error('幻灯片渲染已取消')
 
-  const size = renderWindowSize(presentation)
+  const size = renderWindowSize(
+    presentation,
+    options.width,
+    options.targetPixelWidth ? Number.POSITIVE_INFINITY : MAX_RENDER_HEIGHT,
+  )
+  const isolatedSession = options.restrictRequests
+    ? session.fromPartition(`presentation-pdf-${randomUUID()}`, {
+        cache: false,
+      })
+    : undefined
+  let blockedResource = false
+  if (isolatedSession) {
+    const developmentOrigin = process.env.ELECTRON_RENDERER_URL
+      ? new URL(process.env.ELECTRON_RENDERER_URL).origin
+      : null
+    const allowedRoot = join(app.getAppPath(), 'out/renderer')
+    isolatedSession.webRequest.onBeforeRequest((details, callback) => {
+      let allowed = false
+      try {
+        const url = new URL(details.url)
+        allowed =
+          url.protocol === 'data:' ||
+          url.protocol === 'blob:' ||
+          (developmentOrigin !== null && url.origin === developmentOrigin) ||
+          (developmentOrigin !== null &&
+            (url.protocol === 'ws:' || url.protocol === 'wss:') &&
+            url.host === new URL(developmentOrigin).host) ||
+          (url.protocol === 'file:' &&
+            fileURLToPath(url).startsWith(`${allowedRoot}/`))
+      } catch {
+        /* invalid URL */
+      }
+      if (!allowed) blockedResource = true
+      callback({ cancel: !allowed })
+    })
+  }
   const window = new BrowserWindow({
     ...size,
     backgroundColor: presentation.theme.backgroundColor || '#ffffff',
@@ -137,39 +213,72 @@ export async function renderPresentationSlides(
     show: false,
     useContentSize: true,
     webPreferences: {
+      ...(isolatedSession ? { session: isolatedSession } : {}),
       backgroundThrottling: false,
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
-    }
+      sandbox: true,
+    },
   })
+  if (options.restrictRequests) {
+    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    window.webContents.on('will-navigate', (event) => event.preventDefault())
+  }
   const abort = (): void => window.destroy()
   signal?.addEventListener('abort', abort, { once: true })
 
   try {
     await loadPptistRenderer(window)
     window.webContents.setZoomFactor(1)
-    const rendered: RenderedPresentationSlide[] = []
-    for (let slideNumber = startSlide; slideNumber <= endSlide; slideNumber += 1) {
-      if (signal?.aborted || window.isDestroyed()) throw new Error('幻灯片渲染已取消')
+    if (options.targetPixelWidth) {
+      const devicePixelRatio = (await window.webContents.executeJavaScript(
+        'window.devicePixelRatio',
+        true,
+      )) as number
+      if (!Number.isFinite(devicePixelRatio) || devicePixelRatio <= 0) {
+        throw new Error('幻灯片渲染缩放比例无效')
+      }
+      const targetWidth = Math.max(
+        640,
+        Math.min(2560, Math.round(options.targetPixelWidth / devicePixelRatio)),
+      )
+      const targetSize = renderWindowSize(
+        presentation,
+        targetWidth,
+        Number.POSITIVE_INFINITY,
+      )
+      window.setContentSize(targetSize.width, targetSize.height)
+    }
+    for (
+      let slideNumber = startSlide;
+      slideNumber <= endSlide;
+      slideNumber += 1
+    ) {
+      if (signal?.aborted || window.isDestroyed())
+        throw new Error('幻灯片渲染已取消')
       const rect = await prepareSlide(
         window,
         slideNumber,
-        slideNumber === startSlide ? presentation : undefined
+        slideNumber === startSlide ? presentation : undefined,
+        options.strictImages,
       )
-      const image = await window.webContents.capturePage(captureRectangle(window, rect))
+      const image = await window.webContents.capturePage(
+        captureRectangle(window, rect),
+      )
+      if (blockedResource) throw new Error(`第 ${slideNumber} 页包含未授权资源`)
       if (image.isEmpty()) throw new Error(`第 ${slideNumber} 页渲染结果为空`)
       const png = image.toPNG()
-      if (png.byteLength === 0) throw new Error(`第 ${slideNumber} 页 PNG 编码结果为空`)
+      if (png.byteLength === 0)
+        throw new Error(`第 ${slideNumber} 页 PNG 编码结果为空`)
       const imageSize = image.getSize()
-      rendered.push({
+      await consume({
         height: imageSize.height,
         number: slideNumber,
         png,
-        width: imageSize.width
+        width: imageSize.width,
       })
+      blockedResource = false
     }
-    return rendered
   } finally {
     signal?.removeEventListener('abort', abort)
     if (!window.isDestroyed()) window.destroy()

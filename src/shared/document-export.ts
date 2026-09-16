@@ -46,4 +46,8 @@ export interface DocumentExportApi {
     projectHandle: string,
     input: ExportMarkdownWordInput,
   ): Promise<ExportMarkdownWordResult>
+  exportPdf(
+    projectHandle: string,
+    input: import('./pdf-export').ExportMarkdownPdfInput,
+  ): Promise<import('./pdf-export').PdfExportResult>
 }

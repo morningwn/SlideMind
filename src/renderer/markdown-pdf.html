@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="./src/styles.css" />
+    <style>
+      :root {
+        --blue: #2f61e9;
+        background: #fff;
+      }
+      body {
+        margin: 0;
+        background: #fff;
+      }
+      .markdown-preview {
+        width: auto;
+        margin: 0;
+      }
+      @page {
+        size: A4;
+        margin: 18mm;
+      }
+      @media print {
+        h1,
+        h2,
+        h3 {
+          break-after: avoid;
+        }
+        tr,
+        img,
+        blockquote {
+          break-inside: avoid;
+        }
+        .markdown-preview pre {
+          overflow: visible;
+          white-space: pre-wrap;
+          overflow-wrap: anywhere;
+          box-decoration-break: clone;
+          -webkit-box-decoration-break: clone;
+        }
+        table {
+          table-layout: fixed;
+          overflow-wrap: anywhere;
+        }
+        a {
+          overflow-wrap: anywhere;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <article class="markdown-preview"></article>
+    <script type="module" src="./markdown-pdf.ts"></script>
+  </body>
+</html>

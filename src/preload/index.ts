@@ -35,6 +35,7 @@ import type {
 import type { DesktopApi, DesktopCloseResponse } from '../shared/desktop'
 import type { RendererDiagnosticEvent } from '../shared/logging'
 import type { DocumentExportApi, ExportMarkdownWordInput } from '../shared/document-export'
+import type { ExportMarkdownPdfInput, ExportPresentationPdfInput } from '../shared/pdf-export'
 
 const desktopApi: Readonly<DesktopApi> = Object.freeze({
   platform: process.platform,
@@ -172,6 +173,8 @@ const presentationApi: Readonly<PresentationApi> = Object.freeze({
     ipcRenderer.invoke('presentation:save', projectHandle, input),
   export: (projectHandle: string, input: ExportProjectPresentationInput) =>
     ipcRenderer.invoke('presentation:export', projectHandle, input),
+  exportPdf: (projectHandle: string, input: ExportPresentationPdfInput) =>
+    ipcRenderer.invoke('pdf-export:presentation', projectHandle, input),
   onChanged: (listener: (event: PresentationChangedEvent) => void) => {
     const handler = (
       _event: Electron.IpcRendererEvent,
@@ -186,7 +189,9 @@ contextBridge.exposeInMainWorld('presentations', presentationApi)
 
 const documentExportApi: Readonly<DocumentExportApi> = Object.freeze({
   exportWord: (projectHandle: string, input: ExportMarkdownWordInput) =>
-    ipcRenderer.invoke('document-export:word', projectHandle, input)
+    ipcRenderer.invoke('document-export:word', projectHandle, input),
+  exportPdf: (projectHandle: string, input: ExportMarkdownPdfInput) =>
+    ipcRenderer.invoke('pdf-export:markdown', projectHandle, input)
 })
 
 contextBridge.exposeInMainWorld('documentExport', documentExportApi)

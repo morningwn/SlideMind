@@ -82,7 +82,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve('src/renderer/index.html'),
-          pptist: resolve('src/renderer/pptist.html')
+          pptist: resolve('src/renderer/pptist.html'),
+          'markdown-pdf': resolve('src/renderer/markdown-pdf.html')
         }
       }
     }

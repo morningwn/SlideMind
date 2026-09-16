@@ -98,6 +98,10 @@ export interface PresentationApi {
     projectHandle: string,
     input: ExportProjectPresentationInput
   ): Promise<ExportProjectPresentationResult | null>
+  exportPdf(
+    projectHandle: string,
+    input: import('./pdf-export').ExportPresentationPdfInput
+  ): Promise<import('./pdf-export').PdfExportResult>
   onChanged(listener: (event: PresentationChangedEvent) => void): () => void
 }
 
