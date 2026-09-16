@@ -105,6 +105,8 @@ SlideMind 选择宿主控制的嵌入式集成：复用 Pi 的模型调用、工
 | 权限系统   | 必须保留能力，条件性自研         | 先验证能否用应用固定策略与主进程已有边界完整替代。覆盖工具默认拒绝、项目路径、只读资源及所有工具执行路径；未通过安全等价测试前保留并适配现有扩展，不直接移除                                                                       |
 | Web Access | 评估自研限定能力，复杂路径适配   | 产品必要能力按现有 web_search、source_check、fetch_content、get_search_content 调用方核查。优先复用项目已有网络与文档能力，实现固定搜索服务、内容获取及结果缓存；不承诺完整 Web 抓取是低成本，无可用服务或存在复杂缺口时保留适配版 |
 
+权限系统的威胁模型、工具边界、迁移顺序和验收门槛见 [Pi 权限系统替换实施提案](pi-permission-replacement-plan.md)。
+
 ### Todo 实施设计
 
 2026-09-16 对照 [Pi 当前 SDK 分支的 Todo 示例](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/examples/extensions/todo.ts)、[OpenCode 的工具](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/tool/todo.ts)与[会话存储](https://github.com/anomalyco/opencode/blob/dev/packages/opencode/src/session/todo.ts)、[Codex 的计划工具契约](https://github.com/openai/codex/blob/main/codex-rs/core/src/tools/handlers/plan_spec.rs)。这些链接指向可变分支，只证明所查看实现的取舍。SlideMind 的任务清单跟随 Pi 会话分支，且界面只使用标题、状态和进行中提示；因此选择 Pi 式会话快照，不另建数据库，也不照搬 OpenCode 的整表更新作为唯一操作。
