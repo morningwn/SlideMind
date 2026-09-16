@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const electron = vi.hoisted(() => {
   const handlers = new Map<string, (...args: unknown[]) => unknown>()
@@ -110,5 +113,62 @@ describe('document export IPC', () => {
       handler(event(), 'handle', { path: 'notes.md', content: '# x' }),
     ).resolves.toMatchObject({ status: 'failed', code: 'busy' })
     expect(electron.dialog.showSaveDialog).not.toHaveBeenCalled()
+  })
+
+  it('returns a finite failure for an expired project handle', async () => {
+    const service = {
+      cancelOwner: vi.fn(),
+      isBusy: vi.fn(() => false),
+    } as unknown as MarkdownWordExportService
+    const projectRoots = {
+      resolve: vi.fn(() => {
+        throw new Error('项目授权已失效')
+      }),
+    } as unknown as ProjectRootRegistry
+    electron.fromWebContents.mockReturnValue({ id: 1 })
+    registerDocumentExportIpc(service, projectRoots)
+    const handler = electron.handlers.get('document-export:word')!
+
+    await expect(
+      handler(event(), 'expired', { path: 'notes.md', content: '# x' }),
+    ).resolves.toEqual({
+      status: 'failed',
+      code: 'source_unavailable',
+      message: '项目授权已失效',
+    })
+    expect(electron.dialog.showSaveDialog).not.toHaveBeenCalled()
+  })
+
+  it('confirms the actual suffixed target before overwriting it', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'slidemind-export-ipc-'))
+    const selectedPath = join(directory, 'notes')
+    await writeFile(`${selectedPath}.docx`, 'existing')
+    const owner = { id: 1 }
+    const service = {
+      cancelOwner: vi.fn(),
+      export: vi.fn(),
+      isBusy: vi.fn(() => false),
+    } as unknown as MarkdownWordExportService
+    const projectRoots = {
+      resolve: vi.fn(() => '/project'),
+    } as unknown as ProjectRootRegistry
+    electron.fromWebContents.mockReturnValue(owner)
+    electron.dialog.showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: selectedPath,
+    })
+    electron.dialog.showMessageBox.mockResolvedValue({ response: 1 })
+    registerDocumentExportIpc(service, projectRoots)
+    const handler = electron.handlers.get('document-export:word')!
+
+    await expect(
+      handler(event(), 'handle', { path: 'notes.md', content: '# x' }),
+    ).resolves.toEqual({ status: 'canceled' })
+    expect(electron.dialog.showMessageBox).toHaveBeenCalledWith(
+      owner,
+      expect.objectContaining({ message: expect.stringContaining('.docx') }),
+    )
+    expect(service.export).not.toHaveBeenCalled()
+    await rm(directory, { recursive: true, force: true })
   })
 })

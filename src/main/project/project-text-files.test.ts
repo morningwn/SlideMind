@@ -167,6 +167,12 @@ describe('ProjectTextFileStore', () => {
     await expect(
       readMarkdownExportImage(projectPath, 'notes.md', '../outside.png')
     ).rejects.toThrow('超出项目范围')
+    await expect(
+      readMarkdownExportImage(projectPath, 'notes.md', '%2e%2e/outside.png')
+    ).rejects.toThrow('超出项目范围')
+    await expect(
+      readMarkdownExportImage(projectPath, 'notes.md', '%E0%A4%A')
+    ).rejects.toThrow('图片路径编码无效')
     await expect(readMarkdownExportImage(projectPath, 'notes.md', 'linked.png')).rejects.toThrow(
       '符号链接'
     )

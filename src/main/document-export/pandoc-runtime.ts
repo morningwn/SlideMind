@@ -14,6 +14,7 @@ export interface PandocRuntimeOptions {
   binaryPath: string
   referencePath: string
   timeoutMs?: number
+  astOutputLimitBytes?: number
 }
 
 export interface PandocRuntimeLocationOptions {
@@ -103,10 +104,12 @@ function terminate(child: ChildProcess): void {
 
 export class PandocRuntime {
   private readonly running = new Map<string, RunningProcess>()
+  private readonly astOutputLimitBytes: number
   private readonly timeoutMs: number
 
   constructor(readonly options: PandocRuntimeOptions) {
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+    this.astOutputLimitBytes = options.astOutputLimitBytes ?? AST_LIMIT
   }
 
   async parseMarkdown(
@@ -125,7 +128,7 @@ export class PandocRuntime {
         ],
         input: markdown,
         operationId,
-        outputLimit: AST_LIMIT,
+        outputLimit: this.astOutputLimitBytes,
         signal,
         workDirectory,
       })

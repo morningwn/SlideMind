@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
@@ -83,6 +83,66 @@ describe('MarkdownWordExportService', () => {
       ),
     ).resolves.toMatchObject({ status: 'failed', code: 'output_changed' })
     expect(await readFile(exportPath, 'utf8')).toBe('external change')
+  })
+
+  it('preserves an existing output when generated DOCX validation fails', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-word-service-'))
+    const exportPath = join(projectPath, 'notes.docx')
+    await writeFile(join(projectPath, 'notes.md'), '# notes')
+    await writeFile(exportPath, 'original')
+    const runtime = {
+      parseMarkdown: vi.fn().mockResolvedValue(document),
+      writeDocx: vi.fn(async (_document: unknown, path: string) =>
+        writeFile(path, 'invalid docx'),
+      ),
+      cancel: vi.fn(),
+      close: vi.fn(),
+    } as unknown as PandocRuntime
+    const service = new MarkdownWordExportService(runtime)
+
+    await expect(
+      service.export(
+        projectPath,
+        'project-handle',
+        { path: 'notes.md', content: '# snapshot' },
+        exportPath,
+        1,
+      ),
+    ).resolves.toMatchObject({ status: 'failed', code: 'conversion_failed' })
+    expect(await readFile(exportPath, 'utf8')).toBe('original')
+  })
+
+  it('does not record external outputs as project mutations', async () => {
+    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-word-service-'))
+    const outputDirectory = await mkdtemp(
+      join(tmpdir(), 'slidemind-word-service-output-'),
+    )
+    await writeFile(join(projectPath, 'notes.md'), '# notes')
+    const runtime = {
+      parseMarkdown: vi.fn().mockResolvedValue(document),
+      writeDocx: vi.fn(async (_document: unknown, path: string) =>
+        writeFile(path, docxBytes),
+      ),
+      cancel: vi.fn(),
+      close: vi.fn(),
+    } as unknown as PandocRuntime
+    const run = vi.fn()
+    const service = new MarkdownWordExportService(runtime, {
+      run,
+    } as unknown as ProjectMutationService)
+    const outputPath = join(await realpath(outputDirectory), 'notes.docx')
+
+    await expect(
+      service.export(
+        projectPath,
+        'project-handle',
+        { path: 'notes.md', content: '# snapshot' },
+        outputPath,
+        1,
+      ),
+    ).resolves.toMatchObject({ status: 'exported', outputPath })
+    expect(run).not.toHaveBeenCalled()
+    expect(await readFile(outputPath)).toEqual(docxBytes)
   })
 
   it('reports missing runtime and oversized input as finite business failures', async () => {

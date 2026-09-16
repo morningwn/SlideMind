@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -84,6 +84,18 @@ describe('Pandoc packaging validation', () => {
     )
     await expect(validateRuntime(root, 'darwin-arm64')).rejects.toThrow(
       'escapes',
+    )
+  })
+
+  it('rejects a runtime prepared from the wrong Pandoc version', async () => {
+    const root = await fixture()
+    const manifestPath = join(root, 'prepared-runtime.json')
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    manifest.pandocVersion = '3.10'
+    await writeFile(manifestPath, JSON.stringify(manifest))
+
+    await expect(validateRuntime(root, 'darwin-arm64')).rejects.toThrow(
+      'manifest',
     )
   })
 
