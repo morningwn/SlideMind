@@ -47,6 +47,7 @@ import {
 import type { OpenPresentationDocument } from './presentation-editor'
 import { ImagePreview, type OpenImageDocument } from './image-preview'
 import { ProjectHistoryPanel } from './project-history-panel'
+import { WorkspaceExportMenu } from './workspace-export-menu'
 import {
   findComposerReferenceTrigger,
   promptReferenceKey,
@@ -2400,23 +2401,16 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                       </button>
                     ))}
                   </div>
-                  <span className="workspace-export-note">当前编辑内容快照</span>
-                  <button
-                    className="workspace-export-button"
-                    type="button"
-                    title="导出当前编辑内容，不会保存源文件"
-                    aria-label={`将 ${activeDocument.name} 的当前编辑内容导出为 Word`}
-                    onClick={() => void exportMarkdown(activeDocument.path, 'word')}
+                  <WorkspaceExportMenu
+                    key={activeDocument.path}
+                    options={[
+                      { format: 'word', label: 'Word', description: '导出当前内容，不保存源文件' },
+                      { format: 'pdf', label: 'PDF', description: '导出当前内容，不保存源文件' }
+                    ]}
+                    exportingFormat={activeDocument.exportingFormat}
                     disabled={activeDocument.isExporting}
-                  >{activeDocument.exportingFormat === 'word' ? '导出中…' : '导出 Word'}</button>
-                  <button
-                    className="workspace-export-button"
-                    type="button"
-                    title="导出当前编辑内容快照，不会保存源文件"
-                    aria-label={`将 ${activeDocument.name} 的当前编辑内容快照导出为 PDF`}
-                    onClick={() => void exportMarkdown(activeDocument.path, 'pdf')}
-                    disabled={activeDocument.isExporting}
-                  >{activeDocument.exportingFormat === 'pdf' ? '导出中…' : '导出 PDF'}</button>
+                    onExport={(format) => void exportMarkdown(activeDocument.path, format)}
+                  />
                 </>
               ) : null}
               <button
@@ -2434,21 +2428,16 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             </>
           ) : !isHistoryActive && activePresentation ? (
             <>
-              <button
-                className="workspace-export-button"
-                type="button"
-                title="先保存演示文稿，再导出 PPTX"
-                onClick={() => void exportPresentation(activePresentation.path, 'pptx')}
+              <WorkspaceExportMenu
+                key={activePresentation.path}
+                options={[
+                  { format: 'pptx', label: 'PPTX', description: '先保存演示文稿，再导出' },
+                  { format: 'pdf', label: 'PDF', description: '先保存；动画和视频使用静态画面' }
+                ]}
+                exportingFormat={activePresentation.exportingFormat}
                 disabled={activePresentation.isSaving || activePresentation.isExporting || activePresentation.conflict}
-              >{activePresentation.exportingFormat === 'pptx' ? '导出中…' : '导出 PPTX'}</button>
-              <button
-                className="workspace-export-button"
-                type="button"
-                title="先保存演示文稿，再导出 PDF；动画和视频使用静态画面"
-                aria-label={`先保存 ${activePresentation.name}，再导出为 PDF`}
-                onClick={() => void exportPresentation(activePresentation.path, 'pdf')}
-                disabled={activePresentation.isSaving || activePresentation.isExporting || activePresentation.conflict}
-              >{activePresentation.exportingFormat === 'pdf' ? '导出中…' : '导出 PDF'}</button>
+                onExport={(format) => void exportPresentation(activePresentation.path, format)}
+              />
               <button
                 className="workspace-save-button"
                 type="button"

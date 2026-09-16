@@ -1951,7 +1951,10 @@ button.file-tree-item:not(.file-tree-directory) {
 }
 
 .workspace-export-button {
+  display: inline-flex;
   height: 28px;
+  align-items: center;
+  gap: 7px;
   padding: 0 10px;
   border: 1px solid #cbd7e9;
   border-radius: 7px;
@@ -1973,10 +1976,56 @@ button.file-tree-item:not(.file-tree-directory) {
   cursor: default;
 }
 
-.workspace-export-note {
+.workspace-export-control {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.workspace-export-chevron {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.workspace-export-menu {
+  position: absolute;
+  z-index: 20;
+  top: 34px;
+  right: 0;
+  display: grid;
+  width: 230px;
+  padding: 5px;
+  border: 1px solid #d7dfec;
+  border-radius: 9px;
+  background: white;
+  box-shadow: 0 10px 28px rgb(45 60 88 / 18%);
+}
+
+.workspace-export-menu button {
+  display: grid;
+  gap: 3px;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: 6px;
+  color: #40506a;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.workspace-export-menu button:hover,
+.workspace-export-menu button:focus-visible {
+  color: #24488e;
+  background: #edf2fb;
+  outline: none;
+}
+
+.workspace-export-menu strong {
+  font-size: 11px;
+}
+
+.workspace-export-menu small {
   color: #7b8799;
-  font-size: 9px;
-  white-space: nowrap;
+  font-size: 10px;
 }
 
 .document-export-result {

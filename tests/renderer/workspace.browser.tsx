@@ -30,6 +30,20 @@ function button(text: string): HTMLButtonElement {
   assert(match, `Missing button: ${text}`)
   return match
 }
+function exportTrigger(): HTMLButtonElement {
+  const match = document.querySelector<HTMLButtonElement>('.workspace-export-button')
+  assert(match, 'Missing export menu trigger')
+  return match
+}
+async function chooseExport(format: string): Promise<void> {
+  exportTrigger().click()
+  await until(() => document.querySelector('.workspace-export-menu'), 'export menu opened')
+  const option = [...document.querySelectorAll<HTMLButtonElement>('.workspace-export-menu [role="menuitem"]')]
+    .find((item) => item.querySelector('strong')?.textContent === format)
+  assert(option, `Missing export format: ${format}`)
+  option.click()
+  await until(() => !document.querySelector('.workspace-export-menu'), 'export menu closed')
+}
 function editor(): EditorView {
   const element = document.querySelector('.cm-content')
   assert(element, 'Missing text editor')
@@ -233,12 +247,21 @@ async function workspaceTests(): Promise<void> {
 
   document.querySelector<HTMLButtonElement>('[aria-label="编辑 Markdown 文档 guide.md"]')!.click()
   await until(() => document.querySelector('[aria-label="guide.md Markdown 源码"]'), 'markdown opened')
-  button('导出 Word').click()
-  await until(() => exportAttempt === 1 && button('导出 Word'), 'export cancellation settled')
+  const markdownExport = exportTrigger()
+  markdownExport.focus()
+  key(markdownExport, 'ArrowDown')
+  await until(() => document.activeElement?.querySelector('strong')?.textContent === 'Word', 'export menu initial focus')
+  assert(document.querySelector('.workspace-export-menu')?.textContent?.includes('不保存源文件'), 'Markdown export meaning is missing')
+  key(document.activeElement!, 'ArrowDown')
+  assert(document.activeElement?.querySelector('strong')?.textContent === 'PDF', 'export menu arrow navigation failed')
+  key(document.activeElement!, 'Escape')
+  await until(() => !document.querySelector('.workspace-export-menu') && document.activeElement === markdownExport, 'export menu focus restored')
+  await chooseExport('Word')
+  await until(() => exportAttempt === 1 && !exportTrigger().disabled, 'export cancellation settled')
   await editText('# Snapshot before later edit')
   const savesBeforeExport = saves
-  button('导出 Word').click()
-  await until(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent?.trim() === '导出中…')?.disabled, 'markdown export started')
+  await chooseExport('Word')
+  await until(() => exportTrigger().disabled && exportTrigger().textContent?.includes('导出中'), 'markdown export started')
   await editText('# Continued editing during export')
   assert(exportSnapshots[1].content === '# Snapshot before later edit', 'Word export did not capture the click-time snapshot')
   assert(saves === savesBeforeExport, 'Word export saved the Markdown source unexpectedly')
@@ -247,9 +270,9 @@ async function workspaceTests(): Promise<void> {
   assert(document.querySelector('[role="status"]')?.textContent?.includes('Mermaid'), 'Word export warning was not shown')
   assert(editor().state.doc.toString() === '# Continued editing during export', 'Export completion replaced later edits')
   assert(document.querySelector('[aria-label="guide.md，未保存"]'), 'Word export marked the source as saved')
-  button('导出 Word').click()
+  await chooseExport('Word')
   await until(() => document.querySelector('[role="alert"]')?.textContent?.includes('模拟转换失败'), 'markdown export failure')
-  button('导出 Word').click()
+  await chooseExport('Word')
   await until(() => document.querySelector('[role="status"]')?.textContent?.includes('guide-retry.docx'), 'markdown export retry')
   await delay(250)
   document.title = 'SlideMind renderer tests - markdown export ready'
@@ -261,11 +284,9 @@ async function workspaceTests(): Promise<void> {
   exportFolder.click()
   await until(() => exportFolder.getAttribute('aria-expanded') === 'true', 'PDF export folder expanded')
   const savesBeforePdf = saves
-  button('导出 PDF').click()
-  await until(() => [...document.querySelectorAll<HTMLButtonElement>('button')].some((candidate) => (
-    candidate.textContent?.trim() === '导出中…' && candidate.disabled
-  )), 'PDF export started')
-  assert(button('导出 Word').disabled, 'Word export should be disabled while PDF export runs')
+  await chooseExport('PDF')
+  await until(() => exportTrigger().disabled && exportTrigger().textContent?.includes('导出中'), 'PDF export started')
+  assert(exportTrigger().disabled, 'Export menu should be disabled while PDF export runs')
   await editText('# Edited after PDF click')
   assert(pdfSnapshots[0].content === '# PDF snapshot', 'PDF export did not capture the click-time snapshot')
   assert(saves === savesBeforePdf, 'PDF export saved the Markdown source unexpectedly')
