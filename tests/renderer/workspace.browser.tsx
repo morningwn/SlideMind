@@ -49,6 +49,9 @@ let finishPrompt: ((value: AgentPromptResult) => void) | undefined
 let content = 'original document'
 let revision = 'r1'
 let saves = 0
+let exportAttempt = 0
+const exportSnapshots: Array<{ path: string; content: string }> = []
+let finishExport: ((value: Awaited<ReturnType<Window['documentExport']['exportWord']>>) => void) | undefined
 let persisted: ProjectConversationState | undefined
 const subscriptions = new Set<string>()
 const subscribe = (kind: string) => {
@@ -60,13 +63,15 @@ Object.assign(window, {
   projects: {
     listDirectory: async (_handle, path) => path === 'assets'
       ? [{ kind: 'file', path: 'assets/child.txt', name: 'child.txt' }]
-      : [{ kind: 'file', path: 'notes.txt', name: 'notes.txt' }, { kind: 'directory', path: 'assets', name: 'assets' }],
+      : [{ kind: 'file', path: 'notes.txt', name: 'notes.txt' }, { kind: 'directory', path: 'assets', name: 'assets' }, { kind: 'file', path: 'guide.md', name: 'guide.md' }],
     listFiles: async () => [], watchExternalChanges: async () => {},
     loadConversations: async () => ({ selectedConversationId: 'a', conversations: [{ id: 'a', title: 'Conversation A' }, { id: 'b', title: 'Conversation B' }] }),
     loadConversationMessages: async () => [],
     saveConversations: async (_handle: string, state: ProjectConversationState) => { persisted = structuredClone(state) },
     onFileChanged: (listener: typeof fileListener) => { fileListener = listener; return () => { fileListener = undefined } },
-    readTextFile: async () => ({ path: 'notes.txt', kind: 'text', content, revision, lineEnding: 'lf', hasBom: false }),
+    readTextFile: async (_handle, path) => path === 'guide.md'
+      ? { path, kind: 'markdown', content: '# Draft', revision: 'markdown-r1', lineEnding: 'lf', hasBom: false }
+      : { path: 'notes.txt', kind: 'text', content, revision, lineEnding: 'lf', hasBom: false },
     saveTextFile: async (_handle: string, input: SaveProjectTextFileInput) => {
       saves += 1
       if (input.revision !== revision) return { ok: false, reason: 'conflict', currentRevision: revision }
@@ -75,6 +80,16 @@ Object.assign(window, {
       return { ok: true, revision }
     }
   } satisfies Partial<Window['projects']>,
+  documentExport: {
+    exportWord: async (_handle, input) => {
+      exportAttempt += 1
+      exportSnapshots.push(structuredClone(input))
+      if (exportAttempt === 1) return { status: 'canceled' }
+      if (exportAttempt === 3) return { status: 'failed', code: 'conversion_failed', message: '模拟转换失败' }
+      if (exportAttempt === 4) return { status: 'exported', outputPath: '/tmp/guide-retry.docx', warnings: [] }
+      return new Promise((resolve) => { finishExport = resolve })
+    }
+  } satisfies Window['documentExport'],
   presentations: { onChanged: () => () => {} },
   agent: {
     getConfig: async () => ({ configured: false, provider: 'deepseek', providerName: 'DeepSeek', modelId: '', modelName: '', models: [] }),
@@ -99,13 +114,13 @@ async function workspaceTests(): Promise<void> {
   await until(() => document.activeElement?.textContent?.includes('assets'), 'tree next item')
   const folder = document.activeElement!
   key(folder, 'ArrowRight')
-  await until(() => document.querySelectorAll('[role="treeitem"]').length === 3, 'tree folder expanded')
+  await until(() => document.querySelectorAll('[role="treeitem"]').length === 4, 'tree folder expanded')
   key(folder, 'ArrowRight')
   await until(() => document.activeElement?.textContent?.includes('child.txt'), 'tree child focus')
   key(document.activeElement!, 'ArrowLeft')
   assert(document.activeElement === folder, 'Tree left arrow did not focus parent')
   key(folder, 'ArrowLeft')
-  await until(() => document.querySelectorAll('[role="treeitem"]').length === 2, 'tree folder collapsed')
+  await until(() => document.querySelectorAll('[role="treeitem"]').length === 3, 'tree folder collapsed')
   assert(document.querySelectorAll('[role="treeitem"][tabindex="0"]').length === 1, 'Tree needs a single tab stop')
   const sidebar = document.querySelector<HTMLElement>('.project-sidebar')!
   document.querySelector<HTMLButtonElement>('[aria-label="收起侧栏"]')!.click()
@@ -192,6 +207,33 @@ async function workspaceTests(): Promise<void> {
   passed.push('React workspace: save revision conflict and external watcher preserve dirty content')
   document.querySelector<HTMLButtonElement>('[aria-label="关闭 notes.txt"]')!.click()
   await until(() => !document.querySelector('.cm-content'), 'document closed')
+
+  document.querySelector<HTMLButtonElement>('[aria-label="编辑 Markdown 文档 guide.md"]')!.click()
+  await until(() => document.querySelector('[aria-label="guide.md Markdown 源码"]'), 'markdown opened')
+  button('导出 Word').click()
+  await until(() => exportAttempt === 1 && button('导出 Word'), 'export cancellation settled')
+  await editText('# Snapshot before later edit')
+  const savesBeforeExport = saves
+  button('导出 Word').click()
+  await until(() => [...document.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent?.trim() === '导出中…')?.disabled, 'markdown export started')
+  await editText('# Continued editing during export')
+  assert(exportSnapshots[1].content === '# Snapshot before later edit', 'Word export did not capture the click-time snapshot')
+  assert(saves === savesBeforeExport, 'Word export saved the Markdown source unexpectedly')
+  finishExport?.({ status: 'exported', outputPath: '/tmp/guide.docx', warnings: ['mermaid_not_rendered'] })
+  await until(() => document.querySelector('[role="status"]')?.textContent?.includes('/tmp/guide.docx'), 'markdown export success')
+  assert(document.querySelector('[role="status"]')?.textContent?.includes('Mermaid'), 'Word export warning was not shown')
+  assert(editor().state.doc.toString() === '# Continued editing during export', 'Export completion replaced later edits')
+  assert(document.querySelector('[aria-label="guide.md，未保存"]'), 'Word export marked the source as saved')
+  button('导出 Word').click()
+  await until(() => document.querySelector('[role="alert"]')?.textContent?.includes('模拟转换失败'), 'markdown export failure')
+  button('导出 Word').click()
+  await until(() => document.querySelector('[role="status"]')?.textContent?.includes('guide-retry.docx'), 'markdown export retry')
+  await delay(250)
+  document.title = 'SlideMind renderer tests - markdown export ready'
+  await delay(50)
+  passed.push('Markdown Word export: cancellation, click-time snapshot, concurrent editing, warnings and failure retry')
+  document.querySelector<HTMLButtonElement>('[aria-label="关闭 guide.md"]')!.click()
+  await until(() => !document.querySelector('.cm-content'), 'markdown closed')
 
   const textarea = document.querySelector('textarea')!
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!

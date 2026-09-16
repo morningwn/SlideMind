@@ -13,6 +13,7 @@ import {
 } from 'react'
 import { basicSetup } from 'codemirror'
 import type { ProjectTextFileKind } from '../../../shared/project'
+import type { DocumentExportWarning } from '../../../shared/document-export'
 
 export type MarkdownViewMode = 'edit' | 'split' | 'preview'
 
@@ -26,8 +27,12 @@ export interface OpenTextDocument {
   lineEnding: 'lf' | 'crlf'
   hasBom: boolean
   isSaving: boolean
+  isExporting: boolean
   conflict: boolean
   error: string
+  exportError: string
+  lastExportPath?: string
+  exportWarnings: DocumentExportWarning[]
   viewMode: MarkdownViewMode
 }
 
@@ -37,6 +42,11 @@ interface DocumentEditorProps {
   onReload: () => void
   onSave: () => void
   projectHandle: string
+}
+
+const exportWarningLabels: Record<DocumentExportWarning, string> = {
+  mermaid_not_rendered: 'Mermaid 图表按代码文本导出',
+  unsupported_link_removed: '不支持的链接协议已转为普通文本'
 }
 
 interface SourceEditorProps {
@@ -256,6 +266,19 @@ export function DocumentEditor({
         <div className="document-error" role="alert">
           <span>{document.error}</span>
           {document.conflict ? <button type="button" onClick={onReload}>重新载入</button> : null}
+        </div>
+      ) : null}
+
+      {document.exportError ? (
+        <div className="document-error" role="alert">
+          <span>{document.exportError}</span>
+        </div>
+      ) : document.lastExportPath ? (
+        <div className="document-export-result" role="status">
+          <span>已导出点击时的内容快照：{document.lastExportPath}</span>
+          {document.exportWarnings.length > 0 ? (
+            <small>{document.exportWarnings.map((warning) => exportWarningLabels[warning]).join('；')}</small>
+          ) : null}
         </div>
       ) : null}
 

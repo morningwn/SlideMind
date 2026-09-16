@@ -35,7 +35,7 @@ macOS 打包脚本和 CI 默认关闭签名自动发现；其他本地打包命�
 
 - [开发与验证](docs/development.md)：类型检查、渲染测试、构建产物与发布流程。
 - [本地 Word 读取](docs/document-reading.md)：工具契约、运行时准备、资源限制与打包。
-- [Markdown 导出 Word 方案](docs/markdown-word-export-plan.md)：Pandoc 接入、体积验证与实施计划；P0 可行性验证进行中。
+- [Markdown 导出 Word 方案](docs/markdown-word-export-plan.md)：Pandoc 接入、体积验证与实施计划；P1 核心服务和 P2 界面/打包实现已完成，P3 交付验收待进行。
 - [Tika 验证记录](docs/tika-validation.md)：已记录结果和待完成的平台验收。
 - [工作区与 PPTist 性能记录](docs/p2-validation-2026-09-14.md)：2026-09-14 的渲染验证与测量。
 - [仓库指南](AGENTS.md)：开发规范与跨进程、演示文稿安全约束。
@@ -94,6 +94,10 @@ src/
 - 文件读写通过项目句柄和受限 IPC 完成；渲染进程不会直接获得文件系统访问能力。
 - 文本编辑限制为 2 MiB 的 UTF-8 文件，并保留 UTF-8 BOM 与原始换行风格。
 - 保存采用内容版本校验；文件被其他程序修改时停止写入并提示重新载入。
+- Markdown 操作栏可将当前编辑内容快照导出为 `.docx`；导出不要求先保存，也不会改变源文件的保存状态。转换期间仍可继续编辑，生成结果对应点击导出时的内容。
+- Word 导出支持标题、正文、列表、GFM 表格、代码和项目内 PNG/JPEG 图片；远程、越界、符号链接及不支持格式的图片会中止导出，Mermaid 和被移除的不支持链接会在完成后提示。
+- 打包应用按目标架构内置固定版本 Pandoc、中文参考样式、许可证通知和对应源码归档；运行转换不依赖系统 Pandoc、Word 或网络。
+- 本地开发首次使用 Word 导出前运行 `pnpm pandoc:prepare`，运行时写入 Git 忽略的 `out/.pandoc-package-runtime/`。
 
 ## 演示文稿编辑
 

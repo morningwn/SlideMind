@@ -78,4 +78,4 @@ node scripts/pandoc-p0/prepare-runtime.mjs --platform win32-x64 --skip-execution
 - 参考文档候选从固定 Pandoc 内嵌默认文档派生，设置 A4、2.54 cm 页边距、11 pt 正文和 `Arial Unicode MS` East Asian 字体，并清理作者与修改者元数据。
 - RSS 是短生命周期进程的高频采样值，不等同于操作系统保证的峰值；跨平台需在目标机复测。
 - P0 不修改 preload、IPC、主进程服务或渲染界面，不具备用户可用的导出入口。
-- Pandoc 采用 GPL-2.0-or-later。P0 已固定并保留上游许可证与版权声明；正式分发前仍必须落实对应源代码的合规提供方式，不能只附上游链接。
+- Pandoc 采用 GPL-2.0-or-later。P0 已固定并保留上游许可证与版权声明；P2 打包链路进一步随包提供校验固定的 Pandoc 3.11 对应源码归档，缺失或被修改时打包校验失败。

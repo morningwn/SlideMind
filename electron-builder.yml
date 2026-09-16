@@ -51,4 +51,4 @@ nsis:
 
 publish: null
 
-afterPack: scripts/tika-package/after-pack.mjs
+afterPack: scripts/after-pack.mjs

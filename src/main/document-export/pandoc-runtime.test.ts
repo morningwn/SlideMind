@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { resolvePandocRuntimeOptions } from './pandoc-runtime'
 
 describe('resolvePandocRuntimeOptions', () => {
-  it('uses the prepared P0 runtime in development', () => {
+  it('uses the prepared package runtime in development', () => {
     const result = resolvePandocRuntimeOptions({
       appPath: '/application',
       isPackaged: false,
@@ -13,7 +13,7 @@ describe('resolvePandocRuntimeOptions', () => {
 
     expect(result).toEqual({
       binaryPath: join(
-        '/application/out/.pandoc-p0-runtime',
+        '/application/out/.pandoc-package-runtime',
         `${process.platform}-${process.arch}`,
         'runtime',
         binary,

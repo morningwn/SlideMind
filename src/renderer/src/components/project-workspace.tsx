@@ -1401,8 +1401,11 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         name: entry.name,
         savedContent: file.content,
         isSaving: false,
+        isExporting: false,
         conflict: false,
         error: '',
+        exportError: '',
+        exportWarnings: [],
         viewMode: file.kind === 'markdown' ? 'split' : 'edit'
       }
       setOpenDocuments((current) =>
@@ -1958,6 +1961,50 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }
 
+  async function exportMarkdownWord(path: string): Promise<void> {
+    const document = openDocuments.find((candidate) => candidate.path === path)
+    if (!document || document.kind !== 'markdown' || document.isExporting) return
+
+    const content = document.content
+    setOpenDocuments((current) => current.map((candidate) =>
+      candidate.path === path
+        ? {
+            ...candidate,
+            isExporting: true,
+            exportError: '',
+            lastExportPath: undefined,
+            exportWarnings: []
+          }
+        : candidate
+    ))
+    try {
+      const result = await window.documentExport.exportWord(project.handle, { path, content })
+      setOpenDocuments((current) => current.map((candidate) => {
+        if (candidate.path !== path) return candidate
+        if (result.status === 'canceled') return { ...candidate, isExporting: false }
+        if (result.status === 'failed') {
+          return { ...candidate, isExporting: false, exportError: result.message }
+        }
+        return {
+          ...candidate,
+          isExporting: false,
+          lastExportPath: result.outputPath,
+          exportWarnings: result.warnings
+        }
+      }))
+    } catch (error) {
+      setOpenDocuments((current) => current.map((candidate) =>
+        candidate.path === path
+          ? {
+              ...candidate,
+              isExporting: false,
+              exportError: error instanceof Error ? error.message : '无法导出 Word'
+            }
+          : candidate
+      ))
+    }
+  }
+
   function updateDocument(path: string, content: string): void {
     setOpenDocuments((current) => current.map((document) =>
       document.path === path ? { ...document, content, error: '' } : document
@@ -2316,19 +2363,29 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           {!isHistoryActive && activeDocument ? (
             <>
               {activeDocument.kind === 'markdown' ? (
-                <div className="workspace-view-switch" aria-label="Markdown 查看方式">
-                  {(['edit', 'split', 'preview'] as const).map((mode) => (
-                    <button
-                      className={activeDocument.viewMode === mode ? 'workspace-view-active' : ''}
-                      key={mode}
-                      type="button"
-                      aria-pressed={activeDocument.viewMode === mode}
-                      onClick={() => updateDocumentViewMode(activeDocument.path, mode)}
-                    >
-                      {mode === 'edit' ? '编辑' : mode === 'split' ? '分栏' : '预览'}
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <div className="workspace-view-switch" aria-label="Markdown 查看方式">
+                    {(['edit', 'split', 'preview'] as const).map((mode) => (
+                      <button
+                        className={activeDocument.viewMode === mode ? 'workspace-view-active' : ''}
+                        key={mode}
+                        type="button"
+                        aria-pressed={activeDocument.viewMode === mode}
+                        onClick={() => updateDocumentViewMode(activeDocument.path, mode)}
+                      >
+                        {mode === 'edit' ? '编辑' : mode === 'split' ? '分栏' : '预览'}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="workspace-export-button"
+                    type="button"
+                    title="导出当前编辑内容，不会保存源文件"
+                    aria-label={`将 ${activeDocument.name} 的当前编辑内容导出为 Word`}
+                    onClick={() => void exportMarkdownWord(activeDocument.path)}
+                    disabled={activeDocument.isExporting}
+                  >{activeDocument.isExporting ? '导出中…' : '导出 Word'}</button>
+                </>
               ) : null}
               <button
                 className="workspace-save-button"

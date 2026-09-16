@@ -16,6 +16,12 @@
       "size": 9598
     }
   ],
+  "correspondingSource": {
+    "archive": "pandoc-3.11.tar.gz",
+    "url": "https://github.com/jgm/pandoc/archive/refs/tags/3.11.tar.gz",
+    "sha256": "61d05e7fc57e995a61367bee1bb73a8bb278cda3c787b7e4e27b30037e17aeed",
+    "size": 9018272
+  },
   "artifacts": {
     "darwin-arm64": {
       "archive": "pandoc-3.11-arm64-macOS.zip",

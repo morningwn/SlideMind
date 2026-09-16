@@ -45,7 +45,7 @@ export function resolvePandocRuntimeOptions(
     : {
         binaryPath: join(
           options.appPath,
-          'out/.pandoc-p0-runtime',
+          'out/.pandoc-package-runtime',
           platform,
           'runtime',
           binaryName,

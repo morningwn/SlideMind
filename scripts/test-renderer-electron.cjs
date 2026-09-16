@@ -11,6 +11,13 @@ app.whenReady().then(async () => {
     webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false }
   })
   const errors = []
+  let markdownExportScreenshot = Promise.resolve()
+  window.webContents.on('page-title-updated', (_event, title) => {
+    if (title !== 'SlideMind renderer tests - markdown export ready') return
+    markdownExportScreenshot = window.webContents.capturePage().then((image) =>
+      writeFile(join(output, 'markdown-word-export.png'), image.toPNG())
+    )
+  })
   window.webContents.on('console-message', (details) => {
     if (details.level === 'error') errors.push(details.message)
     if (details.level === 'error' || details.message.startsWith('[test]')) console.log(details.message)
@@ -19,6 +26,7 @@ app.whenReady().then(async () => {
     await mkdir(output, { recursive: true })
     await window.loadURL(url)
     const result = await window.webContents.executeJavaScript('window.rendererTestResult')
+    await markdownExportScreenshot
     if (errors.length) result.error = [result.error, ...errors].filter(Boolean).join('\n')
     await writeFile(join(output, 'results.json'), JSON.stringify({ ...result, chromium: process.versions.chrome, electron: process.versions.electron, platform: process.platform, arch: process.arch, osRelease: release(), cpu: cpus()[0].model }, null, 2))
     await writeFile(join(output, result.error ? 'failure.png' : 'pptist.png'), (await window.webContents.capturePage()).toPNG())
