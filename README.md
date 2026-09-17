@@ -26,7 +26,7 @@ pnpm format        # 使用 Prettier 格式化仓库
 pnpm format:check  # 检查仓库格式
 pnpm package       # 当前平台安装包
 pnpm package:mac   # macOS DMG/ZIP，Intel + Apple Silicon
-pnpm package:win   # Windows NSIS 安装包，x64
+pnpm package:win   # Windows NSIS 安装包，仅 x64，不支持 32 位系统
 ```
 
 生产构建和安装包输出到 `out/`，渲染测试截图与测量结果输出到 `.local/renderer-tests/`；均不提交仓库。
