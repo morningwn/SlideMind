@@ -1,6 +1,6 @@
 # 本地办公文档读取
 
-本文描述当前实现；历史实测与尚未完成的验收统一见 [Tika 验证记录](tika-validation.md)。
+本文描述本地办公文档读取的当前契约、运行时与限制。
 
 ## 能力与调用链
 
@@ -69,7 +69,7 @@ pnpm tika:probe
 SLIDEMIND_TIKA_INTEGRATION=1 pnpm exec vitest run src/main/document/tika-integration.test.ts
 ```
 
-最后一条为 POSIX shell 写法；PowerShell 先设置 `$env:SLIDEMIND_TIKA_INTEGRATION='1'` 再运行 Vitest。真实集成测试仅在未设置开关时跳过，必须确认输出未跳过。样本说明见 [样本说明](tika-fixtures.md)。
+最后一条为 POSIX shell 写法；PowerShell 先设置 `$env:SLIDEMIND_TIKA_INTEGRATION='1'` 再运行 Vitest。真实集成测试仅在未设置开关时跳过，必须确认输出未跳过。样本说明见 [测试样本](#测试样本)。
 
 打包使用 `pnpm package`、`pnpm package:mac` 或 `pnpm package:win`，链路为：
 
@@ -77,8 +77,77 @@ SLIDEMIND_TIKA_INTEGRATION=1 pnpm exec vitest run src/main/document/tika-integra
 2. `after-pack.mjs` 通过 electron-builder `afterPack` 将对应架构运行时放到 ASAR 外的 `resources/tika-runtime/<platform>/`，保留 launcher 相邻依赖及许可证，校验链接运行时的模块清单与模块许可证。
 3. `verify.mjs` 检查清单、路径和许可证，在本机架构执行 DOC、简单及复杂 DOCX、XLS、XLSX、PDF 六样本文本检查；交叉架构只检查结构，不视为运行验收。
 
-`prepared-runtime.json` 的 `javaOptimization` 记录模式、原始/实际模块、裁剪前后 Java 字节数及构建选项。可通过 `--java-mode full|compressed|minimal` 选择完整原版、仅压缩或压缩并裁剪；默认 `minimal`。设置 `SLIDEMIND_JAVA_MODE=full` 后运行打包命令可回退至完整原版。实现、依赖分析、实测与限制见 [Java 运行时优化](java-runtime-optimization.md)。
+`prepared-runtime.json` 的 `javaOptimization` 记录模式、原始/实际模块、裁剪前后 Java 字节数及构建选项。可通过 `--java-mode full|compressed|minimal` 选择完整原版、仅压缩或压缩并裁剪；默认 `minimal`。设置 `SLIDEMIND_JAVA_MODE=full` 后运行打包命令可回退至完整原版。模块与构建约束见下文。
 
 真实集成测试支持 `SLIDEMIND_TIKA_RUNTIME_ROOT` 指定对照运行时根目录；显式启用测试但未准备运行时会报错，不再静默跳过。
 
-支持的打包目标为 macOS arm64、macOS x64、Windows x64。运行时不自动在线下载或升级。升级时需同步版本清单、代码版本校验、协议测试及[第三方声明](THIRD_PARTY_NOTICES.md)，重新执行[验收矩阵](tika-validation.md#待完成验收)。
+支持的打包目标为 macOS arm64、macOS x64、Windows x64。运行时不自动在线下载或升级。升级时需同步版本清单、代码版本校验、协议测试及[第三方声明](THIRD_PARTY_NOTICES.md)，重新执行真实解析和目标平台安装测试。
+
+## Java 构建约束
+
+Tika 和 Java 版本保持为 4.0.0 / Temurin 21.0.12.1+1。默认 `minimal` 使用固定版本 JDK 的 jlink，执行资源压缩 `--compress=zip-6`、移除调试信息 `--strip-debug`、不生成头文件和手册。Java 模块依赖由 jlink 自动补齐，不生成 CDS 类缓存。
+
+下载清单和 SHA-256 固定在 [runtime-manifest.json](../scripts/tika-p0/runtime-manifest.json)。准备过程仍校验原始 JRE，用其实际 `lib/modules` 镜像确定对照模块、统计原始体积，并保留完整上游 `NOTICE` 和 `legal/`。上游 JRE 的 `release` 字段可能包含不在实际镜像中的 JDK 模块，不能直接用它生成对照版。
+
+构建工具使用宿主平台的固定 JDK，模块和原生库来自目标平台同版本 JDK 的 `jmods/`，不依赖系统 Java。`build-tools/`、`downloads/` 均在运行时目录外，不进入应用。跨架构生成只验证结构，必须在目标系统继续完成运行与安装验收。
+
+| 模式         | 行为                                        | 用途             |
+| ------------ | ------------------------------------------- | ---------------- |
+| `full`       | 完整上游 JRE，包含 CDS 缓存，不下载构建 JDK | 兼容性对照和回退 |
+| `compressed` | 保留原 JRE 的全部模块，压缩并移除调试信息   | 单独验证压缩影响 |
+| `minimal`    | 压缩并仅保留固定依赖、提供程序及传递依赖    | 默认打包         |
+
+模式优先级为命令参数 `--java-mode`、环境变量 `SLIDEMIND_JAVA_MODE`、默认 `minimal`。未知模式直接报错。准备失败后不会留下有效的旧 `prepared-runtime.json` 指向不完整资源。
+
+```bash
+node scripts/tika-p0/prepare-runtime.mjs --java-mode minimal
+node scripts/tika-package/prepare.mjs --platforms darwin-x64,darwin-arm64 --java-mode compressed
+
+# 回退完整 JRE 后执行正常打包链路（POSIX shell）
+SLIDEMIND_JAVA_MODE=full pnpm package
+```
+
+PowerShell 先执行 `$env:SLIDEMIND_JAVA_MODE='full'`，再执行打包命令；删除该环境变量恢复默认。每种模式都需重新准备和打包，不会修改已安装的应用。
+
+模块清单由 [java-runtime.mjs](../scripts/tika-p0/java-runtime.mjs) 维护，保留字体、字符集、地区数据和动态加密提供程序。`analyze-java-modules.mjs` 使用 jdeps 静态分析，不能发现全部反射或动态依赖；升级后需人工复核并执行真实解析测试。精简运行时不含被裁剪的调试、JFR 和远程管理能力，不能承诺启动或内存性能改善。
+
+## 测试样本
+
+样本位于 `scripts/tika-p0/fixtures/`，由仓库内源文件自行生成，不含用户或第三方文档内容。以下命令均从仓库根目录执行。
+
+- `simple-content.docx`：中文、英文、混合 Unicode、标题、段落和列表。
+- `simple-content.doc`：由 `simple-content.docx` 通过 LibreOffice 的 `MS Word 97` 导出器生成，是 OLE2 复合文档，不是改后缀文件。
+- `complex-content.docx`：表格、分页、页眉、页脚和多语言字符。
+- `simple-spreadsheet.csv`：Excel 样本的源数据。
+- `simple-spreadsheet.xls` / `simple-spreadsheet.xlsx`：由 LibreOffice 从源 CSV 导出的真实 Excel 文件。
+- `simple-content.pdf`：由 LibreOffice 从 `simple-content.docx` 导出的 PDF。
+- `expectations.json`：自动探针必须找到的关键文本与已知限制。
+
+生成 DOCX 需要 Python 3 和 `python-docx`：
+
+```bash
+python3 scripts/tika-p0/fixtures/generate.py
+```
+
+生成 DOC、Excel 和 PDF 需要 LibreOffice：
+
+```bash
+soffice --headless --convert-to 'doc:MS Word 97' \
+  --outdir scripts/tika-p0/fixtures \
+  scripts/tika-p0/fixtures/simple-content.docx
+soffice --headless --convert-to xls \
+  --outdir scripts/tika-p0/fixtures \
+  scripts/tika-p0/fixtures/simple-spreadsheet.csv
+soffice --headless --convert-to xlsx \
+  --outdir scripts/tika-p0/fixtures \
+  scripts/tika-p0/fixtures/simple-spreadsheet.csv
+soffice --headless --convert-to pdf \
+  --outdir scripts/tika-p0/fixtures \
+  scripts/tika-p0/fixtures/simple-content.docx
+```
+
+## 当前验证边界
+
+macOS arm64 固定样本解析与包内运行时探针已有覆盖；各平台真实安装、离线运行、签名及安全软件行为尚未全面验收。macOS x64、Windows x64 的结构检查不能代替目标机运行。
+
+慢解析取消和超时的进程回收、峰值资源、外部访问诱捕、异常压缩包，以及复杂 Word/Excel/PDF 内容仍需验证。客户端取消成功不等于服务端解析已停止；文本提取成功不等于视觉或语义完整。

@@ -37,16 +37,11 @@ macOS 打包脚本和 CI 默认关闭签名自动发现；其他本地打包命�
 
 ## 文档导航
 
-- [开发与验证](docs/development.md)：类型检查、渲染测试、构建产物与发布流程。
-- [Pi Agent 配置统一管理方案](docs/pi-managed-configuration-plan.md)：关闭外部配置发现、移除非必要扩展与优先自研简单能力的分阶段方案，部分实施。
-- [Pi 配置隔离验收](docs/pi-managed-configuration-acceptance.md)：配置入口、固定版本补丁、独立进程与安装包验证、真实模型验收边界。
-- [本地 Word 读取](docs/document-reading.md)：工具契约、运行时准备、资源限制与打包。
-- [Markdown 导出 Word 方案](docs/markdown-word-export-plan.md)：Pandoc 接入、体积验证与实施计划；P1 核心服务和 P2 界面/打包实现已完成，P3 交付验收待进行。
-- [Markdown 与演示文稿导出 PDF 方案](docs/pdf-export-plan.md)：核心服务及界面入口已实现；[P0 本机验证](docs/pdf-p0-validation.md)和[P3 本机验收进度](docs/pdf-p3-validation.md)已有记录，跨平台与真实安装态待测。
-- [Tika 验证记录](docs/tika-validation.md)：已记录结果和待完成的平台验收。
-- [工作区与 PPTist 性能记录](docs/p2-validation-2026-09-14.md)：2026-09-14 的渲染验证与测量。
-- [仓库指南](AGENTS.md)：开发规范与跨进程、演示文稿安全约束。
-- [第三方声明](docs/THIRD_PARTY_NOTICES.md)。
+- [开发与验证](docs/development.md)：检查命令、构建、测试与发布。
+- [Agent 与工具](docs/agent.md)：配置隔离、文件权限、Web 工具与限制。
+- [本地办公文档读取](docs/document-reading.md)：Tika 契约、Java 运行时与测试样本。
+- [文档导出](docs/document-export.md)：Word、PDF、PPTX 的当前能力与验证边界。
+- [仓库指南](AGENTS.md)与[第三方声明](docs/THIRD_PARTY_NOTICES.md)。
 
 ## 工程结构
 
@@ -69,10 +64,10 @@ src/
 - 工作清单由应用内置 `todo` 工具管理，支持 `replace`、`add`、`update`、`list`；清单随会话分支恢复，旧会话的任务快照可只读显示。
 - 应用内置 PPT 制作总控 Skill，并按阶段调度演示策略、页面文案、视觉设计、数据表达、流程图、模板和成稿审查 Skill；开发态从 `skills/` 加载，打包后作为只读资源注入 Pi Agent。
 - Pi Agent 使用应用内的缓存前缀整理逻辑和 Web 工具，并使用 Pi 原生压缩。DeepSeek 模型由应用注册；Web 固定使用 Exa 公共搜索，不读取本机搜索凭据、旧配置或浏览器 Cookie。公共接口可能限流，失败不会自动改用付费服务。缓存 token 用量、压缩事件与历史会话重新加载的结构性信号记录在本地诊断日志中，不自动上传。
-- Web 工具保留 `web_search`、`source_check`、`fetch_content`、`get_search_content`。支持域名/发布日期过滤、公开网页/文本/PDF 正文及分页字面量查找；`source_check` 组织证据，不判断论断真假。缓存按项目和会话分支授权，单会话最多 32 项/16 MiB，读取有效期一小时；过期、旧插件结果或已清理内容须重新获取。禁止代理、登录、脚本执行、音视频、OCR、raw/answer 和模糊查找。限制和验证记录见 [Web 工具方案](docs/pi-web-tools-plan.md)。
+- Web 工具保留 `web_search`、`source_check`、`fetch_content`、`get_search_content`。支持域名/发布日期过滤、公开网页/文本/PDF 正文及分页字面量查找；`source_check` 组织证据，不判断论断真假。缓存按项目和会话分支授权，单会话最多 32 项/16 MiB，读取有效期一小时；过期、旧插件结果或已清理内容须重新获取。禁止代理、登录、脚本执行、音视频、OCR、raw/answer 和模糊查找。详细契约见 [Agent 与工具](docs/agent.md#web-工具)。
 - 权限由应用内置固定策略管理，未知工具、Shell 和通用 MCP 不注册。文件操作限当前项目及明确列出的只读内置 Skill，拒绝目录越界、符号链接、硬链接、凭据文件和受保护目录；演示文稿图片与导出路径也进入同一检查。
 - Pi 使用独立的内存设置和凭据存储，仅注册 DeepSeek 并显式加载内置 Skill 与工具；固定版本补丁关闭 SDK 的环境凭据、请求参数和包路径回退；不自动读取项目/用户扩展、Skill、权限文件或 AGENTS.md/SYSTEM.md/APPEND_SYSTEM.md。旧配置和会话不删除。
-- `grep`、`find`、`ls` 使用应用内有界遍历，不查找或下载系统命令；不读取 `.gitignore`。正则与 glob 在可终止 Worker 中匹配。范围、限制和验证记录见 [权限替换方案](docs/pi-permission-replacement-plan.md)。
+- `grep`、`find`、`ls` 使用应用内有界遍历，不查找或下载系统命令；不读取 `.gitignore`。正则与 glob 在可终止 Worker 中匹配。限制见 [文件搜索](docs/agent.md#文件搜索)。
 
 ## 设置与本地诊断
 
@@ -150,9 +145,9 @@ src/
 
 Agent 通过 `document_read` 分段读取项目内 `.doc`、`.docx`、`.xls`、`.xlsx` 和 `.pdf` 文本及筛选后的元数据，文件引用自动路由到该工具。读取不保留页面或工作表视觉、准确页码、公式计算结果语义、OCR、嵌入附件或全部复杂表格结构。
 
-打包链路按目标架构携带固定版本的 Tika 与经 jlink 压缩、裁剪的 Java 运行时，可回退完整 JRE，详见 [Java 运行时优化](docs/java-runtime-optimization.md)。解析无需系统 Java、Docker 或网络；在线模型仍需联网。开发前需显式[准备本机运行时](docs/document-reading.md#开发与打包)。Tika 只监听动态回环端口，空闲后退出；不提供面向不可信本机进程或共享主机的隔离保证。
+打包链路按目标架构携带固定版本的 Tika 与经 jlink 压缩、裁剪的 Java 运行时，可回退完整 JRE，详见 [Java 构建约束](docs/document-reading.md#java-构建约束)。解析无需系统 Java、Docker 或网络；在线模型仍需联网。开发前需显式[准备本机运行时](docs/document-reading.md#开发与打包)。Tika 只监听动态回环端口，空闲后退出；不提供面向不可信本机进程或共享主机的隔离保证。
 
-macOS arm64 已有未签名安装包及内置运行时冒烟记录，各平台真实安装、离线、安全软件及签名验收仍未完成，详见[验证记录](docs/tika-validation.md)。
+macOS arm64 已有未签名安装包及内置运行时冒烟记录，各平台真实安装、离线、安全软件及签名验收仍未完成，详见[当前验证边界](docs/document-reading.md#当前验证边界)。
 
 ## 许可证
 

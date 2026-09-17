@@ -10,14 +10,14 @@ SlideMind 是基于 Electron、React、Vue 和 TypeScript 的桌面应用。各�
 - `src/renderer/pptist-*`：嵌入 React 工作区的独立 Vue/PPTist 编辑器入口与主题；两端只通过受限消息桥同步状态。
 - `src/shared/`：主进程与渲染进程共享的类型定义。
 - `skills/`：打包进应用的 PPT 制作总控及策略、文案、视觉、数据、流程图、模板和质量审查 Skill；`SKILL.md` 引用的规则放在对应 `references/`。
-- `docs/`：开发验证、本地 Word 读取及历史测量记录；入口见 [README.md](README.md)。
+- `docs/`：开发指南、Agent、文档读取与导出的当前说明；入口见 [README.md](README.md)。
 - `assets/`：应用图标；`.github/workflows/`：持续集成配置。
 
 单元测试与实现文件放在同一目录，命名为 `*.test.ts`。不得提交 `out/`、`coverage/` 等生成目录。
 
 ## 文档管理
 
-项目总入口 `README.md` 保留在仓库根目录；其余项目说明、开发指南、设计方案、验证记录、样本说明和第三方声明统一放在 `docs/`。新增或移动文档时同步更新链接和构建引用，除根目录 README 外，不在根目录或源码、脚本目录重复维护说明文档。
+项目总入口 `README.md` 保留在仓库根目录；其余项目说明、开发指南、样本说明和第三方声明统一放在 `docs/`。文档只维护当前实现、使用方式与有效限制，不保留实施计划、阶段验收流水或历史测量记录。新增或移动文档时同步更新链接和构建引用，除根目录 README 外，不在根目录或源码、脚本目录重复维护说明文档。
 
 `AGENTS.md` 是仓库协作规则，`skills/` 下的 `SKILL.md` 及 references 是应用运行时资源，`LICENSE` 是许可证原文，保留各自约定位置，不作为普通项目文档迁移。
 

@@ -63,7 +63,7 @@ try {
   )
   console.log(stdout.trim())
   console.error(
-    'Static analysis only: review optional missing dependencies and retain dynamic providers separately. See docs/java-runtime-optimization.md.',
+    'Static analysis only: review optional missing dependencies and retain dynamic providers separately. See docs/document-reading.md.',
   )
 } finally {
   await rm(scratch, { recursive: true, force: true })
