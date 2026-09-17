@@ -230,6 +230,64 @@ describe('BaseAgentService.stop', () => {
   })
 })
 
+describe('BaseAgentService final response', () => {
+  it.each([
+    { content: [] },
+    { content: [{ type: 'thinking', thinking: '继续制作演示' }] },
+    { content: [{ type: 'text', text: '  \n ' }] },
+  ])(
+    'rejects an empty final response and allows the conversation to continue: %j',
+    async ({ content }) => {
+      const service = new BaseAgentService(
+        {
+          load: async () => ({ modelId: 'deepseek-flash', apiKey: 'fake' }),
+        } as never,
+        { resolve: () => '/project' } as never,
+        '/agent',
+        '/skills',
+        {} as never,
+        {} as never,
+        {} as never,
+      )
+      const unsubscribe = vi.fn()
+      const agent = {
+        prompt: vi.fn(async () => {}),
+        setThinkingLevel: vi.fn(),
+        subscribe: vi.fn(() => unsubscribe),
+        state: {
+          messages: [
+            {
+              role: 'assistant',
+              content: [{ type: 'text', text: '上轮已完成' }],
+            },
+            { role: 'assistant', content },
+          ],
+        },
+      }
+      const createAgent = vi.fn(async () => ({ agent, todos: [] }))
+      Object.assign(service, { createAgent })
+      const input = {
+        projectHandle: 'project',
+        conversationId: 'conversation',
+        input: '继续制作',
+      }
+      await expect(
+        service.prompt({ ...input, requestId: 'empty' }),
+      ).rejects.toThrow('模型未返回可见回复')
+      expect(unsubscribe).toHaveBeenCalledOnce()
+      expect(agent.prompt).toHaveBeenCalledOnce()
+      agent.state.messages.push({
+        role: 'assistant',
+        content: [{ type: 'text', text: '已完成' }],
+      })
+      await expect(
+        service.prompt({ ...input, requestId: 'continue' }),
+      ).resolves.toMatchObject({ text: '已完成' })
+      expect(createAgent).toHaveBeenCalledOnce()
+    },
+  )
+})
+
 describe('BaseAgentService prompt references', () => {
   it('routes raw PowerPoint files through pptx_read instead of the binary read tool', async () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-agent-pptx-'))

@@ -58,6 +58,10 @@ const SYSTEM_PROMPT = `你是 SlideMind 的基础演示创作 agent。
 你的职责是帮助用户梳理材料、建立清晰叙事、规划演示结构并打磨表达。
 信息不足时先指出缺口；不要虚构事实；输出应简洁、可执行。
 
+执行与交付：
+- 在用户授权范围内持续执行到请求的交付物完成，遵守 Skill 的审阅模式与安全门禁。用户询问进度时先简要说明，再继续尚未完成的工作；不要仅因阶段结束而停止。
+- 结束前说明实际交付、验证结果与未完成项。需要用户补充信息或处理阻塞时明确说明，不以空回复结束。
+
 中文写作与审校：
 - 撰写或润色文档、演示文案时，以自然、准确、符合受众和用途为目标。正式文档保持克制，不为“去 AI 味”刻意加入语气词、幽默、第一人称或个人经历。
 - 用户提供样稿时，参考其用词、句长、段落推进、转折和判断方式；遵守用户要求、项目编辑规范及术语表，保留作者原有口吻。
@@ -795,7 +799,26 @@ export class BaseAgentService {
       const prompt = await this.injectPromptReferences(input, projectPath)
       this.throwIfStopped(session, input.requestId)
       await session.agent.prompt(prompt)
+      this.throwIfStopped(session, input.requestId)
+      if (session.agent.state.errorMessage) {
+        throw new Error(session.agent.state.errorMessage)
+      }
+      const message = session.agent.state.messages.at(-1)
+      if (!message || !isAssistantMessage(message)) {
+        throw new Error('agent 未返回内容')
+      }
+      const text = message.content
+        .filter((block) => block.type === 'text')
+        .map((block) => block.text)
+        .join('')
+        .trim()
+      if (!text) {
+        throw new Error(
+          '模型未返回可见回复，任务尚未确认完成。已有产物已保留，请继续对话。',
+        )
+      }
       promptCompleted = true
+      return { text, modelId: config.modelId }
     } finally {
       unsubscribe()
       if (cacheReadTokens + cacheWriteTokens + uncachedInputTokens > 0) {
@@ -821,27 +844,6 @@ export class BaseAgentService {
         })
       }
     }
-
-    this.throwIfStopped(session, input.requestId)
-
-    if (session.agent.state.errorMessage) {
-      throw new Error(session.agent.state.errorMessage)
-    }
-
-    const message = [...session.agent.state.messages]
-      .reverse()
-      .find(isAssistantMessage)
-    if (!message) {
-      throw new Error('agent 未返回内容')
-    }
-
-    const text = message.content
-      .filter((block) => block.type === 'text')
-      .map((block) => block.text)
-      .join('')
-      .trim()
-
-    return { text, modelId: config.modelId }
   }
 
   private throwIfStopped(session: AgentSessionRecord, requestId: string): void {

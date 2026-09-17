@@ -2,10 +2,21 @@ import { mkdtemp, rm, writeFile, readdir, rename } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createWebToolsExtension, fetchWebSource } from './web-tools'
+import type { ExtensionAPI } from '@earendil-works/pi-coding-agent'
+import { Agent, type AgentEvent } from '@earendil-works/pi-agent-core'
+import {
+  createAssistantMessageEventStream,
+  type Model,
+  type AssistantMessage,
+} from '@earendil-works/pi-ai'
+import {
+  createWebToolsExtension,
+  fetchWebSource,
+  type WebToolsOptions,
+} from './web-tools'
 import { extractWebHtml } from './web-extract'
 import { parseExaResponse } from './web-search'
-import { requestWeb, type WebTransport } from './web-transport'
+import { requestWeb, WebError, type WebTransport } from './web-transport'
 import { WebCache, visibleWebResponses } from './web-cache'
 
 const dirs: string[] = []
@@ -42,6 +53,22 @@ const source = {
   title: 'Test',
   text: '中文 evidence here',
   kind: 'page' as const,
+}
+
+async function registeredTools(transport: WebTransport) {
+  const tools = new Map<string, Parameters<ExtensionAPI['registerTool']>[0]>()
+  const options: WebToolsOptions = {
+    cacheDirectory: await directory(),
+    getBranch: () => [],
+    parsePdf: async () => '',
+    transport,
+  }
+  await createWebToolsExtension(options)({
+    registerTool: (tool: Parameters<ExtensionAPI['registerTool']>[0]) => {
+      tools.set(tool.name, tool)
+    },
+  } as unknown as ExtensionAPI)
+  return tools
 }
 
 describe('managed web tools', () => {
@@ -205,16 +232,17 @@ describe('managed web tools', () => {
       )
     expect(JSON.stringify(cached)).toContain('evidence')
     branch.length = 0
-    const denied = await tools
-      .get('get_search_content')!
-      .definition.execute(
-        'read-other-branch',
-        { responseId: saved.responseId },
-        new AbortController().signal,
-        undefined,
-        {} as never,
-      )
-    expect(JSON.stringify(denied)).toContain('当前会话分支无法读取')
+    await expect(
+      tools
+        .get('get_search_content')!
+        .definition.execute(
+          'read-other-branch',
+          { responseId: saved.responseId },
+          new AbortController().signal,
+          undefined,
+          {} as never,
+        ),
+    ).rejects.toThrow('当前会话分支无法读取')
     expect(transport.mock.calls[0][0]).toBe(
       'https://mcp.exa.ai/mcp?tools=web_search_advanced_exa',
     )
@@ -226,6 +254,159 @@ describe('managed web tools', () => {
     const signal = AbortSignal.abort()
     await expect(requestWeb('https://example.com', signal)).rejects.toThrow()
     await expect(extractWebHtml('<p>text</p>', signal)).rejects.toThrow()
+  })
+
+  it('records fetch failures as errors through the Pi agent loop', async () => {
+    const tools = await registeredTools(async () => {
+      throw new WebError('Web 请求失败（HTTP 404）')
+    })
+    const tool = tools.get('fetch_content')!
+    const model: Model<'openai-completions'> = {
+      id: 'test-model',
+      name: 'Test',
+      api: 'openai-completions',
+      provider: 'test',
+      baseUrl: 'https://example.com',
+      reasoning: false,
+      input: ['text'],
+      contextWindow: 10000,
+      maxTokens: 1000,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    }
+    let turn = 0
+    const events: AgentEvent[] = []
+    const agent = new Agent({
+      initialState: {
+        model,
+        tools: [
+          {
+            name: tool.name,
+            label: tool.label,
+            description: tool.description,
+            parameters: tool.parameters,
+            execute: (id, args, signal, update) =>
+              tool.execute(id, args, signal, update, {} as never),
+          },
+        ],
+      },
+      streamFn: () => {
+        const first = turn++ === 0
+        const message: AssistantMessage = {
+          role: 'assistant',
+          api: model.api,
+          provider: model.provider,
+          model: model.id,
+          content: first
+            ? [
+                {
+                  type: 'toolCall',
+                  id: 'fetch',
+                  name: 'fetch_content',
+                  arguments: { url: 'https://example.com/missing' },
+                },
+              ]
+            : [{ type: 'text', text: '来源读取失败' }],
+          stopReason: first ? 'toolUse' : 'stop',
+          usage: {
+            input: 0,
+            output: 0,
+            cacheRead: 0,
+            cacheWrite: 0,
+            totalTokens: 0,
+            cost: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              total: 0,
+            },
+          },
+          timestamp: Date.now(),
+        }
+        const stream = createAssistantMessageEventStream()
+        stream.push({
+          type: 'done',
+          reason: message.stopReason as 'stop' | 'toolUse',
+          message,
+        })
+        return stream
+      },
+    })
+    agent.subscribe((event) => {
+      events.push(event)
+    })
+    await agent.prompt('读取来源')
+    expect(
+      agent.state.messages.find((message) => message.role === 'toolResult'),
+    ).toMatchObject({
+      isError: true,
+      content: [{ type: 'text', text: 'Web 请求失败（HTTP 404）' }],
+    })
+    expect(
+      events.find((event) => event.type === 'tool_execution_end'),
+    ).toMatchObject({ isError: true })
+  })
+
+  it('rejects cancellation and preserves unexpected errors instead of returning successful error payloads', async () => {
+    const failure = new TypeError('unexpected parser failure')
+    const transport = vi.fn<WebTransport>(async () => {
+      throw failure
+    })
+    const tools = await registeredTools(transport)
+    const fetch = tools.get('fetch_content')!
+    await expect(
+      fetch.execute(
+        'cancelled',
+        { url: 'https://example.com' },
+        AbortSignal.abort(),
+        undefined,
+        {} as never,
+      ),
+    ).rejects.toThrow('已取消或超时')
+    expect(transport).not.toHaveBeenCalled()
+    await expect(
+      fetch.execute(
+        'unexpected',
+        { url: 'https://example.com' },
+        undefined,
+        undefined,
+        {} as never,
+      ),
+    ).rejects.toBe(failure)
+  })
+
+  it('retains the requested URL when a source redirects and reports partial failures separately', async () => {
+    const tools = await registeredTools(async (url) => {
+      if (url.endsWith('/missing'))
+        throw new WebError('Web 请求失败（HTTP 404）')
+      return {
+        url: 'https://example.com/',
+        contentType: 'text/plain',
+        bytes: Buffer.from('Homepage, not the requested article'),
+      }
+    })
+    const result = await tools.get('fetch_content')!.execute(
+      'redirect',
+      {
+        urls: ['https://example.com/article', 'https://example.com/missing'],
+      },
+      undefined,
+      undefined,
+      {} as never,
+    )
+    expect(result.details).toMatchObject({
+      sources: [
+        {
+          requestedUrl: 'https://example.com/article',
+          url: 'https://example.com/',
+          kind: 'page',
+        },
+        {
+          url: 'https://example.com/missing',
+          error: 'Web 请求失败（HTTP 404）',
+        },
+      ],
+    })
   })
 
   it('expires persisted results and evicts the oldest entry at the session budget', async () => {

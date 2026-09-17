@@ -2,6 +2,7 @@ import { publicWebUrl, WebError, type WebTransport } from './web-transport'
 
 export interface WebSource {
   url: string
+  requestedUrl?: string
   title: string
   text: string
   kind: 'search_excerpt' | 'page'

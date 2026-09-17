@@ -75,7 +75,7 @@ export function createTodoToolsExtension(
       name: 'todo',
       label: '工作清单',
       description:
-        '管理当前会话的工作清单。replace 重建完整清单；add 增加待处理任务；update 修改指定任务；list 查看当前清单。',
+        '管理当前会话的工作清单。需要三个及以上步骤的复杂任务应先建立清单，并在执行中按任务 ID 更新进度；简单问答无需清单。replace 重建完整清单；add 增加待处理任务；update 修改指定任务；list 查看当前清单。清单反映实际进度，不替代 Skill 的工作流状态。',
       promptSnippet:
         'Use todo for complex work with 3+ steps. Update progress by task ID; replace only when rebuilding the whole list.',
       parameters: Type.Object(

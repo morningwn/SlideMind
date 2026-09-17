@@ -112,6 +112,9 @@ describe('local todo tool', () => {
     try {
       const todo = session.getToolDefinition('todo')
       expect(todo).toBeDefined()
+      // Tool descriptions remain visible even when a custom system prompt
+      // bypasses Pi's promptSnippet composition.
+      expect(todo?.description).toContain('三个及以上步骤')
       expect(
         todosFromToolResult(
           await todo!.execute(
