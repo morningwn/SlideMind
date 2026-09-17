@@ -18,6 +18,7 @@ export default defineConfig({
       }),
     ],
     build: {
+      license: { fileName: 'licenses.md' },
       rollupOptions: {
         input: {
           index: resolve('src/main/index.ts'),
@@ -83,6 +84,7 @@ export default defineConfig({
       }),
     ],
     build: {
+      license: { fileName: 'licenses.md' },
       rollupOptions: {
         input: {
           index: resolve('src/renderer/index.html'),

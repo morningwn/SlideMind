@@ -45,6 +45,10 @@ node scripts/test-renderer.mjs
 
 以上目录被 Git 忽略。仅检查生产构建可运行 `pnpm exec electron-vite build`；生成安装包使用 README 中的 `pnpm package*` 命令，它们还会执行类型检查、测试和 Tika 资源校验。
 
+打包依赖按运行方式划分：前端库与已明确由 Vite 内联的主进程库放在 `devDependencies`，需要在运行时通过 Node 加载的库保留在 `dependencies`。主进程和渲染端构建分别生成 `licenses.md`，随构建产物分发被内联依赖的许可证。新增动态加载依赖时需检查这一边界，不能仅凭开发环境运行成功判断包内可用。
+
+Electron 仅分发英文（美式、英式）和中文（简体、繁体）语言资源，macOS 同时匹配下划线形式的 locale 名称。Agent 的 esbuild 运行依赖保留，按目标平台和架构排除其他 esbuild 二进制。内置字体、Tika 和 Pandoc 继续完整离线分发。
+
 ## CI 与发布
 
 [PR 工作流](../.github/workflows/check.yml) 在 Linux、macOS 和 Windows 上安装锁定依赖、检查主进程/渲染进程/PPTist 类型并运行测试。[tag 工作流](../.github/workflows/build.yml) 分别在 macOS 和 Windows 构建安装包，再上传到 GitHub Release。

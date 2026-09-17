@@ -7,10 +7,10 @@ directories:
   buildResources: assets
 
 files:
-  - out/main/**
-  - out/preload/**
-  - out/renderer/**
-  - package.json
+  - &mainFiles out/main/**
+  - &preloadFiles out/preload/**
+  - &rendererFiles out/renderer/**
+  - &packageFile package.json
 
 extraResources:
   - from: skills
@@ -23,9 +23,23 @@ extraResources:
     to: THIRD_PARTY_NOTICES.md
 
 asar: true
+electronLanguages:
+  - en-US
+  - en-GB
+  - zh-CN
+  - zh-TW
+  - zh_CN
+  - zh_TW
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
 mac:
+  # Keep the allowlist: exclusion-only platform patterns also match project files.
+  files:
+    - *mainFiles
+    - *preloadFiles
+    - *rendererFiles
+    - *packageFile
+    - '!node_modules/@esbuild/!(darwin-${arch})/**/*'
   icon: assets/icon.icns
   category: public.app-category.productivity
   target:
@@ -38,6 +52,12 @@ dmg:
   sign: false
 
 win:
+  files:
+    - *mainFiles
+    - *preloadFiles
+    - *rendererFiles
+    - *packageFile
+    - '!node_modules/@esbuild/!(win32-${arch})/**/*'
   icon: assets/icon.ico
   target:
     - target: nsis

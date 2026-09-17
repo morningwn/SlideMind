@@ -8,6 +8,8 @@ PPTist is copyright © 2020-present pipipi-pikachu and contributors, and is lice
 
 SlideMind's PPTist bridge and integration changes are distributed as part of this repository under the same AGPL-3.0-only license.
 
+Licenses for dependencies inlined into the main-process and renderer bundles are included in `out/main/licenses.md` and `out/renderer/licenses.md` inside the packaged application archive. Dependencies loaded separately retain their package license files.
+
 ## Web content extraction
 
 SlideMind's internal Web tools use these pinned extraction libraries:
