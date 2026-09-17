@@ -1,0 +1,16 @@
+diff --git a/dist/utils/provider-env.js b/dist/utils/provider-env.js
+index c50f7d233be7a6470a9e98bf4c85fa062065bf12..7a25fdf778b7551229d73257b2e5ac87dc531887 100644
+--- a/dist/utils/provider-env.js
++++ b/dist/utils/provider-env.js
+@@ -36,9 +36,7 @@ function getBunSandboxEnvValue(name) {
+  * the duplicated Bun sandbox fallback for direct pi-ai consumers.
+  */
+ export function getProviderEnvValue(name, env) {
+-    return (env?.[name] ||
+-        (typeof process !== "undefined" ? process.env[name] : undefined) ||
+-        getBunSandboxEnvValue(name) ||
+-        undefined);
++    // SlideMind accepts only explicitly scoped provider settings.
++    return env?.[name] || undefined;
+ }
+ //# sourceMappingURL=provider-env.js.map

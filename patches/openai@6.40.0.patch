@@ -1,0 +1,54 @@
+diff --git a/internal/utils/env.js b/internal/utils/env.js
+index 86635f5628f9e45f5a18810bf10d05c068f3b680..c3fb85b2669df5908eb0b2a25efcb7086e1b9cb7 100644
+--- a/internal/utils/env.js
++++ b/internal/utils/env.js
+@@ -10,12 +10,7 @@ exports.readEnv = void 0;
+  * Will return undefined if the environment variable doesn't exist or cannot be accessed.
+  */
+ const readEnv = (env) => {
+-    if (typeof globalThis.process !== 'undefined') {
+-        return globalThis.process.env?.[env]?.trim() || undefined;
+-    }
+-    if (typeof globalThis.Deno !== 'undefined') {
+-        return globalThis.Deno.env?.get?.(env)?.trim() || undefined;
+-    }
++  // SlideMind supplies all client settings explicitly; ambient configuration is disabled.
+     return undefined;
+ };
+ exports.readEnv = readEnv;
+diff --git a/internal/utils/env.mjs b/internal/utils/env.mjs
+index f4e8b14d87caa4817b40d1b7fcf68723cfe0ee83..9e4166fe6cb82692def452e5244956b49c1cf7be 100644
+--- a/internal/utils/env.mjs
++++ b/internal/utils/env.mjs
+@@ -7,12 +7,7 @@
+  * Will return undefined if the environment variable doesn't exist or cannot be accessed.
+  */
+ export const readEnv = (env) => {
+-    if (typeof globalThis.process !== 'undefined') {
+-        return globalThis.process.env?.[env]?.trim() || undefined;
+-    }
+-    if (typeof globalThis.Deno !== 'undefined') {
+-        return globalThis.Deno.env?.get?.(env)?.trim() || undefined;
+-    }
++  // SlideMind supplies all client settings explicitly; ambient configuration is disabled.
+     return undefined;
+ };
+ //# sourceMappingURL=env.mjs.map
+\ No newline at end of file
+diff --git a/src/internal/utils/env.ts b/src/internal/utils/env.ts
+index cc5fa0faca8cd9a12a02a2f64b5b9971d0c8fd3b..4384c9aac75fca084ad63cd8545af9de3d3c4a97 100644
+--- a/src/internal/utils/env.ts
++++ b/src/internal/utils/env.ts
+@@ -8,11 +8,6 @@
+  * Will return undefined if the environment variable doesn't exist or cannot be accessed.
+  */
+ export const readEnv = (env: string): string | undefined => {
+-  if (typeof (globalThis as any).process !== 'undefined') {
+-    return (globalThis as any).process.env?.[env]?.trim() || undefined;
+-  }
+-  if (typeof (globalThis as any).Deno !== 'undefined') {
+-    return (globalThis as any).Deno.env?.get?.(env)?.trim() || undefined;
+-  }
++  // SlideMind supplies all client settings explicitly; ambient configuration is disabled.
+   return undefined;
+ };

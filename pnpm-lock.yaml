@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@earendil-works/pi-ai@0.85.1': c661e33227328fad7956db47cc8ef47fd67a9878edd8b137a05d3c40ac11d200
+  '@earendil-works/pi-coding-agent@0.85.1': 43e9f184ff01ead8f79299d00fb4aba0947db0da212c114f99ec6d5da8223c1d
+  openai@6.40.0: 44daebf0784a99740a72d7f3a1a998441c82d4ba97ff5cfb12f1af42487300e6
+
 importers:
 
   .:
@@ -22,10 +27,10 @@ importers:
         version: 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
       '@earendil-works/pi-ai':
         specifier: 0.85.1
-        version: 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
+        version: 0.85.1(patch_hash=c661e33227328fad7956db47cc8ef47fd67a9878edd8b137a05d3c40ac11d200)(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
       '@earendil-works/pi-coding-agent':
         specifier: 0.85.1
-        version: 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
+        version: 0.85.1(patch_hash=43e9f184ff01ead8f79299d00fb4aba0947db0da212c114f99ec6d5da8223c1d)(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
       '@microsoft/antissrf':
         specifier: 1.0.0
         version: 1.0.0
@@ -4484,7 +4489,7 @@ snapshots:
   '@earendil-works/pi-agent-core@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)':
     dependencies:
       '@earendil-works/chord': 0.85.1
-      '@earendil-works/pi-ai': 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
+      '@earendil-works/pi-ai': 0.85.1(patch_hash=c661e33227328fad7956db47cc8ef47fd67a9878edd8b137a05d3c40ac11d200)(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
       '@earendil-works/pi-telemetry': 0.85.1
       diff: 8.0.4
       ignore: 7.0.5
@@ -4498,7 +4503,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-ai@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)':
+  '@earendil-works/pi-ai@0.85.1(patch_hash=c661e33227328fad7956db47cc8ef47fd67a9878edd8b137a05d3c40ac11d200)(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)':
     dependencies:
       '@anthropic-ai/sdk': 0.123.0(zod@3.25.0)
       '@aws-sdk/client-bedrock-runtime': 3.1048.0
@@ -4507,7 +4512,7 @@ snapshots:
       '@smithy/node-http-handler': 4.7.3
       http-proxy-agent: 7.0.2(supports-color@7.2.0)
       https-proxy-agent: 7.0.6(supports-color@7.2.0)
-      openai: 6.40.0(ws@8.21.3)(zod@3.25.0)
+      openai: 6.40.0(patch_hash=44daebf0784a99740a72d7f3a1a998441c82d4ba97ff5cfb12f1af42487300e6)(ws@8.21.3)(zod@3.25.0)
       partial-json: 0.1.7
       typebox: 1.3.7
     transitivePeerDependencies:
@@ -4518,11 +4523,11 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-coding-agent@0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)':
+  '@earendil-works/pi-coding-agent@0.85.1(patch_hash=43e9f184ff01ead8f79299d00fb4aba0947db0da212c114f99ec6d5da8223c1d)(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)':
     dependencies:
       '@earendil-works/chord': 0.85.1
       '@earendil-works/pi-agent-core': 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
-      '@earendil-works/pi-ai': 0.85.1(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
+      '@earendil-works/pi-ai': 0.85.1(patch_hash=c661e33227328fad7956db47cc8ef47fd67a9878edd8b137a05d3c40ac11d200)(@modelcontextprotocol/sdk@1.30.0(supports-color@7.2.0)(zod@3.25.0))(supports-color@7.2.0)(ws@8.21.3)(zod@3.25.0)
       '@earendil-works/pi-tui': 0.85.1
       '@silvia-odwyer/photon-node': 0.3.4
       chalk: 5.6.2
@@ -7150,7 +7155,7 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
-  openai@6.40.0(ws@8.21.3)(zod@3.25.0):
+  openai@6.40.0(patch_hash=44daebf0784a99740a72d7f3a1a998441c82d4ba97ff5cfb12f1af42487300e6)(ws@8.21.3)(zod@3.25.0):
     optionalDependencies:
       ws: 8.21.3
       zod: 3.25.0

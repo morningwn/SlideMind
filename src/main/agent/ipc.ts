@@ -8,7 +8,10 @@ function assertTrustedRenderer(event: IpcMainInvokeEvent): void {
   }
 }
 
-export function registerAgentIpc(configStore: AgentConfigStore, agentService: BaseAgentService): void {
+export function registerAgentIpc(
+  configStore: AgentConfigStore,
+  agentService: BaseAgentService,
+): void {
   ipcMain.handle('agent:get-config', (event) => {
     assertTrustedRenderer(event)
     return configStore.getStatus()
@@ -17,7 +20,6 @@ export function registerAgentIpc(configStore: AgentConfigStore, agentService: Ba
   ipcMain.handle('agent:save-config', async (event, input: unknown) => {
     assertTrustedRenderer(event)
     const status = await configStore.save(input)
-    agentService.reset()
     return status
   })
 
@@ -45,7 +47,7 @@ export function registerAgentIpc(configStore: AgentConfigStore, agentService: Ba
         event.sender.send('agent:stream', {
           requestId: prompt.requestId,
           conversationId: prompt.conversationId,
-          delta
+          delta,
         })
       },
       (prompt, todos) => {
@@ -53,13 +55,13 @@ export function registerAgentIpc(configStore: AgentConfigStore, agentService: Ba
         event.sender.send('agent:todos', {
           requestId: prompt.requestId,
           conversationId: prompt.conversationId,
-          todos
+          todos,
         })
       },
       (activityEvent) => {
         if (event.sender.isDestroyed()) return
         event.sender.send('agent:activity', activityEvent)
-      }
+      },
     )
   })
 

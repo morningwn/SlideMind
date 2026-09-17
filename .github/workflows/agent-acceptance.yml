@@ -1,0 +1,29 @@
+name: Agent isolation and package acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, macos-15-intel, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install pinned dependencies and patches
+        run: pnpm install --frozen-lockfile
+      - name: Verify and package for the native host
+        run: pnpm package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'

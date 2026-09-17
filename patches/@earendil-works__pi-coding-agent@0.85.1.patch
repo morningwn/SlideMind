@@ -1,0 +1,89 @@
+diff --git a/dist/config.js b/dist/config.js
+index 95fa083078b64fbfe6e2b89137ad0d866dd55d9c..c3af7015e5dff557a7539d31484b6f7906e325f0 100644
+--- a/dist/config.js
++++ b/dist/config.js
+@@ -310,10 +310,7 @@ export function findNodePackageDir(startDir) {
+ }
+ export function getPackageDir() {
+     // Allow override via environment variable (useful for Nix/Guix where store paths tokenize poorly)
+-    const envDir = process.env.PI_PACKAGE_DIR;
+-    if (envDir) {
+-        return normalizePath(envDir);
+-    }
++    // SlideMind resolves SDK metadata only from the installed package.
+     if (isBunBinary) {
+         // Bun binary: process.execPath points to the compiled executable
+         return dirname(process.execPath);
+diff --git a/dist/core/model-runtime.d.ts b/dist/core/model-runtime.d.ts
+index e6fbba53dad4459e7bde9294e3bd103b8cc7572e..cbca1c8d214023d4c40442f79a91fb0a3e7a95ab 100644
+--- a/dist/core/model-runtime.d.ts
++++ b/dist/core/model-runtime.d.ts
+@@ -1,6 +1,10 @@
+-import { type Api, type AssistantMessage, type AssistantMessageEventStream, type AuthCheck, type AuthInteraction, type AuthOperationOptions, type AuthResult, type AuthType, type Context, type Credential, type CredentialInfo, type CredentialStore, type DeferredHandle, type Model, type Models, type ModelsApiStreamOptions, type ModelsDeferredCancelOptions, type ModelsDeferredFetchOptions, type ModelsRefreshOptions, type ModelsRefreshResult, type ModelsSimpleStreamOptions, type ModelsStore, type Provider } from "@earendil-works/pi-ai";
++import { type Api, type AssistantMessage, type AssistantMessageEventStream, type AuthCheck, type AuthContext, type AuthInteraction, type AuthOperationOptions, type AuthResult, type AuthType, type Context, type Credential, type CredentialInfo, type CredentialStore, type DeferredHandle, type Model, type Models, type ModelsApiStreamOptions, type ModelsDeferredCancelOptions, type ModelsDeferredFetchOptions, type ModelsRefreshOptions, type ModelsRefreshResult, type ModelsSimpleStreamOptions, type ModelsStore, type Provider } from "@earendil-works/pi-ai";
+ import { type AuthStatus, type CompatibilityRequestConfig, type ProviderConfigInput } from "./provider-composer.ts";
+ export interface CreateModelRuntimeOptions {
++    /** Host-selected providers; skips builtin discovery and remote catalog wrappers. */
++    providers?: Provider[];
++    /** Host-controlled credential environment and file discovery. */
++    authContext?: AuthContext;
+     /** Credential storage. Defaults to the file at authPath. */
+     credentials?: CredentialStore;
+     authPath?: string;
+diff --git a/dist/core/model-runtime.js b/dist/core/model-runtime.js
+index fbcc6cb95e08390559fd4b0a554b0c8ec37d5be5..7e09fbe6293b2a478b7286fd28902fc55fee439f 100644
+--- a/dist/core/model-runtime.js
++++ b/dist/core/model-runtime.js
+@@ -60,7 +60,7 @@ export class ModelRuntime {
+     providerAvailabilitySeq = new Map();
+     availabilityError;
+     credentialOperations = new Map();
+-    constructor(credentials, config, modelsPath, modelsStore, providers, modelNetworkEnabled) {
++    constructor(credentials, config, modelsPath, modelsStore, providers, modelNetworkEnabled, authContext) {
+         this.credentials = credentials;
+         this.config = config;
+         this.modelsPath = modelsPath;
+@@ -68,7 +68,7 @@ export class ModelRuntime {
+         this.defaultBuiltins = new Map(providers.map((provider) => [provider.id, provider]));
+         for (const [providerId, provider] of this.defaultBuiltins)
+             this.builtins.set(providerId, provider);
+-        this.models = createModels({ credentials, modelsStore });
++        this.models = createModels({ credentials, modelsStore, authContext });
+         this.rebuildProviders();
+     }
+     static async create(options = {}) {
+@@ -80,12 +80,12 @@ export class ModelRuntime {
+                 ? new FileModelsStore(options.modelsStorePath ?? join(dirname(modelsPath), "models-store.json"))
+                 : new InMemoryCodingAgentModelsStore());
+         const builtinModelDataGeneratedAt = builtinProviderCatalog.getBuiltinModelDataGeneratedAt();
+-        const providers = builtinProviderCatalog
++        const providers = options.providers ?? builtinProviderCatalog
+             .builtinProviders()
+             .map((provider) => provider.id === "radius"
+             ? provider
+             : withRemoteCatalog(provider, options.catalogBaseUrl, builtinModelDataGeneratedAt));
+-        const runtime = new ModelRuntime(credentials, config, modelsPath, modelsStore, providers, process.env.PI_OFFLINE === undefined);
++        const runtime = new ModelRuntime(credentials, config, modelsPath, modelsStore, providers, options.allowModelNetwork ?? (process.env.PI_OFFLINE === undefined), options.authContext);
+         runtime.configureRadiusProviders();
+         runtime.rebuildProviders();
+         const refreshFromNetwork = runtime.modelNetworkEnabled && options.allowModelNetwork === true;
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index e2b640b661a7712fa3f86ed5ecb494b98a6f9e4d..7be144b64a2de71dd6e770686f823321fee295f0 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -34,3 +34,5 @@ export { formatDimensionNote, type ResizedImage, resizeImage } from "./utils/ima
+ export { detectSupportedImageMimeTypeFromFile } from "./utils/mime.ts";
+ export { getPowerShellConfig, getShellConfig } from "./utils/shell.ts";
+ //# sourceMappingURL=index.d.ts.map
++// SlideMind host-managed inline factory adapter.
++export { loadExtensionFromFactory } from "./core/extensions/loader.js";
+diff --git a/dist/index.js b/dist/index.js
+index 01017cdbf6a26b3d36e236c7f9e835fbf0fa5c3a..bba3186b5cc64c92e561fdf00340a07c2f50772c 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -46,3 +46,5 @@ export { detectSupportedImageMimeTypeFromFile } from "./utils/mime.js";
+ // Shell utilities
+ export { getPowerShellConfig, getShellConfig } from "./utils/shell.js";
+ //# sourceMappingURL=index.js.map
++// SlideMind host-managed inline factory adapter.
++export { loadExtensionFromFactory } from "./core/extensions/loader.js";

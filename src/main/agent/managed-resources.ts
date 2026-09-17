@@ -1,12 +1,7 @@
 import { opendir } from 'node:fs/promises'
-import { findPackageJSON } from 'node:module'
-import { dirname, join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { join } from 'node:path'
 import type {
-  EventBus,
   Extension,
-  ExtensionFactory,
-  ExtensionRuntime,
   InlineExtension,
   ResourceLoader,
   Skill,
@@ -14,37 +9,15 @@ import type {
 import { FilePolicy } from './file-policy'
 import { AGENT_TOOL_NAMES, withManagedPermissions } from './managed-permissions'
 
-type FactoryLoader = (
-  factory: ExtensionFactory,
-  cwd: string,
-  bus: EventBus,
-  runtime: ExtensionRuntime,
-  path: string,
-) => Promise<Extension>
-
 export async function createManagedResources(options: {
   policy: FilePolicy
   skillsDirectory: string
   systemPrompt: string
   factories: InlineExtension[]
 }): Promise<ResourceLoader> {
-  const { createEventBus, createExtensionRuntime } = await import(
-    '@earendil-works/pi-coding-agent'
-  )
-  // Pi 0.85.1 exposes the factory loader internally but not from its root export.
-  // Keep this single version-pinned adapter under integration tests; never invoke discovery.
-  const packagePath = findPackageJSON(
-    '@earendil-works/pi-coding-agent',
-    import.meta.url,
-  )
-  if (!packagePath) throw new Error('Pi SDK package is missing')
-  const loaderPath = join(
-    dirname(packagePath),
-    'dist/core/extensions/loader.js',
-  )
-  const { loadExtensionFromFactory } = (await import(
-    pathToFileURL(loaderPath).href
-  )) as { loadExtensionFromFactory: FactoryLoader }
+  // The version-pinned Pi patch exposes only the inline factory loader.
+  const { createEventBus, createExtensionRuntime, loadExtensionFromFactory } =
+    await import('@earendil-works/pi-coding-agent')
   const eventBus = createEventBus()
   let runtime = createExtensionRuntime()
   let extensions: Extension[] = []

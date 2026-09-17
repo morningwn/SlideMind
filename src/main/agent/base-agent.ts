@@ -71,12 +71,14 @@ const logger = getLogger('agent')
 
 interface AgentSessionRecord {
   agent?: PiAgentSession
+  configurationKey?: string
   activeRequestId?: string
   lastUsedAt: number
   queue: Promise<void>
   requestIds: Set<string>
   stoppedRequestIds: Set<string>
   todos?: AgentTodo[]
+  onTodoRestore?: (todos: AgentTodo[]) => void
 }
 
 class AgentRequestStoppedError extends Error {
@@ -414,6 +416,8 @@ export class BaseAgentService {
     const operationId = diagnosticId(prompt.requestId)
     const run = session.queue.then(async () => {
       session.activeRequestId = prompt.requestId
+      session.onTodoRestore = (todos) =>
+        onTodos?.(prompt, structuredClone(todos))
       const startedAt = Date.now()
       logger.info('agent.request_started', {
         operationId,
@@ -457,6 +461,7 @@ export class BaseAgentService {
       } finally {
         if (session.activeRequestId === prompt.requestId)
           session.activeRequestId = undefined
+        session.onTodoRestore = undefined
         session.requestIds.delete(prompt.requestId)
         session.stoppedRequestIds.delete(prompt.requestId)
       }
@@ -479,7 +484,7 @@ export class BaseAgentService {
   ): Promise<{ agent: PiAgentSession; todos: AgentTodo[] }> {
     const { createAgentSession, SettingsManager, SessionManager } =
       await loadPiRuntime()
-    const modelRuntime = await this.getModelRuntime()
+    const modelRuntime = await this.createModelRuntime()
     const policy = await FilePolicy.create(projectPath, [
       this.bundledSkillsDirectory,
     ])
@@ -640,6 +645,13 @@ export class BaseAgentService {
     }
     this.throwIfStopped(session, input.requestId)
 
+    const configurationKey = createHash('sha256')
+      .update(JSON.stringify([config.modelId, config.apiKey]))
+      .digest('hex')
+    if (session.agent && session.configurationKey !== configurationKey) {
+      session.agent.dispose()
+      session.agent = undefined
+    }
     if (!session.agent) {
       const created = await this.createAgent(
         config,
@@ -649,10 +661,11 @@ export class BaseAgentService {
         input.thinkingLevel,
         (todos) => {
           session.todos = todos
-          if (session.agent) onTodos?.(input, structuredClone(todos))
+          if (session.agent) session.onTodoRestore?.(todos)
         },
       )
       session.agent = created.agent
+      session.configurationKey = configurationKey
       session.todos = created.todos
       onTodos?.(input, structuredClone(created.todos))
     }
@@ -937,23 +950,29 @@ export class BaseAgentService {
     return `${input.input}\n\n<slidemind-injected-context version="1">\n${instructions.join('\n')}\n</slidemind-injected-context>`
   }
 
-  private async getModelRuntime(): Promise<ModelRuntime> {
-    if (!this.modelRuntimePromise) {
-      this.modelRuntimePromise = loadPiRuntime().then(
-        async ({ ModelRuntime }) => {
-          const { InMemoryCredentialStore } = await import(
-            '@earendil-works/pi-ai'
-          )
-          const runtime = await ModelRuntime.create({
-            credentials: new InMemoryCredentialStore(),
-            modelsPath: null,
-            refreshOnCreate: false,
-          })
-          registerDeepSeekModels(runtime)
-          return runtime
-        },
-      )
-    }
+  private getModelRuntime(): Promise<ModelRuntime> {
+    this.modelRuntimePromise ??= this.createModelRuntime()
     return this.modelRuntimePromise
+  }
+
+  private async createModelRuntime(): Promise<ModelRuntime> {
+    const { ModelRuntime } = await loadPiRuntime()
+    const { InMemoryCredentialStore } = await import('@earendil-works/pi-ai')
+    const { deepseekProvider } = await import(
+      '@earendil-works/pi-ai/providers/deepseek'
+    )
+    const runtime = await ModelRuntime.create({
+      providers: [deepseekProvider()],
+      authContext: {
+        env: async () => undefined,
+        fileExists: async () => false,
+      },
+      allowModelNetwork: false,
+      credentials: new InMemoryCredentialStore(),
+      modelsPath: null,
+      refreshOnCreate: false,
+    })
+    registerDeepSeekModels(runtime)
+    return runtime
   }
 }

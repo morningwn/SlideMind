@@ -34,3 +34,7 @@ Each packaged runtime preserves the upstream `COPYING.md` and `COPYRIGHT` files 
 ## PDFKit
 
 SlideMind uses [PDFKit 0.17.2](https://github.com/foliojs/pdfkit) to assemble rendered presentation slides into PDF files. PDFKit is licensed under the MIT License. Its package license text is distributed with the packaged dependency.
+
+## Host-managed configuration patches
+
+SlideMind modifies the distributed JavaScript of Pi Coding Agent 0.85.1 and Pi AI 0.85.1 (MIT), and OpenAI Node SDK 6.40.0 (Apache-2.0), using the version-pinned pnpm patches in `patches/`. The modifications provide explicit provider/auth-context injection and disable ambient package-path, provider-setting, and OpenAI client environment configuration. Original license files remain distributed with each dependency. These changes apply to the embedded SlideMind runtime and are not claims about upstream defaults.

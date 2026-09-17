@@ -13,7 +13,7 @@
   "scripts": {
     "postinstall": "install-electron",
     "dev": "electron-vite dev",
-    "test": "vitest run && tsc --noEmit -p tsconfig.web.json && node scripts/test-renderer.mjs",
+    "test": "vitest run && pnpm test:agent-isolation && tsc --noEmit -p tsconfig.web.json && node scripts/test-renderer.mjs",
     "tika:prepare": "node scripts/tika-p0/prepare-runtime.mjs",
     "tika:probe": "node scripts/tika-p0/run-probe.mjs",
     "pandoc:p0:prepare": "node scripts/pandoc-p0/prepare-runtime.mjs",
@@ -22,9 +22,10 @@
     "pandoc:test": "vitest run src/main/document-export/pandoc-integration.test.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "package": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && node scripts/typecheck-pptist.cjs && pnpm test && electron-vite build && node scripts/tika-package/prepare.mjs && node scripts/pandoc-package/prepare.mjs && pnpm pandoc:test && electron-builder && node scripts/tika-package/verify.mjs && node scripts/pandoc-package/verify.mjs",
-    "package:mac": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && node scripts/typecheck-pptist.cjs && pnpm test && electron-vite build && node scripts/tika-package/prepare.mjs --platforms darwin-x64,darwin-arm64 && node scripts/pandoc-package/prepare.mjs --platforms darwin-x64,darwin-arm64 && pnpm pandoc:test && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --x64 --arm64 && node scripts/tika-package/verify.mjs --platforms darwin-x64,darwin-arm64 && node scripts/pandoc-package/verify.mjs --platforms darwin-x64,darwin-arm64",
-    "package:win": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && node scripts/typecheck-pptist.cjs && pnpm test && electron-vite build && node scripts/tika-package/prepare.mjs --platforms win32-x64 && node scripts/pandoc-package/prepare.mjs --platforms win32-x64 && pnpm pandoc:test && electron-builder --win --x64 && node scripts/tika-package/verify.mjs --platforms win32-x64 && node scripts/pandoc-package/verify.mjs --platforms win32-x64"
+    "package": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && node scripts/typecheck-pptist.cjs && pnpm test && electron-vite build && node scripts/tika-package/prepare.mjs && node scripts/pandoc-package/prepare.mjs && pnpm pandoc:test && electron-builder && node scripts/tika-package/verify.mjs && node scripts/pandoc-package/verify.mjs && node scripts/agent-isolation/verify-package.mjs",
+    "package:mac": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && node scripts/typecheck-pptist.cjs && pnpm test && electron-vite build && node scripts/tika-package/prepare.mjs --platforms darwin-x64,darwin-arm64 && node scripts/pandoc-package/prepare.mjs --platforms darwin-x64,darwin-arm64 && pnpm pandoc:test && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --x64 --arm64 && node scripts/tika-package/verify.mjs --platforms darwin-x64,darwin-arm64 && node scripts/pandoc-package/verify.mjs --platforms darwin-x64,darwin-arm64 && node scripts/agent-isolation/verify-package.mjs --platform darwin",
+    "package:win": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json && node scripts/typecheck-pptist.cjs && pnpm test && electron-vite build && node scripts/tika-package/prepare.mjs --platforms win32-x64 && node scripts/pandoc-package/prepare.mjs --platforms win32-x64 && pnpm pandoc:test && electron-builder --win --x64 && node scripts/tika-package/verify.mjs --platforms win32-x64 && node scripts/pandoc-package/verify.mjs --platforms win32-x64 && node scripts/agent-isolation/verify-package.mjs --platform win32",
+    "test:agent-isolation": "node scripts/agent-isolation/run.mjs"
   },
   "dependencies": {
     "@codemirror/lang-markdown": "^6.5.2",

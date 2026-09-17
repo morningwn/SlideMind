@@ -414,3 +414,109 @@ describe('BaseAgentService prompt references', () => {
     expect(injected).not.toContain('slides_read')
   })
 })
+
+describe('BaseAgentService configuration lifecycle', () => {
+  it('keeps an active request on its snapshot and rebuilds only on the next changed configuration', async () => {
+    let config = { modelId: 'deepseek-flash', apiKey: 'fake-first' }
+    const service = new BaseAgentService(
+      { load: async () => ({ ...config }) } as never,
+      { resolve: () => '/project' } as never,
+      '/agent',
+      '/skills',
+      {} as never,
+      {} as never,
+      {} as never,
+    )
+    let finishPrompt!: () => void
+    const pending = new Promise<void>((resolve) => {
+      finishPrompt = resolve
+    })
+    const makeAgent = () => ({
+      prompt: vi.fn(async () => {}),
+      dispose: vi.fn(),
+      setThinkingLevel: vi.fn(),
+      subscribe: vi.fn(() => vi.fn()),
+      state: {
+        messages: [
+          { role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+        ],
+      },
+    })
+    const first = makeAgent()
+    first.prompt.mockImplementationOnce(() => pending)
+    const second = makeAgent()
+    const third = makeAgent()
+    const createAgent = vi
+      .fn()
+      .mockResolvedValueOnce({ agent: first, todos: [] })
+      .mockResolvedValueOnce({ agent: second, todos: [] })
+      .mockResolvedValueOnce({ agent: third, todos: [] })
+    Object.assign(service, { createAgent })
+    const input = {
+      projectHandle: 'project',
+      conversationId: 'conversation',
+      input: 'hello',
+    }
+    const active = service.prompt({ ...input, requestId: '1' })
+    await vi.waitFor(() => expect(first.prompt).toHaveBeenCalledOnce())
+    config = { ...config, apiKey: 'fake-second' }
+    const queued = service.prompt({ ...input, requestId: '2' })
+    expect(first.dispose).not.toHaveBeenCalled()
+    expect(createAgent).toHaveBeenCalledTimes(1)
+    finishPrompt()
+    await Promise.all([active, queued])
+    expect(first.dispose).toHaveBeenCalledOnce()
+    expect(createAgent.mock.calls[0][0].apiKey).toBe('fake-first')
+    expect(createAgent.mock.calls[1][0].apiKey).toBe('fake-second')
+    expect(createAgent.mock.calls[1].slice(1, 4)).toEqual([
+      '/project',
+      'project',
+      'conversation',
+    ])
+    await service.prompt({ ...input, requestId: '3' })
+    expect(createAgent).toHaveBeenCalledTimes(2)
+    expect(second.prompt).toHaveBeenCalledTimes(2)
+    config = { ...config, modelId: 'deepseek-v4-pro' }
+    await service.prompt({ ...input, requestId: '4' })
+    expect(second.dispose).toHaveBeenCalledOnce()
+    expect(createAgent.mock.calls[2][0].modelId).toBe('deepseek-v4-pro')
+  })
+
+  it('creates independent credential stores and keeps the metadata runtime free of credentials', async () => {
+    const service = new BaseAgentService(
+      {} as never,
+      {} as never,
+      '/agent',
+      '/skills',
+      {} as never,
+      {} as never,
+      {} as never,
+    )
+    const internal = service as unknown as {
+      createModelRuntime(): Promise<
+        import('@earendil-works/pi-coding-agent').ModelRuntime
+      >
+      getModelRuntime(): Promise<
+        import('@earendil-works/pi-coding-agent').ModelRuntime
+      >
+    }
+    const [first, second, metadata] = await Promise.all([
+      internal.createModelRuntime(),
+      internal.createModelRuntime(),
+      internal.getModelRuntime(),
+    ])
+    await first.setRuntimeApiKey('deepseek', 'fake-first')
+    await second.setRuntimeApiKey('deepseek', 'fake-second')
+    expect(await first.getAuth('deepseek')).toMatchObject({
+      auth: { apiKey: 'fake-first' },
+    })
+    expect(await second.getAuth('deepseek')).toMatchObject({
+      auth: { apiKey: 'fake-second' },
+    })
+    expect(metadata.hasConfiguredAuth('deepseek')).toBe(false)
+    await second.setRuntimeApiKey('deepseek', 'fake-replacement')
+    expect(await first.getAuth('deepseek')).toMatchObject({
+      auth: { apiKey: 'fake-first' },
+    })
+  })
+})

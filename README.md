@@ -39,6 +39,7 @@ macOS 打包脚本和 CI 默认关闭签名自动发现；其他本地打包命�
 
 - [开发与验证](docs/development.md)：类型检查、渲染测试、构建产物与发布流程。
 - [Pi Agent 配置统一管理方案](docs/pi-managed-configuration-plan.md)：关闭外部配置发现、移除非必要扩展与优先自研简单能力的分阶段方案，部分实施。
+- [Pi 配置隔离验收](docs/pi-managed-configuration-acceptance.md)：配置入口、固定版本补丁、独立进程与安装包验证、真实模型验收边界。
 - [本地 Word 读取](docs/document-reading.md)：工具契约、运行时准备、资源限制与打包。
 - [Markdown 导出 Word 方案](docs/markdown-word-export-plan.md)：Pandoc 接入、体积验证与实施计划；P1 核心服务和 P2 界面/打包实现已完成，P3 交付验收待进行。
 - [Markdown 与演示文稿导出 PDF 方案](docs/pdf-export-plan.md)：核心服务及界面入口已实现；[P0 本机验证](docs/pdf-p0-validation.md)和[P3 本机验收进度](docs/pdf-p3-validation.md)已有记录，跨平台与真实安装态待测。
@@ -63,13 +64,14 @@ src/
 - 当前服务商为 DeepSeek，默认使用支持图片理解的 DeepSeek V4.1 Flash（`deepseek-flash`），也可选择 DeepSeek V4 Pro；两者均支持关闭、轻量、深入和极致思考。旧 Flash 配置会自动映射到新模型，无需重新填写 API Key。
 - 应用启动时会先检查模型配置；首次使用必须选择受支持的 DeepSeek 模型并保存 API Key，完成后才能进入项目启动台。后续可从启动台右上角再次打开设置。
 - API Key 通过 Electron 系统安全存储加密，并写入应用的 `userData/agent-config.json`。渲染进程只能读取非敏感配置状态，无法读取已保存的 Key。
+- 保存模型或 Key 后，正在运行的请求继续使用原配置，后续请求开始执行时应用新配置并恢复原会话历史；各会话的内存凭据相互隔离。
 - preload 通过受限、类型化接口提供模型配置、Skill 列表、对话调用、停止、用量、任务清单和活动流；Agent 的文件访问与项目修改仍由主进程边界校验。
 - 工作清单由应用内置 `todo` 工具管理，支持 `replace`、`add`、`update`、`list`；清单随会话分支恢复，旧会话的任务快照可只读显示。
 - 应用内置 PPT 制作总控 Skill，并按阶段调度演示策略、页面文案、视觉设计、数据表达、流程图、模板和成稿审查 Skill；开发态从 `skills/` 加载，打包后作为只读资源注入 Pi Agent。
 - Pi Agent 使用应用内的缓存前缀整理逻辑和 Web 工具，并使用 Pi 原生压缩。DeepSeek 模型由应用注册；Web 固定使用 Exa 公共搜索，不读取本机搜索凭据、旧配置或浏览器 Cookie。公共接口可能限流，失败不会自动改用付费服务。缓存 token 用量、压缩事件与历史会话重新加载的结构性信号记录在本地诊断日志中，不自动上传。
 - Web 工具保留 `web_search`、`source_check`、`fetch_content`、`get_search_content`。支持域名/发布日期过滤、公开网页/文本/PDF 正文及分页字面量查找；`source_check` 组织证据，不判断论断真假。缓存按项目和会话分支授权，单会话最多 32 项/16 MiB，读取有效期一小时；过期、旧插件结果或已清理内容须重新获取。禁止代理、登录、脚本执行、音视频、OCR、raw/answer 和模糊查找。限制和验证记录见 [Web 工具方案](docs/pi-web-tools-plan.md)。
 - 权限由应用内置固定策略管理，未知工具、Shell 和通用 MCP 不注册。文件操作限当前项目及明确列出的只读内置 Skill，拒绝目录越界、符号链接、硬链接、凭据文件和受保护目录；演示文稿图片与导出路径也进入同一检查。
-- Pi 使用内存设置和凭据存储，仅显式加载内置 Skill 与工具；不自动读取项目/用户扩展、Skill、权限文件或 AGENTS.md/SYSTEM.md/APPEND_SYSTEM.md。旧配置和会话不删除。
+- Pi 使用独立的内存设置和凭据存储，仅注册 DeepSeek 并显式加载内置 Skill 与工具；固定版本补丁关闭 SDK 的环境凭据、请求参数和包路径回退；不自动读取项目/用户扩展、Skill、权限文件或 AGENTS.md/SYSTEM.md/APPEND_SYSTEM.md。旧配置和会话不删除。
 - `grep`、`find`、`ls` 使用应用内有界遍历，不查找或下载系统命令；不读取 `.gitignore`。正则与 glob 在可终止 Worker 中匹配。范围、限制和验证记录见 [权限替换方案](docs/pi-permission-replacement-plan.md)。
 
 ## 设置与本地诊断
