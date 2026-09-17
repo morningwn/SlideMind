@@ -15,6 +15,7 @@ import { registerProjectVersionIpc } from './version-control/ipc'
 import { ProjectMutationService } from './version-control/project-mutation-service'
 import { ProjectVersionService } from './version-control/project-version-service'
 import { getTitleBarWindowOptions } from './window-options'
+import { createQuitHandler } from './quit-handler'
 import type { DesktopCloseResponse } from '../shared/desktop'
 import { registerLoggingIpc } from './logging/ipc'
 import {
@@ -335,10 +336,18 @@ app.whenReady().then(() => {
     }
   })
 
-  app.on('will-quit', () => {
-    void versionService.flushAll()
-    void externalChangeMonitor.closeAll()
-  })
+  app.on(
+    'will-quit',
+    createQuitHandler({
+      cleanup: [
+        () => versionService.flushAll(),
+        () => externalChangeMonitor.closeAll(),
+      ],
+      onError: (error) =>
+        logger.error('app.shutdown_cleanup_failed', { error }),
+      quit: () => app.quit(),
+    }),
+  )
 })
 
 app.on('before-quit', (event) => {
