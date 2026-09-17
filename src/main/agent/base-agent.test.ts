@@ -202,7 +202,6 @@ describe('BaseAgentService.stop', () => {
     const session = {
       agent: { abort },
       activeRequestId: 'request-1',
-      lastUsedAt: Date.now(),
       queue: Promise.resolve(),
       requestIds: new Set(['request-1']),
       stoppedRequestIds: new Set<string>(),
@@ -416,6 +415,68 @@ describe('BaseAgentService prompt references', () => {
 })
 
 describe('BaseAgentService configuration lifecycle', () => {
+  it('retains active and queued requests when more than 50 conversations are opened', async () => {
+    const service = new BaseAgentService(
+      {
+        load: async () => ({ modelId: 'deepseek-flash', apiKey: 'fake' }),
+      } as never,
+      { resolve: () => '/project' } as never,
+      '/agent',
+      '/skills',
+      {} as never,
+      {} as never,
+      {} as never,
+    )
+    let finishPrompt!: () => void
+    const pending = new Promise<void>((resolve) => {
+      finishPrompt = resolve
+    })
+    const makeAgent = () => ({
+      prompt: vi.fn(async () => {}),
+      abort: vi.fn(async () => {}),
+      dispose: vi.fn(),
+      setThinkingLevel: vi.fn(),
+      subscribe: vi.fn(() => vi.fn()),
+      state: {
+        messages: [
+          { role: 'assistant', content: [{ type: 'text', text: 'done' }] },
+        ],
+      },
+    })
+    const first = makeAgent()
+    first.prompt.mockImplementationOnce(() => pending)
+    const createAgent = vi
+      .fn()
+      .mockResolvedValueOnce({ agent: first, todos: [] })
+      .mockImplementation(async () => ({ agent: makeAgent(), todos: [] }))
+    Object.assign(service, { createAgent })
+    const input = {
+      projectHandle: 'project',
+      conversationId: 'conversation-0',
+      input: 'hello',
+    }
+    const active = service.prompt({ ...input, requestId: 'active' })
+    await vi.waitFor(() => expect(first.prompt).toHaveBeenCalledOnce())
+    const queued = service.prompt({ ...input, requestId: 'queued' })
+    try {
+      for (let index = 1; index <= 50; index++) {
+        await service.prompt({
+          ...input,
+          conversationId: `conversation-${index}`,
+          requestId: `request-${index}`,
+        })
+      }
+      expect(first.abort).not.toHaveBeenCalled()
+      expect(first.dispose).not.toHaveBeenCalled()
+    } finally {
+      finishPrompt()
+      await Promise.all([active, queued])
+    }
+    await service.prompt({ ...input, requestId: 'resume' })
+    expect(first.prompt).toHaveBeenCalledTimes(3)
+    expect(createAgent).toHaveBeenCalledTimes(51)
+  })
+
   it('keeps an active request on its snapshot and rebuilds only on the next changed configuration', async () => {
     let config = { modelId: 'deepseek-flash', apiKey: 'fake-first' }
     const service = new BaseAgentService(

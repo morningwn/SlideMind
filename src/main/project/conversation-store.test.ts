@@ -49,6 +49,23 @@ function appendExchange(
 }
 
 describe('ProjectConversationStore', () => {
+  it('persists and reloads more than 500 conversations', async () => {
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
+    const store = new ProjectConversationStore()
+    const state = {
+      selectedConversationId: 'conversation-500',
+      conversations: Array.from({ length: 501 }, (_, index) => ({
+        id: `conversation-${index}`,
+        title: `Conversation ${index}`,
+      })),
+    }
+
+    await store.save(projectPath, state)
+    expect(await store.load(projectPath)).toEqual(state)
+  })
+
   it('hides injected reference instructions from visible user messages', () => {
     expect(
       visibleUserPrompt(

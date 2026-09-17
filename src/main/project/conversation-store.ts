@@ -26,7 +26,6 @@ interface PiSessionRuntime {
 }
 
 const STORAGE_FILE = 'conversations.json'
-const MAX_CONVERSATIONS = 500
 const MAX_MESSAGES_PER_CONVERSATION = 10_000
 const MAX_MESSAGE_LENGTH = 2_000_000
 const MAX_ID_LENGTH = 200
@@ -80,7 +79,6 @@ function isProjectConversationState(
   if (
     !Array.isArray(candidate.conversations) ||
     candidate.conversations.length === 0 ||
-    candidate.conversations.length > MAX_CONVERSATIONS ||
     !candidate.conversations.every(isProjectConversation) ||
     !isConversationId(candidate.selectedConversationId)
   ) {

@@ -52,7 +52,6 @@ import { createCacheOptimizationExtension } from './cache-optimization'
 import type { DocumentReadService } from '../document/document-reader'
 import { isDocumentPath } from '../../shared/document'
 
-const MAX_AGENT_SESSIONS = 50
 const MAX_PROMPT_REFERENCES = 20
 const SESSION_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/
 const SYSTEM_PROMPT = `你是 SlideMind 的基础演示创作 agent。
@@ -73,7 +72,6 @@ interface AgentSessionRecord {
   agent?: PiAgentSession
   configurationKey?: string
   activeRequestId?: string
-  lastUsedAt: number
   queue: Promise<void>
   requestIds: Set<string>
   stoppedRequestIds: Set<string>
@@ -399,9 +397,7 @@ export class BaseAgentService {
     const sessionKey = this.sessionKey(prompt)
     let session = this.sessions.get(sessionKey)
     if (!session) {
-      this.evictOldestSession()
       session = {
-        lastUsedAt: Date.now(),
         queue: Promise.resolve(),
         requestIds: new Set(),
         stoppedRequestIds: new Set(),
@@ -671,7 +667,6 @@ export class BaseAgentService {
     }
     this.throwIfStopped(session, input.requestId)
     session.agent.setThinkingLevel(input.thinkingLevel)
-    session.lastUsedAt = Date.now()
     let thinkingSequence = 0
     let activeThinkingId: string | undefined
     let compactionStartedAt: number | undefined
@@ -865,18 +860,6 @@ export class BaseAgentService {
       contextWindow,
       contextPercent: contextWindow ? 0 : null,
     }
-  }
-
-  private evictOldestSession(): void {
-    if (this.sessions.size < MAX_AGENT_SESSIONS) return
-
-    const oldest = [...this.sessions.entries()].reduce((candidate, entry) =>
-      entry[1].lastUsedAt < candidate[1].lastUsedAt ? entry : candidate,
-    )
-    if (oldest[1].agent) {
-      void oldest[1].agent.abort().finally(() => oldest[1].agent?.dispose())
-    }
-    this.sessions.delete(oldest[0])
   }
 
   private sessionKey(input: AgentConversationInput): string {
