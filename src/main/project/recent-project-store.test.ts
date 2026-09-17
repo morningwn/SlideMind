@@ -7,9 +7,19 @@ import { RecentProjectStore, resolveProject } from './recent-project-store'
 describe('RecentProjectStore', () => {
   it('records projects in most-recent order without duplicates', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'slidemind-recent-'))
-    const store = new RecentProjectStore(join(directory, 'recent-projects.json'))
-    const first = { name: 'First', path: '/projects/first', lastOpenedAt: '2026-08-27T09:00:00.000Z' }
-    const second = { name: 'Second', path: '/projects/second', lastOpenedAt: '2026-08-28T09:00:00.000Z' }
+    const store = new RecentProjectStore(
+      join(directory, 'recent-projects.json'),
+    )
+    const first = {
+      name: 'First',
+      path: '/projects/first',
+      lastOpenedAt: '2026-08-27T09:00:00.000Z',
+    }
+    const second = {
+      name: 'Second',
+      path: '/projects/second',
+      lastOpenedAt: '2026-08-28T09:00:00.000Z',
+    }
 
     await store.record(first)
     await store.record(second)
@@ -17,7 +27,7 @@ describe('RecentProjectStore', () => {
 
     expect(await store.list()).toEqual([
       { ...first, lastOpenedAt: '2026-08-29T09:00:00.000Z' },
-      second
+      second,
     ])
   })
 
@@ -25,11 +35,18 @@ describe('RecentProjectStore', () => {
     const directory = await mkdtemp(join(tmpdir(), 'slidemind-recent-'))
     const storePath = join(directory, 'recent-projects.json')
     const store = new RecentProjectStore(storePath)
-    const project = { name: 'Deck', path: '/projects/deck', lastOpenedAt: '2026-08-29T09:00:00.000Z' }
+    const project = {
+      name: 'Deck',
+      path: '/projects/deck',
+      lastOpenedAt: '2026-08-29T09:00:00.000Z',
+    }
 
     await store.record(project)
     expect(await store.remove(project.path)).toEqual([])
-    expect(JSON.parse(await readFile(storePath, 'utf8'))).toEqual({ version: 1, projects: [] })
+    expect(JSON.parse(await readFile(storePath, 'utf8'))).toEqual({
+      version: 1,
+      projects: [],
+    })
   })
 })
 
@@ -49,7 +66,7 @@ describe('resolveProject', () => {
   it('rejects invalid paths', async () => {
     await expect(resolveProject('')).rejects.toThrow('项目路径无效')
     await expect(resolveProject('/path/that/does/not/exist')).rejects.toThrow(
-      '项目文件夹不存在或无法访问'
+      '项目文件夹不存在或无法访问',
     )
   })
 })

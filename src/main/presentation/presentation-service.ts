@@ -1,13 +1,20 @@
 import { randomUUID } from 'node:crypto'
 import { lstat, realpath, rename, unlink } from 'node:fs/promises'
-import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  relative,
+  resolve,
+  sep,
+} from 'node:path'
 import { Worker } from 'node:worker_threads'
 import type {
   ExportProjectPresentationInput,
   ExportProjectPresentationResult,
   PresentationChangedEvent,
   ProjectPresentationFile,
-  SaveProjectPresentationResult
+  SaveProjectPresentationResult,
 } from '../../shared/presentation'
 import type { ProjectMutationSource } from '../../shared/project'
 import type { ProjectMutationService } from '../version-control/project-mutation-service'
@@ -15,7 +22,7 @@ import { getLogger, registerSensitivePath } from '../logging/logger'
 import {
   defaultPresentationOutputPath,
   isPptxPath,
-  ProjectPresentationStore
+  ProjectPresentationStore,
 } from './presentation-store'
 
 const EXPORT_TIMEOUT_MS = 120_000
@@ -44,7 +51,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isInsideProject(projectPath: string, candidatePath: string): boolean {
-  return candidatePath === projectPath || candidatePath.startsWith(`${projectPath}${sep}`)
+  return (
+    candidatePath === projectPath ||
+    candidatePath.startsWith(`${projectPath}${sep}`)
+  )
 }
 
 function validateExportInput(value: unknown): ExportProjectPresentationInput {
@@ -53,30 +63,35 @@ function validateExportInput(value: unknown): ExportProjectPresentationInput {
     path: validateString(value.path, '演示文稿路径'),
     ...(value.outputPath === undefined
       ? {}
-      : { outputPath: validateString(value.outputPath, '导出路径') })
+      : { outputPath: validateString(value.outputPath, '导出路径') }),
   }
 }
 
 export async function resolvePresentationOutputPath(
   projectPathInput: unknown,
   pathInput: unknown,
-  allowExternalOutput = false
+  allowExternalOutput = false,
 ): Promise<{
   outputPath: string
   projectRelativePath?: string
   resultPath: string
 }> {
-  const projectPath = await realpath(validateString(projectPathInput, '项目路径'))
+  const projectPath = await realpath(
+    validateString(projectPathInput, '项目路径'),
+  )
   const inputPath = validateString(pathInput, '导出路径')
   const absoluteInput = isAbsolute(inputPath)
   if (absoluteInput && !allowExternalOutput) {
     throw new Error('导出路径必须位于项目目录内')
   }
-  const requestedOutputPath = absoluteInput ? resolve(inputPath) : resolve(projectPath, inputPath)
+  const requestedOutputPath = absoluteInput
+    ? resolve(inputPath)
+    : resolve(projectPath, inputPath)
   if (!absoluteInput && !isInsideProject(projectPath, requestedOutputPath)) {
     throw new Error('导出路径超出项目范围')
   }
-  if (!isPptxPath(requestedOutputPath)) throw new Error('导出文件必须使用 .pptx 扩展名')
+  if (!isPptxPath(requestedOutputPath))
+    throw new Error('导出文件必须使用 .pptx 扩展名')
 
   const parentPath = await realpath(dirname(requestedOutputPath))
   const outputPath = resolve(parentPath, basename(requestedOutputPath))
@@ -91,7 +106,10 @@ export async function resolvePresentationOutputPath(
     if (
       projectRelativePath
         .split(sep)
-        .some((segment) => segment.toLocaleLowerCase() === INTERNAL_PROJECT_DIRECTORY)
+        .some(
+          (segment) =>
+            segment.toLocaleLowerCase() === INTERNAL_PROJECT_DIRECTORY,
+        )
     ) {
       throw new Error('不能导出到 SlideMind 内部目录')
     }
@@ -117,17 +135,19 @@ export async function resolvePresentationOutputPath(
   return {
     outputPath,
     ...(projectRelativePath === undefined ? {} : { projectRelativePath }),
-    resultPath: absoluteInput ? requestedOutputPath : projectRelativePath!
+    resultPath: absoluteInput ? requestedOutputPath : projectRelativePath!,
   }
 }
 
 function runExportWorker(
   presentation: ProjectPresentationFile['document']['presentation'],
   outputPath: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
 ): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
-    const worker = new Worker(resolve(__dirname, 'presentation-export-worker.js'))
+    const worker = new Worker(
+      resolve(__dirname, 'presentation-export-worker.js'),
+    )
     let settled = false
     const finish = (error?: Error): void => {
       if (settled) return
@@ -141,7 +161,7 @@ function runExportWorker(
     const abort = (): void => finish(new Error('演示文稿导出已取消'))
     const timeout = setTimeout(
       () => finish(new Error('演示文稿导出超时')),
-      EXPORT_TIMEOUT_MS
+      EXPORT_TIMEOUT_MS,
     )
     signal?.addEventListener('abort', abort, { once: true })
     if (signal?.aborted) {
@@ -153,22 +173,25 @@ function runExportWorker(
       if (!value?.ok) finish(new Error(value?.error || '演示文稿导出失败'))
       else finish()
     })
-    worker.once('error', (error) => finish(
-      error instanceof Error ? error : new Error(String(error))
-    ))
+    worker.once('error', (error) =>
+      finish(error instanceof Error ? error : new Error(String(error))),
+    )
     worker.once('exit', (code) => {
-      if (!settled && code !== 0) finish(new Error(`演示文稿导出 Worker 异常退出：${code}`))
+      if (!settled && code !== 0)
+        finish(new Error(`演示文稿导出 Worker 异常退出：${code}`))
     })
     worker.postMessage({ presentation, outputPath })
   })
 }
 
 export class PresentationService {
-  private readonly listeners = new Set<(event: PresentationChangedEvent) => void>()
+  private readonly listeners = new Set<
+    (event: PresentationChangedEvent) => void
+  >()
 
   constructor(
     private readonly mutations?: ProjectMutationService,
-    private readonly store = new ProjectPresentationStore()
+    private readonly store = new ProjectPresentationStore(),
   ) {}
 
   onChanged(listener: (event: PresentationChangedEvent) => void): () => void {
@@ -176,7 +199,10 @@ export class PresentationService {
     return () => this.listeners.delete(listener)
   }
 
-  read(projectPath: string, relativePath: unknown): Promise<ProjectPresentationFile> {
+  read(
+    projectPath: string,
+    relativePath: unknown,
+  ): Promise<ProjectPresentationFile> {
     return this.store.read(projectPath, relativePath)
   }
 
@@ -184,13 +210,18 @@ export class PresentationService {
     projectPath: string,
     projectHandle: string,
     input: unknown,
-    source: ProjectMutationSource = 'presentation-editor'
+    source: ProjectMutationSource = 'presentation-editor',
   ): Promise<ProjectPresentationFile> {
-    const path = isRecord(input) && typeof input.path === 'string' ? input.path : undefined
+    const path =
+      isRecord(input) && typeof input.path === 'string' ? input.path : undefined
     const operation = () => this.store.create(projectPath, input)
-    const created = this.mutations && path
-      ? await this.mutations.run({ projectPath, projectHandle, paths: [path], source }, operation)
-      : await operation()
+    const created =
+      this.mutations && path
+        ? await this.mutations.run(
+            { projectPath, projectHandle, paths: [path], source },
+            operation,
+          )
+        : await operation()
     this.emitChanged({ projectHandle, path: created.path })
     return created
   }
@@ -198,13 +229,18 @@ export class PresentationService {
   async import(
     projectPath: string,
     projectHandle: string,
-    input: unknown
+    input: unknown,
   ): Promise<ProjectPresentationFile> {
-    const path = isRecord(input) && typeof input.path === 'string' ? input.path : undefined
+    const path =
+      isRecord(input) && typeof input.path === 'string' ? input.path : undefined
     const operation = () => this.store.import(projectPath, input)
-    const imported = this.mutations && path
-      ? await this.mutations.run({ projectPath, projectHandle, paths: [path], source: 'import' }, operation)
-      : await operation()
+    const imported =
+      this.mutations && path
+        ? await this.mutations.run(
+            { projectPath, projectHandle, paths: [path], source: 'import' },
+            operation,
+          )
+        : await operation()
     this.emitChanged({ projectHandle, path: imported.path })
     return imported
   }
@@ -213,17 +249,19 @@ export class PresentationService {
     projectPath: string,
     projectHandle: string,
     input: unknown,
-    source: ProjectMutationSource = 'presentation-editor'
+    source: ProjectMutationSource = 'presentation-editor',
   ): Promise<SaveProjectPresentationResult> {
-    const path = isRecord(input) && typeof input.path === 'string' ? input.path : undefined
+    const path =
+      isRecord(input) && typeof input.path === 'string' ? input.path : undefined
     const operation = () => this.store.save(projectPath, input)
-    const result = this.mutations && path
-      ? await this.mutations.run(
-          { projectPath, projectHandle, paths: [path], source },
-          operation,
-          (candidate) => candidate.ok
-        )
-      : await operation()
+    const result =
+      this.mutations && path
+        ? await this.mutations.run(
+            { projectPath, projectHandle, paths: [path], source },
+            operation,
+            (candidate) => candidate.ok,
+          )
+        : await operation()
     if (result.ok && isRecord(input) && typeof input.path === 'string') {
       this.emitChanged({ projectHandle, path: input.path })
     }
@@ -235,16 +273,23 @@ export class PresentationService {
     projectHandle: string,
     inputValue: unknown,
     signal?: AbortSignal,
-    source: ProjectMutationSource = 'presentation-editor'
+    source: ProjectMutationSource = 'presentation-editor',
   ): Promise<ExportProjectPresentationResult> {
-    return this.exportToPath(projectPath, projectHandle, inputValue, signal, source, false)
+    return this.exportToPath(
+      projectPath,
+      projectHandle,
+      inputValue,
+      signal,
+      source,
+      false,
+    )
   }
 
   async exportToSelectedPath(
     projectPath: string,
     projectHandle: string,
     inputValue: unknown,
-    signal?: AbortSignal
+    signal?: AbortSignal,
   ): Promise<ExportProjectPresentationResult> {
     return this.exportToPath(
       projectPath,
@@ -252,7 +297,7 @@ export class PresentationService {
       inputValue,
       signal,
       'presentation-editor',
-      true
+      true,
     )
   }
 
@@ -262,13 +307,13 @@ export class PresentationService {
     inputValue: unknown,
     signal: AbortSignal | undefined,
     source: ProjectMutationSource,
-    allowExternalOutput: boolean
+    allowExternalOutput: boolean,
   ): Promise<ExportProjectPresentationResult> {
     const operationId = randomUUID()
     const startedAt = Date.now()
     logger.info('presentation.export_started', {
       operationId,
-      context: { allowExternalOutput }
+      context: { allowExternalOutput },
     })
     try {
       const input = validateExportInput(inputValue)
@@ -276,16 +321,21 @@ export class PresentationService {
         registerSensitivePath(dirname(input.outputPath))
       }
       const presentation = await this.store.read(projectPath, input.path)
-      const requestedOutputPath = input.outputPath ?? defaultPresentationOutputPath(presentation.path)
+      const requestedOutputPath =
+        input.outputPath ?? defaultPresentationOutputPath(presentation.path)
       const output = await resolvePresentationOutputPath(
         projectPath,
         requestedOutputPath,
-        allowExternalOutput
+        allowExternalOutput,
       )
       const temporaryPath = `${output.outputPath}.${process.pid}-${randomUUID()}.slidemind-tmp.pptx`
       const operation = async (): Promise<ExportProjectPresentationResult> => {
         try {
-          await runExportWorker(presentation.document.presentation, temporaryPath, signal)
+          await runExportWorker(
+            presentation.document.presentation,
+            temporaryPath,
+            signal,
+          )
           await rename(temporaryPath, output.outputPath)
         } catch (error) {
           await unlink(temporaryPath).catch(() => undefined)
@@ -293,10 +343,16 @@ export class PresentationService {
         }
         return { outputPath: output.resultPath }
       }
-      const result = await (this.mutations && output.projectRelativePath !== undefined
+      const result = await (this.mutations &&
+      output.projectRelativePath !== undefined
         ? this.mutations.run(
-            { projectPath, projectHandle, paths: [output.projectRelativePath], source },
-            operation
+            {
+              projectPath,
+              projectHandle,
+              paths: [output.projectRelativePath],
+              source,
+            },
+            operation,
           )
         : operation())
       logger.info('presentation.export_completed', {
@@ -304,15 +360,15 @@ export class PresentationService {
         durationMs: Date.now() - startedAt,
         context: {
           externalOutput: output.projectRelativePath === undefined,
-          slideCount: presentation.document.presentation.slides.length
-        }
+          slideCount: presentation.document.presentation.slides.length,
+        },
       })
       return result
     } catch (error) {
       logger.error('presentation.export_failed', {
         operationId,
         durationMs: Date.now() - startedAt,
-        error
+        error,
       })
       throw error
     }

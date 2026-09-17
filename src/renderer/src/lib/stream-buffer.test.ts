@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { applyStreamEvents, createStreamBuffer, isNearMessageBottom } from './stream-buffer'
+import {
+  applyStreamEvents,
+  createStreamBuffer,
+  isNearMessageBottom,
+} from './stream-buffer'
 
 afterEach(() => vi.useRealTimers())
 
@@ -17,7 +21,7 @@ describe('createStreamBuffer', () => {
     expect(consume).toHaveBeenCalledExactlyOnceWith([
       { conversationId: 'a', requestId: '1', delta: 'hello world' },
       { conversationId: 'a', requestId: '2', delta: 'next' },
-      { conversationId: 'b', requestId: '1', delta: 'other' }
+      { conversationId: 'b', requestId: '1', delta: 'other' },
     ])
   })
 
@@ -45,8 +49,20 @@ describe('createStreamBuffer', () => {
 
 describe('isNearMessageBottom', () => {
   it('follows the bottom but preserves history reading position', () => {
-    expect(isNearMessageBottom({ scrollHeight: 1000, scrollTop: 520, clientHeight: 400 })).toBe(true)
-    expect(isNearMessageBottom({ scrollHeight: 1000, scrollTop: 100, clientHeight: 400 })).toBe(false)
+    expect(
+      isNearMessageBottom({
+        scrollHeight: 1000,
+        scrollTop: 520,
+        clientHeight: 400,
+      }),
+    ).toBe(true)
+    expect(
+      isNearMessageBottom({
+        scrollHeight: 1000,
+        scrollTop: 100,
+        clientHeight: 400,
+      }),
+    ).toBe(false)
   })
 })
 
@@ -54,11 +70,11 @@ describe('applyStreamEvents', () => {
   it('updates the originating conversation while preserving completed messages', () => {
     const conversations = [
       { id: 'a', messages: [{ id: '1', text: 'old', isStreaming: true }] },
-      { id: 'b', messages: [{ id: '1', text: 'final', isStreaming: false }] }
+      { id: 'b', messages: [{ id: '1', text: 'final', isStreaming: false }] },
     ]
     const result = applyStreamEvents(conversations, [
       { conversationId: 'a', requestId: '1', delta: ' new' },
-      { conversationId: 'b', requestId: '1', delta: ' late' }
+      { conversationId: 'b', requestId: '1', delta: ' late' },
     ])
     expect(result[0].messages[0].text).toBe('old new')
     expect(result[1].messages[0]).toBe(conversations[1].messages[0])
@@ -67,7 +83,9 @@ describe('applyStreamEvents', () => {
 
   it('retains buffered partial output before a failed request finishes', () => {
     vi.useFakeTimers()
-    let conversations = [{ id: 'a', messages: [{ id: '1', text: '', isStreaming: true }] }]
+    let conversations = [
+      { id: 'a', messages: [{ id: '1', text: '', isStreaming: true }] },
+    ]
     const buffer = createStreamBuffer((events) => {
       conversations = applyStreamEvents(conversations, events)
     })

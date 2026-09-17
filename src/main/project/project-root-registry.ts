@@ -22,7 +22,11 @@ export class ProjectRootRegistry {
 
   resolve(input: unknown): string {
     const handle = typeof input === 'string' ? input.trim() : ''
-    if (!handle || handle.length > MAX_PROJECT_HANDLE_LENGTH || handle.includes('\0')) {
+    if (
+      !handle ||
+      handle.length > MAX_PROJECT_HANDLE_LENGTH ||
+      handle.includes('\0')
+    ) {
       throw new Error('项目授权无效')
     }
 

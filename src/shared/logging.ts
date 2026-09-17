@@ -5,10 +5,11 @@ export const RENDERER_DIAGNOSTIC_EVENTS = [
   'presentation.editor_failed',
   'renderer.react_error',
   'renderer.unhandled_error',
-  'renderer.unhandled_rejection'
+  'renderer.unhandled_rejection',
 ] as const
 
-export type RendererDiagnosticEventName = typeof RENDERER_DIAGNOSTIC_EVENTS[number]
+export type RendererDiagnosticEventName =
+  (typeof RENDERER_DIAGNOSTIC_EVENTS)[number]
 export type RendererDiagnosticLevel = 'warn' | 'error'
 export type DiagnosticContextValue = string | number | boolean | null
 

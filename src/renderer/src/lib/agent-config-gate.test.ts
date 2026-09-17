@@ -9,7 +9,7 @@ function configStatus(configured: boolean): AgentConfigStatus {
     providerName: 'DeepSeek',
     modelId: 'deepseek-v4-flash',
     modelName: 'DeepSeek V4 Flash',
-    models: []
+    models: [],
   }
 }
 

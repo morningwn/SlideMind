@@ -1,7 +1,7 @@
 import type {
   DiagnosticContextValue,
   RendererDiagnosticEventName,
-  RendererDiagnosticLevel
+  RendererDiagnosticLevel,
 } from '../../../shared/logging'
 
 function errorText(error: unknown): string {
@@ -13,14 +13,16 @@ export function reportDiagnosticEvent(
   level: RendererDiagnosticLevel,
   event: RendererDiagnosticEventName,
   error?: unknown,
-  context?: Record<string, DiagnosticContextValue>
+  context?: Record<string, DiagnosticContextValue>,
 ): void {
   try {
     window.desktop.reportDiagnosticEvent({
       level,
       event,
-      ...(error === undefined ? {} : { error: errorText(error).slice(0, 4_000) }),
-      ...(context ? { context } : {})
+      ...(error === undefined
+        ? {}
+        : { error: errorText(error).slice(0, 4_000) }),
+      ...(context ? { context } : {}),
     })
   } catch {
     // Logging must never interrupt the user operation being diagnosed.

@@ -7,29 +7,40 @@ import { createServer, loadConfigFromFile } from 'vite'
 
 const require = createRequire(import.meta.url)
 const profile = await mkdtemp(join(tmpdir(), 'slidemind-renderer-test-'))
-const config = await loadConfigFromFile({ command: 'serve', mode: 'test' }, resolve('electron.vite.config.ts'))
+const config = await loadConfigFromFile(
+  { command: 'serve', mode: 'test' },
+  resolve('electron.vite.config.ts'),
+)
 const server = await createServer({
   ...config.config.renderer,
   configFile: false,
   optimizeDeps: {
     ...config.config.renderer.optimizeDeps,
-    entries: ['tests/renderer/index.html', 'src/renderer/pptist.html', 'tests/renderer/pptist-probe.js']
+    entries: [
+      'tests/renderer/index.html',
+      'src/renderer/pptist.html',
+      'tests/renderer/pptist-probe.js',
+    ],
   },
   root: process.cwd(),
   server: { host: '127.0.0.1', port: 0 },
-  clearScreen: false
+  clearScreen: false,
 })
 try {
   await server.listen()
   const address = server.httpServer.address()
   const env = { ...process.env }
   delete env.ELECTRON_RUN_AS_NODE
-  const child = spawn(require('electron'), [
-    resolve('scripts/test-renderer-electron.cjs'),
-    `http://127.0.0.1:${address.port}/tests/renderer/index.html`,
-    profile,
-    resolve('.local/renderer-tests')
-  ], { stdio: 'inherit', env })
+  const child = spawn(
+    require('electron'),
+    [
+      resolve('scripts/test-renderer-electron.cjs'),
+      `http://127.0.0.1:${address.port}/tests/renderer/index.html`,
+      profile,
+      resolve('.local/renderer-tests'),
+    ],
+    { stdio: 'inherit', env },
+  )
   const watchdog = setTimeout(() => {
     console.error('Renderer test process exceeded 180 seconds')
     child.kill('SIGKILL')

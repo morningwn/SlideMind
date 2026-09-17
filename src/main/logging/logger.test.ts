@@ -7,9 +7,11 @@ import { clearArchivedLogFiles, rotateLogFile } from './logger'
 const temporaryDirectories: string[] = []
 
 afterEach(async () => {
-  await Promise.all(temporaryDirectories.splice(0).map((path) =>
-    rm(path, { force: true, recursive: true })
-  ))
+  await Promise.all(
+    temporaryDirectories
+      .splice(0)
+      .map((path) => rm(path, { force: true, recursive: true })),
+  )
 })
 
 describe('rotateLogFile', () => {
@@ -23,8 +25,12 @@ describe('rotateLogFile', () => {
       rotateLogFile(currentPath, 2)
     }
 
-    await expect(readFile(join(directory, 'slidemind.1.log'), 'utf8')).resolves.toBe('three')
-    await expect(readFile(join(directory, 'slidemind.2.log'), 'utf8')).resolves.toBe('two')
+    await expect(
+      readFile(join(directory, 'slidemind.1.log'), 'utf8'),
+    ).resolves.toBe('three')
+    await expect(
+      readFile(join(directory, 'slidemind.2.log'), 'utf8'),
+    ).resolves.toBe('two')
   })
 
   it('clears only archived SlideMind logs', async () => {
@@ -36,13 +42,15 @@ describe('rotateLogFile', () => {
     await Promise.all([
       writeFile(currentPath, 'current'),
       writeFile(archivePath, 'archive'),
-      writeFile(unrelatedPath, 'unrelated')
+      writeFile(unrelatedPath, 'unrelated'),
     ])
 
     clearArchivedLogFiles(directory)
 
     await expect(readFile(currentPath, 'utf8')).resolves.toBe('current')
     await expect(readFile(unrelatedPath, 'utf8')).resolves.toBe('unrelated')
-    await expect(readFile(archivePath, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+    await expect(readFile(archivePath, 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    })
   })
 })

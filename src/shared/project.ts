@@ -103,40 +103,60 @@ export interface ProjectApi {
   chooseFolder(): Promise<OpenedProject | null>
   open(path: string): Promise<OpenedProject>
   removeRecent(path: string): Promise<ProjectInfo[]>
-  listDirectory(projectHandle: string, relativePath: string): Promise<ProjectFileEntry[]>
+  listDirectory(
+    projectHandle: string,
+    relativePath: string,
+  ): Promise<ProjectFileEntry[]>
   listFiles(projectHandle: string): Promise<ProjectFileEntry[]>
-  createDirectory(projectHandle: string, relativePath: string): Promise<ProjectFileEntry>
-  createMarkdownFile(projectHandle: string, relativePath: string): Promise<ProjectFileEntry>
+  createDirectory(
+    projectHandle: string,
+    relativePath: string,
+  ): Promise<ProjectFileEntry>
+  createMarkdownFile(
+    projectHandle: string,
+    relativePath: string,
+  ): Promise<ProjectFileEntry>
   renameFile(
     projectHandle: string,
-    input: RenameProjectFileInput
+    input: RenameProjectFileInput,
   ): Promise<ProjectFileEntry>
   deleteFile(projectHandle: string, relativePath: string): Promise<void>
   renameDirectory(
     projectHandle: string,
-    input: RenameProjectDirectoryInput
+    input: RenameProjectDirectoryInput,
   ): Promise<ProjectFileEntry>
   deleteDirectory(projectHandle: string, relativePath: string): Promise<void>
-  readTextFile(projectHandle: string, relativePath: string): Promise<ProjectTextFile>
-  readImageFile(projectHandle: string, relativePath: string): Promise<ProjectImageFile>
+  readTextFile(
+    projectHandle: string,
+    relativePath: string,
+  ): Promise<ProjectTextFile>
+  readImageFile(
+    projectHandle: string,
+    relativePath: string,
+  ): Promise<ProjectImageFile>
   readPreviewAsset(
     projectHandle: string,
     documentPath: string,
-    assetPath: string
+    assetPath: string,
   ): Promise<string>
   saveTextFile(
     projectHandle: string,
-    input: SaveProjectTextFileInput
+    input: SaveProjectTextFileInput,
   ): Promise<SaveProjectTextFileResult>
   watchExternalChanges(
     projectHandle: string,
-    scope: ProjectExternalWatchScope
+    scope: ProjectExternalWatchScope,
   ): Promise<void>
   onFileChanged(listener: (event: ProjectFileChangedEvent) => void): () => void
-  loadConversations(projectHandle: string): Promise<ProjectConversationState | null>
+  loadConversations(
+    projectHandle: string,
+  ): Promise<ProjectConversationState | null>
   loadConversationMessages(
     projectHandle: string,
-    conversationId: string
+    conversationId: string,
   ): Promise<ConversationMessage[]>
-  saveConversations(projectHandle: string, state: ProjectConversationState): Promise<void>
+  saveConversations(
+    projectHandle: string,
+    state: ProjectConversationState,
+  ): Promise<void>
 }

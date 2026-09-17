@@ -13,7 +13,9 @@ export interface AgentConfigController {
   save: () => Promise<AgentConfigStatus | null>
 }
 
-export function useAgentConfig(initialConfig: AgentConfigStatus | null = null): AgentConfigController {
+export function useAgentConfig(
+  initialConfig: AgentConfigStatus | null = null,
+): AgentConfigController {
   const [config, setConfig] = useState<AgentConfigStatus | null>(initialConfig)
   const [modelId, setModelId] = useState(initialConfig?.modelId ?? '')
   const [apiKey, setApiKey] = useState('')
@@ -30,14 +32,18 @@ export function useAgentConfig(initialConfig: AgentConfigStatus | null = null): 
     }
 
     let active = true
-    void window.agent.getConfig()
+    void window.agent
+      .getConfig()
       .then((status) => {
         if (!active) return
         setConfig(status)
         setModelId(status.modelId)
       })
       .catch((reason: unknown) => {
-        if (active) setError(reason instanceof Error ? reason.message : '无法读取 Pi Agent 配置')
+        if (active)
+          setError(
+            reason instanceof Error ? reason.message : '无法读取 Pi Agent 配置',
+          )
       })
       .finally(() => {
         if (active) setIsLoading(false)
@@ -58,7 +64,8 @@ export function useAgentConfig(initialConfig: AgentConfigStatus | null = null): 
       setApiKey('')
       return status
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : 'Pi Agent 配置保存失败'
+      const message =
+        reason instanceof Error ? reason.message : 'Pi Agent 配置保存失败'
       setError(message)
       return null
     } finally {
@@ -75,6 +82,6 @@ export function useAgentConfig(initialConfig: AgentConfigStatus | null = null): 
     error,
     isLoading,
     isSaving,
-    save
+    save,
   }
 }

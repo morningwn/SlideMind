@@ -4,7 +4,12 @@ import { homedir } from 'node:os'
 import { basename, dirname, extname, join } from 'node:path'
 import electronLog from 'electron-log/main'
 import type { DiagnosticContextValue } from '../../shared/logging'
-import { sanitizeContext, sanitizeError, sanitizeText, type SanitizedError } from './sanitize'
+import {
+  sanitizeContext,
+  sanitizeError,
+  sanitizeText,
+  type SanitizedError,
+} from './sanitize'
 
 const LOG_FILE_NAME = 'slidemind.log'
 const LOG_FILE_MAX_SIZE = 5 * 1024 * 1024
@@ -65,7 +70,10 @@ function archivePath(currentPath: string, index: number): string {
   return join(dirname(currentPath), `${name}.${index}${extension}`)
 }
 
-export function rotateLogFile(currentPath: string, archiveCount = LOG_ARCHIVE_COUNT): void {
+export function rotateLogFile(
+  currentPath: string,
+  archiveCount = LOG_ARCHIVE_COUNT,
+): void {
   if (archiveCount < 1) {
     unlinkSync(currentPath)
     return
@@ -75,14 +83,17 @@ export function rotateLogFile(currentPath: string, archiveCount = LOG_ARCHIVE_CO
   if (existsSync(oldestPath)) unlinkSync(oldestPath)
   for (let index = archiveCount - 1; index >= 1; index -= 1) {
     const source = archivePath(currentPath, index)
-    if (existsSync(source)) renameSync(source, archivePath(currentPath, index + 1))
+    if (existsSync(source))
+      renameSync(source, archivePath(currentPath, index + 1))
   }
   renameSync(currentPath, archivePath(currentPath, 1))
 }
 
 function writeFailure(error: unknown): void {
   const failure = sanitizeError(error, sanitizeOptions)
-  process.stderr.write(`[slidemind-logging] ${failure.name}: ${failure.message}\n`)
+  process.stderr.write(
+    `[slidemind-logging] ${failure.name}: ${failure.message}\n`,
+  )
 }
 
 export function initializeApplicationLogging(options: LoggingOptions): void {
@@ -90,11 +101,12 @@ export function initializeApplicationLogging(options: LoggingOptions): void {
   electronLog.transports.file.level = options.isPackaged ? 'info' : 'debug'
   electronLog.transports.file.format = '{text}'
   electronLog.transports.file.maxSize = LOG_FILE_MAX_SIZE
-  electronLog.transports.file.resolvePathFn = () => join(options.logsDirectory, LOG_FILE_NAME)
+  electronLog.transports.file.resolvePathFn = () =>
+    join(options.logsDirectory, LOG_FILE_NAME)
   electronLog.transports.file.writeOptions = {
     encoding: 'utf8',
     flag: 'a',
-    mode: 0o600
+    mode: 0o600,
   }
   electronLog.transports.file.archiveLogFn = (file) => {
     try {
@@ -108,7 +120,9 @@ export function initializeApplicationLogging(options: LoggingOptions): void {
   electronLog.transports.console.format = '{text}'
   electronLog.transports.ipc.level = false
   electronLog.transports.remote.level = false
-  electronLog.transports.file.getFile().on('error', (error) => writeFailure(error))
+  electronLog.transports.file
+    .getFile()
+    .on('error', (error) => writeFailure(error))
 
   sink = (record) => {
     try {
@@ -130,8 +144,10 @@ export function isApplicationLogFileName(name: string): boolean {
 
 export function clearArchivedLogFiles(directory: string): void {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === LOG_FILE_NAME || !isApplicationLogFileName(entry.name)) continue
-    if (entry.isFile() || entry.isSymbolicLink()) unlinkSync(join(directory, entry.name))
+    if (entry.name === LOG_FILE_NAME || !isApplicationLogFileName(entry.name))
+      continue
+    if (entry.isFile() || entry.isSymbolicLink())
+      unlinkSync(join(directory, entry.name))
   }
 }
 
@@ -163,7 +179,7 @@ function recordLog(
   level: LogLevel,
   component: string,
   event: string,
-  details: LogDetails = {}
+  details: LogDetails = {},
 ): void {
   const context = sanitizeContext(details.context, sanitizeOptions)
   const durationMs = details.durationMs
@@ -183,7 +199,7 @@ function recordLog(
     ...(details.error === undefined
       ? {}
       : { error: sanitizeError(details.error, sanitizeOptions) }),
-    ...(context && Object.keys(context).length > 0 ? { context } : {})
+    ...(context && Object.keys(context).length > 0 ? { context } : {}),
   }
   sink(record)
 }
@@ -193,6 +209,6 @@ export function getLogger(component: string): ComponentLogger {
     debug: (event, details) => recordLog('debug', component, event, details),
     error: (event, details) => recordLog('error', component, event, details),
     info: (event, details) => recordLog('info', component, event, details),
-    warn: (event, details) => recordLog('warn', component, event, details)
+    warn: (event, details) => recordLog('warn', component, event, details),
   }
 }

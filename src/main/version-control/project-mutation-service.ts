@@ -3,16 +3,16 @@ import { lstat, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type {
   ProjectFileChangedEvent,
-  ProjectMutationSource
+  ProjectMutationSource,
 } from '../../shared/project'
 import type {
   RestoreProjectVersionInput,
-  RestoreProjectVersionResult
+  RestoreProjectVersionResult,
 } from '../../shared/project-version'
 import {
   isVersionedProjectPath,
   normalizeVersionedPath,
-  type ProjectVersionService
+  type ProjectVersionService,
 } from './project-version-service'
 import { getLogger } from '../logging/logger'
 
@@ -27,11 +27,16 @@ interface ProjectMutationInput {
 }
 
 export class ProjectMutationService {
-  private readonly internalEchoes = new Map<string, {
-    expiresAt: number
-    revision?: string
-  }>()
-  private readonly listeners = new Set<(event: ProjectFileChangedEvent) => void>()
+  private readonly internalEchoes = new Map<
+    string,
+    {
+      expiresAt: number
+      revision?: string
+    }
+  >()
+  private readonly listeners = new Set<
+    (event: ProjectFileChangedEvent) => void
+  >()
 
   constructor(private readonly versions: ProjectVersionService) {}
 
@@ -43,7 +48,7 @@ export class ProjectMutationService {
   restoreVersion(
     projectPath: string,
     projectHandle: string,
-    input: RestoreProjectVersionInput
+    input: RestoreProjectVersionInput,
   ): Promise<RestoreProjectVersionResult> {
     const paths = input.files.map((file) => file.path)
     return this.run(
@@ -51,67 +56,87 @@ export class ProjectMutationService {
         projectPath,
         projectHandle,
         paths,
-        source: 'restore'
+        source: 'restore',
       },
       () => this.versions.restoreFiles(projectPath, input),
-      (result) => result.ok && result.restoredPaths.length > 0
+      (result) => result.ok && result.restoredPaths.length > 0,
     )
   }
 
   async run<T>(
     input: ProjectMutationInput,
     operation: () => Promise<T>,
-    didCommit: (result: T) => boolean = () => true
+    didCommit: (result: T) => boolean = () => true,
   ): Promise<T> {
-    const paths = [...new Set(input.paths
-      .map((path) => normalizeVersionedPath(input.projectPath, path))
-      .filter(isVersionedProjectPath))]
+    const paths = [
+      ...new Set(
+        input.paths
+          .map((path) => normalizeVersionedPath(input.projectPath, path))
+          .filter(isVersionedProjectPath),
+      ),
+    ]
     const existed = new Map<string, boolean>()
-    await Promise.all(paths.map(async (path) => {
-      existed.set(path, await lstat(resolve(input.projectPath, path)).then(
-        () => true,
-        () => false
-      ))
-    }))
+    await Promise.all(
+      paths.map(async (path) => {
+        existed.set(
+          path,
+          await lstat(resolve(input.projectPath, path)).then(
+            () => true,
+            () => false,
+          ),
+        )
+      }),
+    )
 
     try {
       await this.versions.ensureBaseline(input.projectPath, paths)
     } catch (error) {
       logger.warn('version.baseline_failed', {
         error,
-        context: { fileCount: paths.length, source: input.source }
+        context: { fileCount: paths.length, source: input.source },
       })
     }
 
     const expiresAt = Date.now() + INTERNAL_ECHO_TTL_MS
     for (const path of paths) {
-      this.internalEchoes.set(this.echoKey(input.projectPath, path), { expiresAt })
+      this.internalEchoes.set(this.echoKey(input.projectPath, path), {
+        expiresAt,
+      })
     }
 
     let result: T
     try {
       result = await operation()
     } catch (error) {
-      for (const path of paths) this.internalEchoes.delete(this.echoKey(input.projectPath, path))
+      for (const path of paths)
+        this.internalEchoes.delete(this.echoKey(input.projectPath, path))
       throw error
     }
 
     if (!didCommit(result)) {
-      for (const path of paths) this.internalEchoes.delete(this.echoKey(input.projectPath, path))
+      for (const path of paths)
+        this.internalEchoes.delete(this.echoKey(input.projectPath, path))
       return result
     }
 
     const existsAfter = new Map<string, boolean>()
-    await Promise.all(paths.map(async (path) => {
-      try {
-        const revision = await this.fileRevision(resolve(input.projectPath, path))
-        this.internalEchoes.set(this.echoKey(input.projectPath, path), { expiresAt, revision })
-        existsAfter.set(path, revision !== 'missing')
-      } catch (error) {
-        this.internalEchoes.delete(this.echoKey(input.projectPath, path))
-        logger.warn('version.internal_echo_failed', { error })
-      }
-    }))
+    await Promise.all(
+      paths.map(async (path) => {
+        try {
+          const revision = await this.fileRevision(
+            resolve(input.projectPath, path),
+          )
+          this.internalEchoes.set(this.echoKey(input.projectPath, path), {
+            expiresAt,
+            revision,
+          })
+          existsAfter.set(path, revision !== 'missing')
+        } catch (error) {
+          this.internalEchoes.delete(this.echoKey(input.projectPath, path))
+          logger.warn('version.internal_echo_failed', { error })
+        }
+      }),
+    )
 
     this.versions.record(input.projectPath, paths, input.source)
     for (const path of paths) {
@@ -120,18 +145,22 @@ export class ProjectMutationService {
       this.emit({
         projectHandle: input.projectHandle,
         path,
-        kind: existedBefore && !existsNow
-          ? 'remove'
-          : !existedBefore && existsNow
-            ? 'add'
-            : 'change',
-        source: input.source
+        kind:
+          existedBefore && !existsNow
+            ? 'remove'
+            : !existedBefore && existsNow
+              ? 'add'
+              : 'change',
+        source: input.source,
       })
     }
     return result
   }
 
-  async isInternalEcho(projectPath: string, pathInput: string): Promise<boolean> {
+  async isInternalEcho(
+    projectPath: string,
+    pathInput: string,
+  ): Promise<boolean> {
     let path: string
     try {
       path = normalizeVersionedPath(projectPath, pathInput)

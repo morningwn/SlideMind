@@ -6,7 +6,11 @@ import { reportDiagnosticEvent } from './lib/logger'
 import './styles.css'
 
 window.addEventListener('error', (event) => {
-  reportDiagnosticEvent('error', 'renderer.unhandled_error', event.error ?? event.message)
+  reportDiagnosticEvent(
+    'error',
+    'renderer.unhandled_error',
+    event.error ?? event.message,
+  )
 })
 
 window.addEventListener('unhandledrejection', (event) => {
@@ -24,5 +28,5 @@ createRoot(root).render(
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
-  </StrictMode>
+  </StrictMode>,
 )

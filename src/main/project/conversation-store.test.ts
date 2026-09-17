@@ -4,23 +4,30 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { ProjectConversationState } from '../../shared/project'
-import { ProjectConversationStore, visibleUserPrompt } from './conversation-store'
+import {
+  ProjectConversationStore,
+  visibleUserPrompt,
+} from './conversation-store'
 
 const conversationState: ProjectConversationState = {
   selectedConversationId: 'conversation-1',
   conversations: [
     {
       id: 'conversation-1',
-      title: '季度汇报'
-    }
-  ]
+      title: '季度汇报',
+    },
+  ],
 }
 
-function appendExchange(session: SessionManager, userText: string, assistantText: string): void {
+function appendExchange(
+  session: SessionManager,
+  userText: string,
+  assistantText: string,
+): void {
   session.appendMessage({
     role: 'user',
     content: [{ type: 'text', text: userText }],
-    timestamp: 1
+    timestamp: 1,
   })
   session.appendMessage({
     role: 'assistant',
@@ -34,88 +41,122 @@ function appendExchange(session: SessionManager, userText: string, assistantText
       cacheRead: 0,
       cacheWrite: 0,
       totalTokens: 0,
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
     },
     stopReason: 'stop',
-    timestamp: 2
+    timestamp: 2,
   })
 }
 
 describe('ProjectConversationStore', () => {
   it('hides injected reference instructions from visible user messages', () => {
-    expect(visibleUserPrompt(
-      '整理这份材料\n\n<slidemind-injected-context version="1">\n- internal\n</slidemind-injected-context>'
-    )).toBe('整理这份材料')
+    expect(
+      visibleUserPrompt(
+        '整理这份材料\n\n<slidemind-injected-context version="1">\n- internal\n</slidemind-injected-context>',
+      ),
+    ).toBe('整理这份材料')
     expect(visibleUserPrompt('普通消息')).toBe('普通消息')
   })
 
   it('returns null when a project has no conversation record', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
 
     expect(await new ProjectConversationStore().load(projectPath)).toBeNull()
   })
 
   it('persists only the version 2 conversation index inside the project', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
     const store = new ProjectConversationStore()
 
     await store.save(projectPath, conversationState)
 
     expect(await store.load(projectPath)).toEqual(conversationState)
-    expect(JSON.parse(await readFile(join(projectPath, '.slideMind', 'conversations.json'), 'utf8')))
-      .toEqual({ version: 2, ...conversationState })
+    expect(
+      JSON.parse(
+        await readFile(
+          join(projectPath, '.slideMind', 'conversations.json'),
+          'utf8',
+        ),
+      ),
+    ).toEqual({ version: 2, ...conversationState })
   })
 
   it('persists archive and restore state without changing the conversation identity', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
     const store = new ProjectConversationStore()
     for (const archived of [true, false]) {
-      const state = { ...conversationState, conversations: conversationState.conversations.map((conversation) => ({ ...conversation, archived })) }
+      const state = {
+        ...conversationState,
+        conversations: conversationState.conversations.map((conversation) => ({
+          ...conversation,
+          archived,
+        })),
+      }
       await store.save(projectPath, state)
       expect(await store.load(projectPath)).toEqual(state)
     }
   })
 
   it('rejects invalid archive metadata at the storage boundary', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
-    await expect(new ProjectConversationStore().save(projectPath, {
-      ...conversationState,
-      conversations: [{ ...conversationState.conversations[0], archived: 'true' }]
-    })).rejects.toThrow('项目会话记录无效')
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
+    await expect(
+      new ProjectConversationStore().save(projectPath, {
+        ...conversationState,
+        conversations: [
+          { ...conversationState.conversations[0], archived: 'true' },
+        ],
+      }),
+    ).rejects.toThrow('项目会话记录无效')
   })
 
   it('loads visible messages from the original Pi JSONL session', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
     const conversationsDirectory = join(projectPath, '.slideMind', 'convs')
     const store = new ProjectConversationStore()
     await store.save(projectPath, conversationState)
 
     const session = SessionManager.create(projectPath, conversationsDirectory, {
-      id: 'conversation-1'
+      id: 'conversation-1',
     })
     appendExchange(session, '帮我整理季度汇报', '先确认受众和目标。')
 
-    const similarlyNamedSession = SessionManager.create(projectPath, conversationsDirectory, {
-      id: 'prefix_conversation-1'
-    })
+    const similarlyNamedSession = SessionManager.create(
+      projectPath,
+      conversationsDirectory,
+      {
+        id: 'prefix_conversation-1',
+      },
+    )
     appendExchange(similarlyNamedSession, '另一段对话', '不应被当前会话加载。')
 
     expect(await store.loadMessages(projectPath, 'conversation-1')).toEqual([
       { id: expect.any(String), role: 'user', text: '帮我整理季度汇报' },
-      { id: expect.any(String), role: 'assistant', text: '先确认受众和目标。' }
+      { id: expect.any(String), role: 'assistant', text: '先确认受众和目标。' },
     ])
   })
 
   it('restores thinking, skills and tool results with the assistant response', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
     const conversationsDirectory = join(projectPath, '.slideMind', 'convs')
     const session = SessionManager.create(projectPath, conversationsDirectory, {
-      id: 'conversation-1'
+      id: 'conversation-1',
     })
     session.appendMessage({
       role: 'user',
       content: [{ type: 'text', text: '生成一份演示文稿' }],
-      timestamp: 1
+      timestamp: 1,
     })
     session.appendMessage({
       role: 'assistant',
@@ -125,8 +166,8 @@ describe('ProjectConversationStore', () => {
           type: 'toolCall',
           id: 'skill-call-1',
           name: 'read',
-          arguments: { path: '/project/skills/slide-copywriting/SKILL.md' }
-        }
+          arguments: { path: '/project/skills/slide-copywriting/SKILL.md' },
+        },
       ],
       api: 'deepseek-messages',
       provider: 'deepseek',
@@ -137,10 +178,10 @@ describe('ProjectConversationStore', () => {
         cacheRead: 0,
         cacheWrite: 0,
         totalTokens: 0,
-        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
       },
       stopReason: 'toolUse',
-      timestamp: 2
+      timestamp: 2,
     })
     session.appendMessage({
       role: 'toolResult',
@@ -148,13 +189,13 @@ describe('ProjectConversationStore', () => {
       toolName: 'read',
       content: [{ type: 'text', text: 'skill instructions' }],
       isError: false,
-      timestamp: 3
+      timestamp: 3,
     })
     appendExchange(session, '继续', '演示文稿已经生成。')
 
     const messages = await new ProjectConversationStore().loadMessages(
       projectPath,
-      'conversation-1'
+      'conversation-1',
     )
 
     expect(messages[1]).toMatchObject({
@@ -164,75 +205,99 @@ describe('ProjectConversationStore', () => {
         {
           kind: 'thinking',
           status: 'completed',
-          content: '先读取文案工作流。'
+          content: '先读取文案工作流。',
         },
         {
           id: 'skill-call-1',
           kind: 'skill',
           name: 'slide-copywriting',
-          status: 'completed'
-        }
-      ]
+          status: 'completed',
+        },
+      ],
     })
   })
 
   it('serializes writes for the same project', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
     const store = new ProjectConversationStore()
     const latestState = {
       ...conversationState,
-      conversations: [{ ...conversationState.conversations[0], title: '最新标题' }]
+      conversations: [
+        { ...conversationState.conversations[0], title: '最新标题' },
+      ],
     }
 
     await Promise.all([
       store.save(projectPath, conversationState),
-      store.save(projectPath, latestState)
+      store.save(projectPath, latestState),
     ])
 
     expect(await store.load(projectPath)).toEqual(latestState)
   })
 
   it('rejects malformed data without overwriting it', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
     const storagePath = join(projectPath, '.slideMind')
     await mkdir(storagePath)
-    await writeFile(join(storagePath, 'conversations.json'), JSON.stringify({
-      version: 1,
-      ...conversationState
-    }))
-
-    await expect(new ProjectConversationStore().load(projectPath)).rejects.toThrow(
-      '项目会话记录格式无效'
+    await writeFile(
+      join(storagePath, 'conversations.json'),
+      JSON.stringify({
+        version: 1,
+        ...conversationState,
+      }),
     )
+
+    await expect(
+      new ProjectConversationStore().load(projectPath),
+    ).rejects.toThrow('项目会话记录格式无效')
   })
 
   it('rejects a symbolic-link storage directory', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
-    const outsidePath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-outside-'))
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
+    const outsidePath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-outside-'),
+    )
     await symlink(outsidePath, join(projectPath, '.slideMind'))
 
-    await expect(new ProjectConversationStore().save(projectPath, conversationState)).rejects.toThrow(
-      '项目会话存储目录无效'
-    )
+    await expect(
+      new ProjectConversationStore().save(projectPath, conversationState),
+    ).rejects.toThrow('项目会话存储目录无效')
   })
 
   it('rejects a symbolic-link Pi conversation directory', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
-    const outsidePath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-outside-'))
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
+    const outsidePath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-outside-'),
+    )
     await mkdir(join(projectPath, '.slideMind'))
     await symlink(outsidePath, join(projectPath, '.slideMind', 'convs'))
 
     await expect(
-      new ProjectConversationStore().loadMessages(projectPath, 'conversation-1')
+      new ProjectConversationStore().loadMessages(
+        projectPath,
+        'conversation-1',
+      ),
     ).rejects.toThrow('Pi 会话存储目录无效')
   })
 
   it('rejects invalid state at the persistence boundary', async () => {
-    const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-conversations-'))
+    const projectPath = await mkdtemp(
+      join(tmpdir(), 'slidemind-conversations-'),
+    )
 
-    await expect(new ProjectConversationStore().save(projectPath, {
-      conversations: [],
-      selectedConversationId: ''
-    })).rejects.toThrow('项目会话记录无效')
+    await expect(
+      new ProjectConversationStore().save(projectPath, {
+        conversations: [],
+        selectedConversationId: '',
+      }),
+    ).rejects.toThrow('项目会话记录无效')
   })
 })

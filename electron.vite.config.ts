@@ -12,37 +12,41 @@ const pptistPublic = resolve('node_modules/pptist/public')
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ['chokidar', 'pptxgenjs', 'pptxtojson'] })],
+    plugins: [
+      externalizeDepsPlugin({
+        exclude: ['chokidar', 'pptxgenjs', 'pptxtojson'],
+      }),
+    ],
     build: {
       rollupOptions: {
         input: {
           index: resolve('src/main/index.ts'),
           'presentation-export-worker': resolve(
-            'src/main/presentation/presentation-export-worker.ts'
+            'src/main/presentation/presentation-export-worker.ts',
           ),
-          'pptx-read-worker': resolve('src/main/agent/pptx-read-worker.ts')
-        }
-      }
-    }
+          'pptx-read-worker': resolve('src/main/agent/pptx-read-worker.ts'),
+        },
+      },
+    },
   },
   preload: {
-    plugins: [externalizeDepsPlugin()]
+    plugins: [externalizeDepsPlugin()],
   },
   renderer: {
     publicDir: pptistPublic,
     optimizeDeps: {
       esbuildOptions: {
         loader: {
-          '.ts': 'ts'
-        }
-      }
+          '.ts': 'ts',
+        },
+      },
     },
     resolve: {
       alias: {
         '@': pptistSource,
         '@pptist-theme': resolve('src/renderer/pptist-theme.scss'),
-        '@renderer': resolve('src/renderer/src')
-      }
+        '@renderer': resolve('src/renderer/src'),
+      },
     },
     css: {
       preprocessorOptions: {
@@ -50,9 +54,9 @@ export default defineConfig({
           additionalData: `
             @use '@pptist-theme' as *;
             @use '@/assets/styles/mixin.scss' as *;
-          `
-        }
-      }
+          `,
+        },
+      },
     },
     plugins: [
       react(),
@@ -64,28 +68,28 @@ export default defineConfig({
         resolvers: [
           IconsResolver({
             prefix: 'i',
-            customCollections: ['custom']
-          })
-        ]
+            customCollections: ['custom'],
+          }),
+        ],
       }),
       Icons({
         compiler: 'vue3',
         autoInstall: false,
         customCollections: {
-          custom: FileSystemIconLoader(resolve(pptistSource, 'assets/icons'))
+          custom: FileSystemIconLoader(resolve(pptistSource, 'assets/icons')),
         },
         scale: 1,
-        defaultClass: 'i-icon'
-      })
+        defaultClass: 'i-icon',
+      }),
     ],
     build: {
       rollupOptions: {
         input: {
           index: resolve('src/renderer/index.html'),
           pptist: resolve('src/renderer/pptist.html'),
-          'markdown-pdf': resolve('src/renderer/markdown-pdf.html')
-        }
-      }
-    }
-  }
+          'markdown-pdf': resolve('src/renderer/markdown-pdf.html'),
+        },
+      },
+    },
+  },
 })

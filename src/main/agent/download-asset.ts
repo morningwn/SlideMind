@@ -1,8 +1,23 @@
 import { randomUUID } from 'node:crypto'
 import type { IncomingHttpHeaders } from 'node:http'
-import { lstat, mkdir, open, readFile, realpath, rename, unlink } from 'node:fs/promises'
+import {
+  lstat,
+  mkdir,
+  open,
+  readFile,
+  realpath,
+  rename,
+  unlink,
+} from 'node:fs/promises'
 import { get } from 'node:https'
-import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path'
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  relative,
+  resolve,
+  sep,
+} from 'node:path'
 import type { Readable } from 'node:stream'
 import { AntiSSRFPolicy, PolicyConfigOptions } from '@microsoft/antissrf'
 
@@ -16,7 +31,7 @@ const PROTECTED_PROJECT_DIRECTORIES = new Set([
   'coverage',
   'node_modules',
   'out',
-  'release-dist'
+  'release-dist',
 ])
 
 export type DownloadAssetKind = 'image' | 'text'
@@ -29,7 +44,7 @@ export interface AssetResponse {
 
 export type AssetOpener = (
   url: URL,
-  signal: AbortSignal
+  signal: AbortSignal,
 ) => Promise<AssetResponse>
 
 export interface DownloadedAsset {
@@ -41,13 +56,18 @@ export interface DownloadedAsset {
 }
 
 function isInsideProject(projectPath: string, candidatePath: string): boolean {
-  return candidatePath === projectPath || candidatePath.startsWith(`${projectPath}${sep}`)
+  return (
+    candidatePath === projectPath ||
+    candidatePath.startsWith(`${projectPath}${sep}`)
+  )
 }
 
 function hasProtectedSegment(path: string): boolean {
   return path
     .split(sep)
-    .some((segment) => PROTECTED_PROJECT_DIRECTORIES.has(segment.toLocaleLowerCase()))
+    .some((segment) =>
+      PROTECTED_PROJECT_DIRECTORIES.has(segment.toLocaleLowerCase()),
+    )
 }
 
 function validatePathInput(value: unknown): string {
@@ -65,7 +85,7 @@ function validatePathInput(value: unknown): string {
 
 export async function resolveDownloadTarget(
   projectPathInput: string,
-  pathInput: string
+  pathInput: string,
 ): Promise<{ path: string; projectPath: string; targetPath: string }> {
   const projectPath = await realpath(projectPathInput)
   const inputPath = validatePathInput(pathInput)
@@ -78,7 +98,9 @@ export async function resolveDownloadTarget(
   if (hasProtectedSegment(path)) throw new Error('不能下载到受保护的项目目录')
 
   let currentPath = projectPath
-  for (const segment of relative(projectPath, dirname(targetPath)).split(sep).filter(Boolean)) {
+  for (const segment of relative(projectPath, dirname(targetPath))
+    .split(sep)
+    .filter(Boolean)) {
     currentPath = resolve(currentPath, segment)
     try {
       const stats = await lstat(currentPath)
@@ -113,7 +135,10 @@ function validateUrl(value: string): URL {
   return url
 }
 
-function singleHeader(headers: IncomingHttpHeaders, name: string): string | undefined {
+function singleHeader(
+  headers: IncomingHttpHeaders,
+  name: string,
+): string | undefined {
   const value = headers[name]
   if (Array.isArray(value)) {
     if (value.length !== 1) throw new Error(`响应包含多个 ${name} 头`)
@@ -130,24 +155,30 @@ function createSafeAssetOpener(): { close: () => void; open: AssetOpener } {
 
   return {
     close: () => agent.destroy(),
-    open: (url, signal) => new Promise((resolveResponse, reject) => {
-      const request = get(url, {
-        agent,
-        headers: {
-          accept: 'image/*, text/*, application/json, application/xml;q=0.9, */*;q=0.1',
-          'accept-encoding': 'identity',
-          'user-agent': 'SlideMind/0.1'
-        },
-        signal
-      }, (response) => {
-        resolveResponse({
-          body: response,
-          headers: response.headers,
-          statusCode: response.statusCode ?? 0
-        })
-      })
-      request.once('error', reject)
-    })
+    open: (url, signal) =>
+      new Promise((resolveResponse, reject) => {
+        const request = get(
+          url,
+          {
+            agent,
+            headers: {
+              accept:
+                'image/*, text/*, application/json, application/xml;q=0.9, */*;q=0.1',
+              'accept-encoding': 'identity',
+              'user-agent': 'SlideMind/0.1',
+            },
+            signal,
+          },
+          (response) => {
+            resolveResponse({
+              body: response,
+              headers: response.headers,
+              statusCode: response.statusCode ?? 0,
+            })
+          },
+        )
+        request.once('error', reject)
+      }),
   }
 }
 
@@ -174,7 +205,7 @@ function createDeadlineSignal(source?: AbortSignal): {
       source?.removeEventListener('abort', relayAbort)
     },
     didTimeOut: () => timedOut,
-    signal: controller.signal
+    signal: controller.signal,
   }
 }
 
@@ -185,10 +216,14 @@ function isRedirect(statusCode: number): boolean {
 async function resolveResponse(
   initialUrl: URL,
   openAsset: AssetOpener,
-  signal: AbortSignal
+  signal: AbortSignal,
 ): Promise<{ response: AssetResponse; url: URL }> {
   let url = initialUrl
-  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount += 1) {
+  for (
+    let redirectCount = 0;
+    redirectCount <= MAX_REDIRECTS;
+    redirectCount += 1
+  ) {
     const response = await openAsset(url, signal)
     if (!isRedirect(response.statusCode)) return { response, url }
 
@@ -202,7 +237,10 @@ async function resolveResponse(
 }
 
 function contentTypeFrom(headers: IncomingHttpHeaders): string | undefined {
-  return singleHeader(headers, 'content-type')?.split(';', 1)[0]?.trim().toLocaleLowerCase()
+  return singleHeader(headers, 'content-type')
+    ?.split(';', 1)[0]
+    ?.trim()
+    .toLocaleLowerCase()
 }
 
 function contentLengthFrom(headers: IncomingHttpHeaders): number | undefined {
@@ -240,7 +278,10 @@ export async function downloadAsset(options: {
   url: string
   validateImage?: (path: string) => Promise<void>
 }): Promise<DownloadedAsset> {
-  const initialTarget = await resolveDownloadTarget(options.projectPath, options.path)
+  const initialTarget = await resolveDownloadTarget(
+    options.projectPath,
+    options.path,
+  )
   const initialUrl = validateUrl(options.url)
   const maxBytes = options.kind === 'image' ? MAX_IMAGE_BYTES : MAX_TEXT_BYTES
   const deadline = createDeadlineSignal(options.signal)
@@ -250,14 +291,22 @@ export async function downloadAsset(options: {
 
   try {
     await mkdir(dirname(initialTarget.targetPath), { recursive: true })
-    const target = await resolveDownloadTarget(options.projectPath, options.path)
-    if (target.targetPath !== initialTarget.targetPath) throw new Error('下载路径已发生变化')
+    const target = await resolveDownloadTarget(
+      options.projectPath,
+      options.path,
+    )
+    if (target.targetPath !== initialTarget.targetPath)
+      throw new Error('下载路径已发生变化')
 
     temporaryPath = resolve(
       dirname(target.targetPath),
-      `.${basename(target.targetPath)}.${randomUUID()}.slidemind-tmp`
+      `.${basename(target.targetPath)}.${randomUUID()}.slidemind-tmp`,
     )
-    const { response, url } = await resolveResponse(initialUrl, openAsset, deadline.signal)
+    const { response, url } = await resolveResponse(
+      initialUrl,
+      openAsset,
+      deadline.signal,
+    )
     if (response.statusCode < 200 || response.statusCode >= 300) {
       response.body.destroy()
       throw new Error(`下载失败，HTTP 状态码：${response.statusCode}`)
@@ -311,7 +360,7 @@ export async function downloadAsset(options: {
       contentType: contentTypeFrom(response.headers),
       finalUrl: publicUrl(url),
       path: target.path,
-      targetPath: target.targetPath
+      targetPath: target.targetPath,
     }
   } catch (error) {
     if (deadline.didTimeOut()) throw new Error('下载超时')

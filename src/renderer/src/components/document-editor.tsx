@@ -7,7 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
-  type PointerEvent as ReactPointerEvent
+  type PointerEvent as ReactPointerEvent,
 } from 'react'
 import { basicSetup } from 'codemirror'
 import type { ProjectTextFileKind } from '../../../shared/project'
@@ -46,7 +46,7 @@ interface DocumentEditorProps {
 
 const exportWarningLabels: Record<DocumentExportWarning, string> = {
   mermaid_not_rendered: 'Mermaid 图表按代码文本导出',
-  unsupported_link_removed: '不支持的链接协议已转为普通文本'
+  unsupported_link_removed: '不支持的链接协议已转为普通文本',
 }
 
 interface SourceEditorProps {
@@ -64,7 +64,7 @@ function SourceEditor({
   lineEnding,
   onChange,
   onSave,
-  value
+  value,
 }: SourceEditorProps): React.JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<EditorView | null>(null)
@@ -84,40 +84,45 @@ function SourceEditor({
       EditorView.updateListener.of((update) => {
         if (update.docChanged) onChangeRef.current(update.state.doc.toString())
       }),
-      keymap.of([{
-        key: 'Mod-s',
-        preventDefault: true,
-        run: () => {
-          onSaveRef.current()
-          return true
-        }
-      }]),
+      keymap.of([
+        {
+          key: 'Mod-s',
+          preventDefault: true,
+          run: () => {
+            onSaveRef.current()
+            return true
+          },
+        },
+      ]),
       EditorView.theme({
         '&': { height: '100%', backgroundColor: 'transparent' },
         '.cm-scroller': {
           overflow: 'auto',
-          fontFamily: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
+          fontFamily:
+            '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
           fontSize: '12px',
-          lineHeight: '1.7'
+          lineHeight: '1.7',
         },
         '.cm-content': { padding: '22px 0 64px' },
         '.cm-line': { padding: '0 22px' },
         '.cm-gutters': {
           backgroundColor: '#f8fafe',
           borderRight: '1px solid #e5eaf2',
-          color: '#9aa5b5'
+          color: '#9aa5b5',
         },
         '.cm-activeLine, .cm-activeLineGutter': { backgroundColor: '#eef3ff' },
         '&.cm-focused': { outline: 'none' },
         '&.cm-focused .cm-cursor': { borderLeftColor: '#2f61e9' },
-        '&.cm-focused .cm-selectionBackground, ::selection': { backgroundColor: '#dce7ff' }
-      })
+        '&.cm-focused .cm-selectionBackground, ::selection': {
+          backgroundColor: '#dce7ff',
+        },
+      }),
     ]
     if (kind === 'markdown') extensions.push(markdown())
 
     const view = new EditorView({
       state: EditorState.create({ doc: value, extensions }),
-      parent: hostRef.current
+      parent: hostRef.current,
     })
     editorRef.current = view
     return () => {
@@ -129,7 +134,9 @@ function SourceEditor({
   useEffect(() => {
     const view = editorRef.current
     if (!view || view.state.doc.toString() === value) return
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } })
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: value },
+    })
   }, [value])
 
   return <div className="source-editor" ref={hostRef} />
@@ -138,7 +145,7 @@ function SourceEditor({
 function MarkdownPreview({
   documentPath,
   projectHandle,
-  source
+  source,
 }: {
   documentPath: string
   projectHandle: string
@@ -146,11 +153,16 @@ function MarkdownPreview({
 }): React.JSX.Element {
   const deferredSource = useDeferredValue(source)
   const previewRef = useRef<HTMLDivElement>(null)
-  const html = useMemo(() => renderMarkdownHtml(deferredSource), [deferredSource])
+  const html = useMemo(
+    () => renderMarkdownHtml(deferredSource),
+    [deferredSource],
+  )
 
   useEffect(() => {
     let active = true
-    const images = previewRef.current?.querySelectorAll<HTMLImageElement>('img[data-project-source]')
+    const images = previewRef.current?.querySelectorAll<HTMLImageElement>(
+      'img[data-project-source]',
+    )
     for (const image of images ?? []) {
       const sourcePath = image.dataset.projectSource
       if (!sourcePath) continue
@@ -181,13 +193,21 @@ function MarkdownPreview({
     if (!link) return
     event.preventDefault()
     const href = link.getAttribute('href') ?? ''
-    if (/^https?:\/\//i.test(href)) window.open(href, '_blank', 'noopener,noreferrer')
+    if (/^https?:\/\//i.test(href))
+      window.open(href, '_blank', 'noopener,noreferrer')
   }
 
   return (
-    <div className="markdown-preview-scroll" onClick={handlePreviewClick} ref={previewRef}>
+    <div
+      className="markdown-preview-scroll"
+      onClick={handlePreviewClick}
+      ref={previewRef}
+    >
       {deferredSource.trim() ? (
-        <article className="markdown-preview" dangerouslySetInnerHTML={{ __html: html }} />
+        <article
+          className="markdown-preview"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
       ) : (
         <div className="markdown-preview-empty">
           <span aria-hidden="true">Aa</span>
@@ -203,7 +223,7 @@ export function DocumentEditor({
   onChange,
   onReload,
   onSave,
-  projectHandle
+  projectHandle,
 }: DocumentEditorProps): React.JSX.Element {
   const [splitPercent, setSplitPercent] = useState(50)
   const splitRef = useRef<HTMLDivElement>(null)
@@ -217,7 +237,8 @@ export function DocumentEditor({
     function resize(pointerEvent: PointerEvent): void {
       const bounds = container?.getBoundingClientRect()
       if (!bounds) return
-      const percent = ((pointerEvent.clientX - bounds.left) / bounds.width) * 100
+      const percent =
+        ((pointerEvent.clientX - bounds.left) / bounds.width) * 100
       setSplitPercent(Math.min(68, Math.max(32, percent)))
     }
 
@@ -231,17 +252,25 @@ export function DocumentEditor({
   }
 
   function adjustSplit(direction: -1 | 1): void {
-    setSplitPercent((current) => Math.min(68, Math.max(32, current + direction * 4)))
+    setSplitPercent((current) =>
+      Math.min(68, Math.max(32, current + direction * 4)),
+    )
   }
 
   return (
     <section className="document-panel" aria-labelledby="active-document-title">
-      <h1 id="active-document-title" className="sr-only">{document.name}</h1>
+      <h1 id="active-document-title" className="sr-only">
+        {document.name}
+      </h1>
 
       {document.error ? (
         <div className="document-error" role="alert">
           <span>{document.error}</span>
-          {document.conflict ? <button type="button" onClick={onReload}>重新载入</button> : null}
+          {document.conflict ? (
+            <button type="button" onClick={onReload}>
+              重新载入
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -251,13 +280,18 @@ export function DocumentEditor({
         </div>
       ) : document.isExporting ? (
         <div className="document-export-result" role="status">
-          正在将当前编辑内容快照导出为 {document.exportingFormat === 'pdf' ? 'PDF' : 'Word'}…
+          正在将当前编辑内容快照导出为{' '}
+          {document.exportingFormat === 'pdf' ? 'PDF' : 'Word'}…
         </div>
       ) : document.lastExportPath ? (
         <div className="document-export-result" role="status">
           <span>已导出点击时的内容快照：{document.lastExportPath}</span>
           {document.exportWarnings.length > 0 ? (
-            <small>{document.exportWarnings.map((warning) => exportWarningLabels[warning]).join('；')}</small>
+            <small>
+              {document.exportWarnings
+                .map((warning) => exportWarningLabels[warning])
+                .join('；')}
+            </small>
           ) : null}
         </div>
       ) : null}
@@ -266,10 +300,15 @@ export function DocumentEditor({
         <div
           className={`markdown-workbench markdown-workbench-${document.viewMode}`}
           ref={splitRef}
-          style={{ '--editor-split': `${splitPercent}%` } as React.CSSProperties}
+          style={
+            { '--editor-split': `${splitPercent}%` } as React.CSSProperties
+          }
         >
           <section className="document-source-pane" aria-label="Markdown 编辑">
-            <div className="document-pane-label"><span>Markdown</span><small>源码</small></div>
+            <div className="document-pane-label">
+              <span>Markdown</span>
+              <small>源码</small>
+            </div>
             <SourceEditor
               ariaLabel={`${document.name} Markdown 源码`}
               kind={document.kind}
@@ -294,10 +333,15 @@ export function DocumentEditor({
                 if (event.key === 'ArrowLeft') adjustSplit(-1)
                 if (event.key === 'ArrowRight') adjustSplit(1)
               }}
-            ><i /></button>
+            >
+              <i />
+            </button>
           ) : null}
           <section className="document-preview-pane" aria-label="Markdown 预览">
-            <div className="document-pane-label"><span>Preview</span><small>预览</small></div>
+            <div className="document-pane-label">
+              <span>Preview</span>
+              <small>预览</small>
+            </div>
             <MarkdownPreview
               documentPath={document.path}
               projectHandle={projectHandle}

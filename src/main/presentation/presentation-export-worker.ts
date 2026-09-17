@@ -17,10 +17,12 @@ if (!port) throw new Error('演示文稿导出 Worker 缺少父进程通道')
 
 port.once('message', (request: PresentationExportWorkerRequest) => {
   void exportPresentationToPptx(request.presentation, request.outputPath).then(
-    () => port.postMessage({ ok: true } satisfies PresentationExportWorkerResult),
-    (error: unknown) => port.postMessage({
-      ok: false,
-      error: error instanceof Error ? error.message : String(error)
-    } satisfies PresentationExportWorkerResult)
+    () =>
+      port.postMessage({ ok: true } satisfies PresentationExportWorkerResult),
+    (error: unknown) =>
+      port.postMessage({
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      } satisfies PresentationExportWorkerResult),
   )
 })

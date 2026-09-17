@@ -2,28 +2,46 @@ import { describe, expect, it } from 'vitest'
 import type { PresentationDocument } from '../../../shared/presentation'
 import { serializePresentationDocumentState } from './presentation-document-state'
 
-function presentationWithOrder(order: 'stored' | 'editor'): PresentationDocument {
+function presentationWithOrder(
+  order: 'stored' | 'editor',
+): PresentationDocument {
   const theme = {
     backgroundColor: '#ffffff',
     themeColors: ['#5b9bd5'],
     fontColor: '#333333',
     fontName: '',
     outline: { width: 2, color: '#525252', style: 'solid' },
-    shadow: { h: 3, v: 3, blur: 2, color: '#808080' }
+    shadow: { h: 3, v: 3, blur: 2, color: '#808080' },
   }
   const slides = [{ id: 'slide-1', elements: [] }]
-  const presentation = order === 'stored'
-    ? { title: '季度复盘', viewportSize: 1000, viewportRatio: 0.5625, theme, slides }
-    : { title: '季度复盘', theme, slides, viewportSize: 1000, viewportRatio: 0.5625 }
+  const presentation =
+    order === 'stored'
+      ? {
+          title: '季度复盘',
+          viewportSize: 1000,
+          viewportRatio: 0.5625,
+          theme,
+          slides,
+        }
+      : {
+          title: '季度复盘',
+          theme,
+          slides,
+          viewportSize: 1000,
+          viewportRatio: 0.5625,
+        }
 
   return {
     format: 'slidemind.presentation',
     version: 2,
-    presentation
+    presentation,
   }
 }
 
-function addTextElement(document: PresentationDocument, overrides: Record<string, unknown> = {}): void {
+function addTextElement(
+  document: PresentationDocument,
+  overrides: Record<string, unknown> = {},
+): void {
   document.presentation.slides[0].elements.push({
     id: 'text-1',
     type: 'text',
@@ -33,7 +51,7 @@ function addTextElement(document: PresentationDocument, overrides: Record<string
     height: 80,
     rotate: 0,
     content: '<p>正文</p>',
-    ...overrides
+    ...overrides,
   })
 }
 
@@ -44,7 +62,7 @@ describe('serializePresentationDocumentState', () => {
 
     expect(JSON.stringify(editor)).not.toBe(JSON.stringify(stored))
     expect(serializePresentationDocumentState(editor)).toBe(
-      serializePresentationDocumentState(stored)
+      serializePresentationDocumentState(stored),
     )
   })
 
@@ -54,7 +72,7 @@ describe('serializePresentationDocumentState', () => {
     edited.presentation.title = '年度复盘'
 
     expect(serializePresentationDocumentState(edited)).not.toBe(
-      serializePresentationDocumentState(stored)
+      serializePresentationDocumentState(stored),
     )
   })
 
@@ -65,7 +83,7 @@ describe('serializePresentationDocumentState', () => {
     addTextElement(measured, { height: 81.5 })
 
     expect(serializePresentationDocumentState(measured)).toBe(
-      serializePresentationDocumentState(stored)
+      serializePresentationDocumentState(stored),
     )
   })
 
@@ -76,7 +94,7 @@ describe('serializePresentationDocumentState', () => {
     addTextElement(resized, { width: 420 })
 
     expect(serializePresentationDocumentState(resized)).not.toBe(
-      serializePresentationDocumentState(stored)
+      serializePresentationDocumentState(stored),
     )
   })
 
@@ -87,7 +105,7 @@ describe('serializePresentationDocumentState', () => {
     addTextElement(verticalMeasured, { vertical: true, width: 401.5 })
 
     expect(serializePresentationDocumentState(verticalMeasured)).toBe(
-      serializePresentationDocumentState(verticalStored)
+      serializePresentationDocumentState(verticalStored),
     )
 
     const fixedStored = presentationWithOrder('stored')
@@ -96,7 +114,7 @@ describe('serializePresentationDocumentState', () => {
     addTextElement(fixedResized, { fixedHeight: true, height: 81.5 })
 
     expect(serializePresentationDocumentState(fixedResized)).not.toBe(
-      serializePresentationDocumentState(fixedStored)
+      serializePresentationDocumentState(fixedStored),
     )
   })
 
@@ -112,13 +130,13 @@ describe('serializePresentationDocumentState', () => {
       height: 180,
       rotate: 0,
       cellMinHeight: 36,
-      data: []
+      data: [],
     }
     stored.presentation.slides[0].elements.push(table)
     measured.presentation.slides[0].elements.push({ ...table, height: 181.25 })
 
     expect(serializePresentationDocumentState(measured)).toBe(
-      serializePresentationDocumentState(stored)
+      serializePresentationDocumentState(stored),
     )
   })
 })

@@ -11,7 +11,12 @@ import { getLogger } from '../logging/logger'
 const logger = getLogger('tika-runtime')
 const STDERR_LIMIT = 64 * 1024
 
-export type TikaRuntimeState = 'stopped' | 'starting' | 'ready' | 'stopping' | 'failed'
+export type TikaRuntimeState =
+  | 'stopped'
+  | 'starting'
+  | 'ready'
+  | 'stopping'
+  | 'failed'
 
 export interface TikaRuntimeOptions {
   configPath: string
@@ -38,7 +43,7 @@ interface PreparedRuntimeManifest {
 }
 
 export function resolveTikaRuntimeOptions(
-  options: TikaRuntimeLocationOptions
+  options: TikaRuntimeLocationOptions,
 ): TikaRuntimeOptions {
   const platform = `${process.platform}-${process.arch}`
   const runtimeRoot = options.isPackaged
@@ -52,26 +57,33 @@ export function resolveTikaRuntimeOptions(
   if (existsSync(preparedPath)) {
     let value: Partial<PreparedRuntimeManifest>
     try {
-      value = JSON.parse(readFileSync(preparedPath, 'utf8')) as Partial<PreparedRuntimeManifest>
+      value = JSON.parse(
+        readFileSync(preparedPath, 'utf8'),
+      ) as Partial<PreparedRuntimeManifest>
     } catch (error) {
-      throw new DocumentReadError('runtime_unavailable', 'Tika 运行时清单无效', { cause: error })
+      throw new DocumentReadError(
+        'runtime_unavailable',
+        'Tika 运行时清单无效',
+        { cause: error },
+      )
     }
-    const resourcePath = (path: string): string => isAbsolute(path)
-      ? path
-      : resolve(runtimeRoot, path)
-    const pathsStayInRuntime = [value.javaBinary, value.tikaJar].every((path) => {
-      if (typeof path !== 'string' || isAbsolute(path)) return !options.isPackaged
-      return resourcePath(path).startsWith(`${resolve(runtimeRoot)}${sep}`)
-    })
+    const resourcePath = (path: string): string =>
+      isAbsolute(path) ? path : resolve(runtimeRoot, path)
+    const pathsStayInRuntime = [value.javaBinary, value.tikaJar].every(
+      (path) => {
+        if (typeof path !== 'string' || isAbsolute(path))
+          return !options.isPackaged
+        return resourcePath(path).startsWith(`${resolve(runtimeRoot)}${sep}`)
+      },
+    )
     if (
       typeof value.javaBinary !== 'string' ||
       typeof value.tikaJar !== 'string' ||
       value.tikaVersion !== '4.0.0' ||
-      (options.isPackaged && (
-        value.schemaVersion !== 1 ||
-        value.platform !== platform ||
-        !pathsStayInRuntime
-      ))
+      (options.isPackaged &&
+        (value.schemaVersion !== 1 ||
+          value.platform !== platform ||
+          !pathsStayInRuntime))
     ) {
       throw new DocumentReadError('runtime_unavailable', 'Tika 运行时清单无效')
     }
@@ -82,13 +94,14 @@ export function resolveTikaRuntimeOptions(
         ? '内置 Tika 运行时不完整，请重新安装应用'
         : 'Tika 开发运行时未准备，请先运行 pnpm tika:prepare',
       tikaJar: resourcePath(value.tikaJar),
-      tikaVersion: value.tikaVersion
+      tikaVersion: value.tikaVersion,
     }
   }
 
-  const javaBinary = process.platform === 'win32'
-    ? join(runtimeRoot, 'runtime/java/bin/java.exe')
-    : join(runtimeRoot, 'runtime/java/Contents/Home/bin/java')
+  const javaBinary =
+    process.platform === 'win32'
+      ? join(runtimeRoot, 'runtime/java/bin/java.exe')
+      : join(runtimeRoot, 'runtime/java/Contents/Home/bin/java')
   return {
     configPath,
     javaBinary,
@@ -96,7 +109,7 @@ export function resolveTikaRuntimeOptions(
       ? '内置 Tika 运行时不完整，请重新安装应用'
       : 'Tika 开发运行时未准备，请先运行 pnpm tika:prepare',
     tikaJar: join(runtimeRoot, 'runtime/tika/tika-server-standard-4.0.0.jar'),
-    tikaVersion: '4.0.0'
+    tikaVersion: '4.0.0',
   }
 }
 
@@ -122,12 +135,15 @@ async function reservePort(): Promise<number> {
         reject(new Error('无法分配 Tika 回环端口'))
         return
       }
-      server.close((error) => error ? reject(error) : resolve(address.port))
+      server.close((error) => (error ? reject(error) : resolve(address.port)))
     })
   })
 }
 
-function minimalEnvironment(javaBinary: string, workDirectory: string): NodeJS.ProcessEnv {
+function minimalEnvironment(
+  javaBinary: string,
+  workDirectory: string,
+): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = {
     JAVA_HOME: dirname(dirname(javaBinary)),
     NO_PROXY: '127.0.0.1,localhost',
@@ -135,7 +151,7 @@ function minimalEnvironment(javaBinary: string, workDirectory: string): NodeJS.P
     TEMP: workDirectory,
     TMP: workDirectory,
     TMPDIR: workDirectory,
-    no_proxy: '127.0.0.1,localhost'
+    no_proxy: '127.0.0.1,localhost',
   }
   for (const key of ['LANG', 'LC_ALL', 'SystemRoot', 'WINDIR']) {
     if (process.env[key]) environment[key] = process.env[key]
@@ -147,10 +163,14 @@ async function terminateProcessTree(child: ChildProcess): Promise<void> {
   if (!child.pid || child.exitCode !== null) return
   if (process.platform === 'win32') {
     await new Promise<void>((resolve) => {
-      const killer = spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
-        stdio: 'ignore',
-        windowsHide: true
-      })
+      const killer = spawn(
+        'taskkill',
+        ['/pid', String(child.pid), '/t', '/f'],
+        {
+          stdio: 'ignore',
+          windowsHide: true,
+        },
+      )
       killer.once('error', () => resolve())
       killer.once('exit', () => resolve())
     })
@@ -164,7 +184,7 @@ async function terminateProcessTree(child: ChildProcess): Promise<void> {
   }
   await Promise.race([
     new Promise<void>((resolve) => child.once('exit', () => resolve())),
-    delay(3_000)
+    delay(3_000),
   ])
   if (child.exitCode === null) {
     try {
@@ -230,16 +250,19 @@ export class TikaRuntime {
     this.startingProcess = undefined
     await terminateProcessTree(running.child)
     if (pendingStart) await pendingStart.catch(() => undefined)
-    await rm(running.workDirectory, { force: true, recursive: true }).catch(() => {
-      logger.warn('runtime.temp_cleanup_failed')
-    })
+    await rm(running.workDirectory, { force: true, recursive: true }).catch(
+      () => {
+        logger.warn('runtime.temp_cleanup_failed')
+      },
+    )
     this.stopExpected = false
     this.runtimeState = 'stopped'
     logger.info('runtime.stopped')
   }
 
   private async start(): Promise<string> {
-    if (this.runtimeState === 'ready' && this.running) return this.running.baseUrl
+    if (this.runtimeState === 'ready' && this.running)
+      return this.running.baseUrl
     if (this.startPromise) return this.startPromise
     this.startPromise = this.spawnRuntime()
     try {
@@ -255,16 +278,18 @@ export class TikaRuntime {
     const missingResources = [
       ['config', this.options.configPath],
       ['java', this.options.javaBinary],
-      ['tika', this.options.tikaJar]
+      ['tika', this.options.tikaJar],
     ].filter(([, path]) => !existsSync(path))
     if (missingResources.length > 0) {
       this.runtimeState = 'failed'
       logger.error('runtime.resources_missing', {
-        context: { resources: missingResources.map(([name]) => name).join(',') }
+        context: {
+          resources: missingResources.map(([name]) => name).join(','),
+        },
       })
       throw new DocumentReadError(
         'runtime_unavailable',
-        this.options.missingRuntimeMessage ?? 'Tika 运行时文件缺失'
+        this.options.missingRuntimeMessage ?? 'Tika 运行时文件缺失',
       )
     }
     const workDirectory = await mkdtemp(join(tmpdir(), 'slidemind-tika-'))
@@ -272,26 +297,30 @@ export class TikaRuntime {
     const serverId = `slidemind-${randomUUID()}`
     const baseUrl = `http://127.0.0.1:${port}`
     let stderr = ''
-    const child = spawn(this.options.javaBinary, [
-      '-Xmx256m',
-      `-Djava.io.tmpdir=${workDirectory}`,
-      '-jar',
-      this.options.tikaJar,
-      '-c',
-      this.options.configPath,
-      '-h',
-      '127.0.0.1',
-      '-p',
-      String(port),
-      '-i',
-      serverId
-    ], {
-      cwd: dirname(this.options.tikaJar),
-      detached: process.platform !== 'win32',
-      env: minimalEnvironment(this.options.javaBinary, workDirectory),
-      stdio: ['ignore', 'ignore', 'pipe'],
-      windowsHide: true
-    })
+    const child = spawn(
+      this.options.javaBinary,
+      [
+        '-Xmx256m',
+        `-Djava.io.tmpdir=${workDirectory}`,
+        '-jar',
+        this.options.tikaJar,
+        '-c',
+        this.options.configPath,
+        '-h',
+        '127.0.0.1',
+        '-p',
+        String(port),
+        '-i',
+        serverId,
+      ],
+      {
+        cwd: dirname(this.options.tikaJar),
+        detached: process.platform !== 'win32',
+        env: minimalEnvironment(this.options.javaBinary, workDirectory),
+        stdio: ['ignore', 'ignore', 'pipe'],
+        windowsHide: true,
+      },
+    )
     this.startingProcess = { child, workDirectory }
     let spawnError: Error | undefined
     child.once('error', (error) => {
@@ -299,14 +328,19 @@ export class TikaRuntime {
     })
     child.stderr?.setEncoding('utf8')
     child.stderr?.on('data', (value: string) => {
-      if (stderr.length < STDERR_LIMIT) stderr += value.slice(0, STDERR_LIMIT - stderr.length)
+      if (stderr.length < STDERR_LIMIT)
+        stderr += value.slice(0, STDERR_LIMIT - stderr.length)
     })
     child.once('exit', (code) => {
       if (!this.stopExpected && this.running?.child === child) {
         this.running = undefined
         this.runtimeState = 'failed'
-        void rm(workDirectory, { force: true, recursive: true }).catch(() => undefined)
-        logger.error('runtime.unexpected_exit', { context: { exitCode: code ?? -1 } })
+        void rm(workDirectory, { force: true, recursive: true }).catch(
+          () => undefined,
+        )
+        logger.error('runtime.unexpected_exit', {
+          context: { exitCode: code ?? -1 },
+        })
       }
     })
 
@@ -315,20 +349,24 @@ export class TikaRuntime {
       const identityText = `Started Apache Tika server ${serverId} at ${baseUrl}/`
       while (Date.now() < deadline) {
         if (spawnError) throw spawnError
-        if (child.exitCode !== null) throw new Error(`Tika exited with code ${child.exitCode}`)
+        if (child.exitCode !== null)
+          throw new Error(`Tika exited with code ${child.exitCode}`)
         try {
           const response = await fetch(`${baseUrl}/version`, {
             redirect: 'error',
-            signal: AbortSignal.timeout(500)
+            signal: AbortSignal.timeout(500),
           })
           const version = response.ok ? await response.text() : ''
-          if (version.includes(this.options.tikaVersion) && stderr.includes(identityText)) {
+          if (
+            version.includes(this.options.tikaVersion) &&
+            stderr.includes(identityText)
+          ) {
             this.running = { baseUrl, child, serverId, workDirectory }
             this.startingProcess = undefined
             this.runtimeState = 'ready'
             logger.info('runtime.started', {
               durationMs: Date.now() - startedAt,
-              context: { tikaVersion: this.options.tikaVersion }
+              context: { tikaVersion: this.options.tikaVersion },
             })
             return baseUrl
           }
@@ -343,13 +381,19 @@ export class TikaRuntime {
       this.startingProcess = undefined
       this.stopExpected = true
       await terminateProcessTree(child)
-      await rm(workDirectory, { force: true, recursive: true }).catch(() => undefined)
+      await rm(workDirectory, { force: true, recursive: true }).catch(
+        () => undefined,
+      )
       this.stopExpected = false
       logger.error('runtime.start_failed', {
         durationMs: Date.now() - startedAt,
-        error
+        error,
       })
-      throw new DocumentReadError('runtime_unavailable', 'Tika 运行时启动失败', { cause: error })
+      throw new DocumentReadError(
+        'runtime_unavailable',
+        'Tika 运行时启动失败',
+        { cause: error },
+      )
     }
   }
 

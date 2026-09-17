@@ -4,7 +4,10 @@
       <Thumbnails class="layout-content-left" />
       <div class="layout-content-center">
         <CanvasTool class="center-top" />
-        <Canvas class="center-body" :style="{ height: `calc(100% - ${remarkHeight + 40}px)` }" />
+        <Canvas
+          class="center-body"
+          :style="{ height: `calc(100% - ${remarkHeight + 40}px)` }"
+        />
         <Remark
           v-model:height="remarkHeight"
           class="center-bottom"

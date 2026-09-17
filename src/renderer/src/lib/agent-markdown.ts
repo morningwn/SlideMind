@@ -3,11 +3,16 @@ import { marked, Renderer } from 'marked'
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => {
     switch (character) {
-      case '&': return '&amp;'
-      case '<': return '&lt;'
-      case '>': return '&gt;'
-      case '"': return '&quot;'
-      default: return '&#39;'
+      case '&':
+        return '&amp;'
+      case '<':
+        return '&lt;'
+      case '>':
+        return '&gt;'
+      case '"':
+        return '&quot;'
+      default:
+        return '&#39;'
     }
   })
 }
@@ -42,6 +47,6 @@ export function parseAgentMarkdown(source: string): string {
   return marked.parse(source, {
     async: false,
     gfm: true,
-    renderer
+    renderer,
   })
 }

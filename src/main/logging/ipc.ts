@@ -6,13 +6,13 @@ import {
   ipcMain,
   shell,
   type IpcMainInvokeEvent,
-  type WebContents
+  type WebContents,
 } from 'electron'
 import type { DiagnosticExportResult } from '../../shared/desktop'
 import {
   diagnosticBundleFileName,
   writeDiagnosticBundle,
-  type DiagnosticEnvironment
+  type DiagnosticEnvironment,
 } from './diagnostics'
 import { clearApplicationLogs, getLogger } from './logger'
 import { parseRendererDiagnosticEvent } from './renderer-event'
@@ -73,7 +73,7 @@ export function registerLoggingIpc(options: LoggingIpcOptions): void {
     logger[diagnosticEvent.level](diagnosticEvent.event, {
       context: diagnosticEvent.context,
       error: diagnosticEvent.error,
-      process: 'renderer'
+      process: 'renderer',
     })
   })
 
@@ -90,18 +90,24 @@ export function registerLoggingIpc(options: LoggingIpcOptions): void {
     }
   })
 
-  ipcMain.handle('logging:open-crash-directory', async (event): Promise<void> => {
-    trustedWindow(event)
-    try {
-      await mkdir(options.crashDumpsDirectory, { recursive: true, mode: 0o700 })
-      const errorMessage = await shell.openPath(options.crashDumpsDirectory)
-      if (errorMessage) throw new Error(errorMessage)
-      logger.info('crash_reports.directory_opened')
-    } catch (error) {
-      logger.error('crash_reports.directory_open_failed', { error })
-      throw new Error('无法打开崩溃报告目录')
-    }
-  })
+  ipcMain.handle(
+    'logging:open-crash-directory',
+    async (event): Promise<void> => {
+      trustedWindow(event)
+      try {
+        await mkdir(options.crashDumpsDirectory, {
+          recursive: true,
+          mode: 0o700,
+        })
+        const errorMessage = await shell.openPath(options.crashDumpsDirectory)
+        if (errorMessage) throw new Error(errorMessage)
+        logger.info('crash_reports.directory_opened')
+      } catch (error) {
+        logger.error('crash_reports.directory_open_failed', { error })
+        throw new Error('无法打开崩溃报告目录')
+      }
+    },
+  )
 
   ipcMain.handle(
     'logging:export-diagnostics',
@@ -110,9 +116,12 @@ export function registerLoggingIpc(options: LoggingIpcOptions): void {
       const result = await dialog.showSaveDialog(window, {
         title: '导出 SlideMind 诊断包',
         buttonLabel: '导出诊断包',
-        defaultPath: join(options.downloadsDirectory, diagnosticBundleFileName()),
+        defaultPath: join(
+          options.downloadsDirectory,
+          diagnosticBundleFileName(),
+        ),
         filters: [{ name: '压缩诊断数据', extensions: ['gz'] }],
-        properties: ['createDirectory', 'showOverwriteConfirmation']
+        properties: ['createDirectory', 'showOverwriteConfirmation'],
       })
       if (result.canceled || !result.filePath) return { canceled: true }
 
@@ -121,7 +130,7 @@ export function registerLoggingIpc(options: LoggingIpcOptions): void {
         await writeDiagnosticBundle(
           result.filePath,
           options.logsDirectory,
-          options.environment
+          options.environment,
         )
         logger.info('diagnostics.export_completed')
         return { canceled: false, filePath: result.filePath }
@@ -129,7 +138,7 @@ export function registerLoggingIpc(options: LoggingIpcOptions): void {
         logger.error('diagnostics.export_failed', { error })
         throw new Error('无法导出诊断包')
       }
-    }
+    },
   )
 
   ipcMain.handle('logging:clear', async (event): Promise<boolean> => {
@@ -140,7 +149,7 @@ export function registerLoggingIpc(options: LoggingIpcOptions): void {
       message: '清除后，现有日志将无法用于排查之前的问题。',
       buttons: ['清除日志', '取消'],
       defaultId: 1,
-      cancelId: 1
+      cancelId: 1,
     })
     if (result.response !== 0) return false
 

@@ -83,24 +83,27 @@ export interface PresentationChangedEvent {
 export interface PresentationApi {
   create(
     projectHandle: string,
-    input: CreateProjectPresentationInput
+    input: CreateProjectPresentationInput,
   ): Promise<ProjectPresentationFile>
   import(
     projectHandle: string,
-    input: ImportProjectPresentationInput
+    input: ImportProjectPresentationInput,
   ): Promise<ProjectPresentationFile>
-  read(projectHandle: string, relativePath: string): Promise<ProjectPresentationFile>
+  read(
+    projectHandle: string,
+    relativePath: string,
+  ): Promise<ProjectPresentationFile>
   save(
     projectHandle: string,
-    input: SaveProjectPresentationInput
+    input: SaveProjectPresentationInput,
   ): Promise<SaveProjectPresentationResult>
   export(
     projectHandle: string,
-    input: ExportProjectPresentationInput
+    input: ExportProjectPresentationInput,
   ): Promise<ExportProjectPresentationResult | null>
   exportPdf(
     projectHandle: string,
-    input: import('./pdf-export').ExportPresentationPdfInput
+    input: import('./pdf-export').ExportPresentationPdfInput,
   ): Promise<import('./pdf-export').PdfExportResult>
   onChanged(listener: (event: PresentationChangedEvent) => void): () => void
 }

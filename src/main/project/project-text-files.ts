@@ -1,13 +1,28 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { lstat, readFile, realpath, rename, unlink, writeFile } from 'node:fs/promises'
-import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import {
+  lstat,
+  readFile,
+  realpath,
+  rename,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
+import {
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path'
 import { TextDecoder } from 'node:util'
 import type {
   ProjectTextFile,
   ProjectTextFileKind,
   ProjectImageFile,
   SaveProjectTextFileInput,
-  SaveProjectTextFileResult
+  SaveProjectTextFileResult,
 } from '../../shared/project'
 
 const MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024
@@ -18,29 +33,34 @@ const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf])
 const SUPPORTED_EXTENSIONS = new Map<string, ProjectTextFileKind>([
   ['.md', 'markdown'],
   ['.markdown', 'markdown'],
-  ['.txt', 'text']
+  ['.txt', 'text'],
 ])
 const PREVIEW_ASSET_TYPES = new Map<string, string>([
   ['.gif', 'image/gif'],
   ['.jpeg', 'image/jpeg'],
   ['.jpg', 'image/jpeg'],
   ['.png', 'image/png'],
-  ['.webp', 'image/webp']
+  ['.webp', 'image/webp'],
 ])
 
 function imageMimeType(
   path: string,
-  unsupportedMessage = '当前仅支持 PNG、JPEG、GIF 和 WebP 图片预览'
+  unsupportedMessage = '当前仅支持 PNG、JPEG、GIF 和 WebP 图片预览',
 ): string {
   const mimeType = PREVIEW_ASSET_TYPES.get(extname(path).toLocaleLowerCase())
   if (!mimeType) throw new Error(unsupportedMessage)
   return mimeType
 }
 
-function exportImageMimeType(path: string, bytes: Buffer): 'image/jpeg' | 'image/png' {
+function exportImageMimeType(
+  path: string,
+  bytes: Buffer,
+): 'image/jpeg' | 'image/png' {
   const extension = extname(path).toLocaleLowerCase()
   if (extension === '.png') {
-    const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    const pngSignature = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ])
     if (!bytes.subarray(0, pngSignature.length).equals(pngSignature)) {
       throw new Error('PNG 图片内容无效')
     }
@@ -74,7 +94,10 @@ function validateString(value: unknown, label: string): string {
 }
 
 function isInsideProject(projectPath: string, candidatePath: string): boolean {
-  return candidatePath === projectPath || candidatePath.startsWith(`${projectPath}${sep}`)
+  return (
+    candidatePath === projectPath ||
+    candidatePath.startsWith(`${projectPath}${sep}`)
+  )
 }
 
 function documentKind(path: string): ProjectTextFileKind {
@@ -99,23 +122,35 @@ function validateSaveInput(value: unknown): SaveProjectTextFileInput {
   ) {
     throw new Error('文件保存内容无效')
   }
-  return { path, content: input.content, revision: input.revision, hasBom: input.hasBom }
+  return {
+    path,
+    content: input.content,
+    revision: input.revision,
+    hasBom: input.hasBom,
+  }
 }
 
 async function resolveRegularProjectFile(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<{ targetPath: string; relativePath: string; size: number }> {
-  const projectPath = await realpath(validateString(projectPathInput, '项目路径'))
+  const projectPath = await realpath(
+    validateString(projectPathInput, '项目路径'),
+  )
   const relativePath = validateString(relativePathInput, '文件路径')
   if (isAbsolute(relativePath)) throw new Error('文件路径无效')
 
   const lexicalTarget = resolve(projectPath, relativePath)
-  if (!isInsideProject(projectPath, lexicalTarget)) throw new Error('文件路径超出项目范围')
+  if (!isInsideProject(projectPath, lexicalTarget))
+    throw new Error('文件路径超出项目范围')
 
   const normalizedRelativePath = relative(projectPath, lexicalTarget)
   const segments = normalizedRelativePath.split(sep)
-  if (segments.some((segment) => segment.toLocaleLowerCase() === INTERNAL_PROJECT_DIRECTORY)) {
+  if (
+    segments.some(
+      (segment) => segment.toLocaleLowerCase() === INTERNAL_PROJECT_DIRECTORY,
+    )
+  ) {
     throw new Error('不能打开 SlideMind 内部文件')
   }
 
@@ -128,7 +163,8 @@ async function resolveRegularProjectFile(
   }
 
   const targetPath = await realpath(lexicalTarget)
-  if (!isInsideProject(projectPath, targetPath)) throw new Error('文件路径超出项目范围')
+  if (!isInsideProject(projectPath, targetPath))
+    throw new Error('文件路径超出项目范围')
   const stats = await lstat(targetPath)
   if (!stats.isFile()) throw new Error('目标不是普通文件')
 
@@ -138,16 +174,22 @@ async function resolveRegularProjectFile(
 export class ProjectTextFileStore {
   private readonly writeQueues = new Map<string, Promise<void>>()
 
-  async read(projectPathInput: unknown, relativePathInput: unknown): Promise<ProjectTextFile> {
+  async read(
+    projectPathInput: unknown,
+    relativePathInput: unknown,
+  ): Promise<ProjectTextFile> {
     const { targetPath, relativePath, size } = await resolveRegularProjectFile(
       projectPathInput,
-      relativePathInput
+      relativePathInput,
     )
     const kind = documentKind(relativePath)
-    if (size > MAX_TEXT_FILE_BYTES) throw new Error('文件超过 2 MiB，无法在应用内编辑')
+    if (size > MAX_TEXT_FILE_BYTES)
+      throw new Error('文件超过 2 MiB，无法在应用内编辑')
     const bytes = await readFile(targetPath)
-    if (bytes.byteLength > MAX_TEXT_FILE_BYTES) throw new Error('文件超过 2 MiB，无法在应用内编辑')
-    if (bytes.includes(0)) throw new Error('文件包含二进制内容，无法作为文本打开')
+    if (bytes.byteLength > MAX_TEXT_FILE_BYTES)
+      throw new Error('文件超过 2 MiB，无法在应用内编辑')
+    if (bytes.includes(0))
+      throw new Error('文件包含二进制内容，无法作为文本打开')
 
     const hasBom = bytes.subarray(0, UTF8_BOM.length).equals(UTF8_BOM)
     const textBytes = hasBom ? bytes.subarray(UTF8_BOM.length) : bytes
@@ -164,13 +206,13 @@ export class ProjectTextFileStore {
       content,
       revision: fileRevision(bytes),
       lineEnding: content.includes('\r\n') ? 'crlf' : 'lf',
-      hasBom
+      hasBom,
     }
   }
 
   async readImage(
     projectPathInput: unknown,
-    relativePathInput: unknown
+    relativePathInput: unknown,
   ): Promise<ProjectImageFile> {
     return readProjectImageFile(projectPathInput, relativePathInput)
   }
@@ -178,39 +220,56 @@ export class ProjectTextFileStore {
   async readPreviewAsset(
     projectPathInput: unknown,
     documentPathInput: unknown,
-    assetPathInput: unknown
+    assetPathInput: unknown,
   ): Promise<string> {
     const documentPath = validateString(documentPathInput, '文档路径')
-    const documentFile = await resolveRegularProjectFile(projectPathInput, documentPath)
+    const documentFile = await resolveRegularProjectFile(
+      projectPathInput,
+      documentPath,
+    )
     documentKind(documentFile.relativePath)
 
-    const rawAssetPath = validateString(assetPathInput, '预览资源路径').split(/[?#]/, 1)[0]
+    const rawAssetPath = validateString(assetPathInput, '预览资源路径').split(
+      /[?#]/,
+      1,
+    )[0]
     let decodedAssetPath: string
     try {
       decodedAssetPath = decodeURIComponent(rawAssetPath)
     } catch {
       throw new Error('预览资源路径无效')
     }
-    if (isAbsolute(decodedAssetPath) || /^[a-z][a-z0-9+.-]*:/i.test(decodedAssetPath)) {
+    if (
+      isAbsolute(decodedAssetPath) ||
+      /^[a-z][a-z0-9+.-]*:/i.test(decodedAssetPath)
+    ) {
       throw new Error('预览资源路径无效')
     }
 
-    const relativeAssetPath = join(dirname(documentFile.relativePath), decodedAssetPath)
-    const assetFile = await resolveRegularProjectFile(projectPathInput, relativeAssetPath)
+    const relativeAssetPath = join(
+      dirname(documentFile.relativePath),
+      decodedAssetPath,
+    )
+    const assetFile = await resolveRegularProjectFile(
+      projectPathInput,
+      relativeAssetPath,
+    )
     const mimeType = imageMimeType(
       assetFile.relativePath,
-      'Markdown 预览仅支持 PNG、JPEG、GIF 和 WebP 图片'
+      'Markdown 预览仅支持 PNG、JPEG、GIF 和 WebP 图片',
     )
-    if (assetFile.size > MAX_PREVIEW_ASSET_BYTES) throw new Error('预览图片超过 5 MiB')
+    if (assetFile.size > MAX_PREVIEW_ASSET_BYTES)
+      throw new Error('预览图片超过 5 MiB')
 
     const bytes = await readFile(assetFile.targetPath)
-    if (bytes.byteLength > MAX_PREVIEW_ASSET_BYTES) throw new Error('预览图片超过 5 MiB')
+    if (bytes.byteLength > MAX_PREVIEW_ASSET_BYTES)
+      throw new Error('预览图片超过 5 MiB')
     return `data:${mimeType};base64,${bytes.toString('base64')}`
   }
 
   save(
     projectPathInput: unknown,
-    inputValue: unknown
+    inputValue: unknown,
   ): Promise<SaveProjectTextFileResult> {
     const input = validateSaveInput(inputValue)
     const queueKey = `${String(projectPathInput)}\0${input.path}`
@@ -219,19 +278,26 @@ export class ProjectTextFileStore {
     const operation = previousWrite.then(async () => {
       result = await this.write(projectPathInput, input)
     })
-    const queue = operation.then(() => undefined, () => undefined)
+    const queue = operation.then(
+      () => undefined,
+      () => undefined,
+    )
     this.writeQueues.set(queueKey, queue)
     void queue.finally(() => {
-      if (this.writeQueues.get(queueKey) === queue) this.writeQueues.delete(queueKey)
+      if (this.writeQueues.get(queueKey) === queue)
+        this.writeQueues.delete(queueKey)
     })
     return operation.then(() => result)
   }
 
   private async write(
     projectPathInput: unknown,
-    input: SaveProjectTextFileInput
+    input: SaveProjectTextFileInput,
   ): Promise<SaveProjectTextFileResult> {
-    const { targetPath, relativePath } = await resolveRegularProjectFile(projectPathInput, input.path)
+    const { targetPath, relativePath } = await resolveRegularProjectFile(
+      projectPathInput,
+      input.path,
+    )
     documentKind(relativePath)
     const currentBytes = await readFile(targetPath)
     const currentRevision = fileRevision(currentBytes)
@@ -240,7 +306,9 @@ export class ProjectTextFileStore {
     }
 
     const textBytes = Buffer.from(input.content, 'utf8')
-    const nextBytes = input.hasBom ? Buffer.concat([UTF8_BOM, textBytes]) : textBytes
+    const nextBytes = input.hasBom
+      ? Buffer.concat([UTF8_BOM, textBytes])
+      : textBytes
     if (nextBytes.byteLength > MAX_TEXT_FILE_BYTES) {
       throw new Error('文件超过 2 MiB，无法保存')
     }
@@ -248,7 +316,10 @@ export class ProjectTextFileStore {
     const stats = await lstat(targetPath)
     const temporaryPath = `${targetPath}.${process.pid}-${randomUUID()}.slidemind-tmp`
     try {
-      await writeFile(temporaryPath, nextBytes, { flag: 'wx', mode: stats.mode })
+      await writeFile(temporaryPath, nextBytes, {
+        flag: 'wx',
+        mode: stats.mode,
+      })
       await rename(temporaryPath, targetPath)
     } catch (error) {
       await unlink(temporaryPath).catch(() => undefined)
@@ -261,35 +332,46 @@ export class ProjectTextFileStore {
 
 export async function readProjectImageFile(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<ProjectImageFile> {
-  const imageFile = await resolveRegularProjectFile(projectPathInput, relativePathInput)
+  const imageFile = await resolveRegularProjectFile(
+    projectPathInput,
+    relativePathInput,
+  )
   const mimeType = imageMimeType(imageFile.relativePath)
-  if (imageFile.size > MAX_IMAGE_FILE_BYTES) throw new Error('图片超过 20 MiB，无法预览')
+  if (imageFile.size > MAX_IMAGE_FILE_BYTES)
+    throw new Error('图片超过 20 MiB，无法预览')
 
   const bytes = await readFile(imageFile.targetPath)
-  if (bytes.byteLength > MAX_IMAGE_FILE_BYTES) throw new Error('图片超过 20 MiB，无法预览')
+  if (bytes.byteLength > MAX_IMAGE_FILE_BYTES)
+    throw new Error('图片超过 20 MiB，无法预览')
   return {
     path: imageFile.relativePath,
     mimeType,
     dataUrl: `data:${mimeType};base64,${bytes.toString('base64')}`,
     size: bytes.byteLength,
-    revision: fileRevision(bytes)
+    revision: fileRevision(bytes),
   }
 }
 
 export async function readMarkdownExportImage(
   projectPathInput: unknown,
   documentPathInput: unknown,
-  assetPathInput: unknown
+  assetPathInput: unknown,
 ): Promise<{ bytes: Buffer; mimeType: 'image/jpeg' | 'image/png' }> {
   const documentPath = validateString(documentPathInput, '文档路径')
-  const documentFile = await resolveRegularProjectFile(projectPathInput, documentPath)
+  const documentFile = await resolveRegularProjectFile(
+    projectPathInput,
+    documentPath,
+  )
   if (documentKind(documentFile.relativePath) !== 'markdown') {
     throw new Error('只能从 Markdown 文档导出 Word')
   }
 
-  const rawAssetPath = validateString(assetPathInput, '图片路径').split(/[?#]/, 1)[0]
+  const rawAssetPath = validateString(assetPathInput, '图片路径').split(
+    /[?#]/,
+    1,
+  )[0]
   let decodedAssetPath: string
   try {
     decodedAssetPath = decodeURIComponent(rawAssetPath)
@@ -305,10 +387,18 @@ export async function readMarkdownExportImage(
     throw new Error('图片路径必须位于当前项目内')
   }
 
-  const relativeAssetPath = join(dirname(documentFile.relativePath), decodedAssetPath)
-  const assetFile = await resolveRegularProjectFile(projectPathInput, relativeAssetPath)
-  if (assetFile.size > MAX_PREVIEW_ASSET_BYTES) throw new Error('导出图片超过 5 MiB')
+  const relativeAssetPath = join(
+    dirname(documentFile.relativePath),
+    decodedAssetPath,
+  )
+  const assetFile = await resolveRegularProjectFile(
+    projectPathInput,
+    relativeAssetPath,
+  )
+  if (assetFile.size > MAX_PREVIEW_ASSET_BYTES)
+    throw new Error('导出图片超过 5 MiB')
   const bytes = await readFile(assetFile.targetPath)
-  if (bytes.byteLength > MAX_PREVIEW_ASSET_BYTES) throw new Error('导出图片超过 5 MiB')
+  if (bytes.byteLength > MAX_PREVIEW_ASSET_BYTES)
+    throw new Error('导出图片超过 5 MiB')
   return { bytes, mimeType: exportImageMimeType(assetFile.relativePath, bytes) }
 }

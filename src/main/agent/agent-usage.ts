@@ -1,6 +1,9 @@
 import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import type { Usage } from '@earendil-works/pi-ai'
-import type { SessionEntry, SessionManager } from '@earendil-works/pi-coding-agent'
+import type {
+  SessionEntry,
+  SessionManager,
+} from '@earendil-works/pi-coding-agent'
 import type { AgentConversationUsage } from '../../shared/agent'
 
 type UsageSessionManager = Pick<
@@ -13,10 +16,12 @@ function finiteTokenCount(value: number): number {
 }
 
 function billedTokens(usage: Usage): number {
-  return finiteTokenCount(usage.input) +
+  return (
+    finiteTokenCount(usage.input) +
     finiteTokenCount(usage.output) +
     finiteTokenCount(usage.cacheRead) +
     finiteTokenCount(usage.cacheWrite)
+  )
 }
 
 function contextTokens(usage: Usage): number {
@@ -24,7 +29,10 @@ function contextTokens(usage: Usage): number {
 }
 
 function entryUsage(entry: SessionEntry): Usage | undefined {
-  if ((entry.type === 'compaction' || entry.type === 'branch_summary') && entry.usage) {
+  if (
+    (entry.type === 'compaction' || entry.type === 'branch_summary') &&
+    entry.usage
+  ) {
     return entry.usage
   }
   if (entry.type !== 'message') return undefined
@@ -38,7 +46,8 @@ function validAssistantUsage(message: AgentMessage): Usage | undefined {
     message.role !== 'assistant' ||
     message.stopReason === 'aborted' ||
     message.stopReason === 'error'
-  ) return undefined
+  )
+    return undefined
   return contextTokens(message.usage) > 0 ? message.usage : undefined
 }
 
@@ -49,12 +58,18 @@ function contentLength(content: unknown): number {
     if (!block || typeof block !== 'object') return total
     const candidate = block as Record<string, unknown>
     if (typeof candidate.text === 'string') return total + candidate.text.length
-    if (typeof candidate.thinking === 'string') return total + candidate.thinking.length
+    if (typeof candidate.thinking === 'string')
+      return total + candidate.thinking.length
     if (candidate.type === 'image') return total + 4_800
     if (candidate.type === 'toolCall') {
-      const nameLength = typeof candidate.name === 'string' ? candidate.name.length : 0
+      const nameLength =
+        typeof candidate.name === 'string' ? candidate.name.length : 0
       try {
-        return total + nameLength + (JSON.stringify(candidate.arguments) ?? '').length
+        return (
+          total +
+          nameLength +
+          (JSON.stringify(candidate.arguments) ?? '').length
+        )
       } catch {
         return total + nameLength
       }
@@ -76,11 +91,17 @@ function estimateCurrentContext(messages: AgentMessage[]): number {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const usage = validAssistantUsage(messages[index])
     if (!usage) continue
-    return contextTokens(usage) + messages
-      .slice(index + 1)
-      .reduce((total, message) => total + estimateMessageTokens(message), 0)
+    return (
+      contextTokens(usage) +
+      messages
+        .slice(index + 1)
+        .reduce((total, message) => total + estimateMessageTokens(message), 0)
+    )
   }
-  return messages.reduce((total, message) => total + estimateMessageTokens(message), 0)
+  return messages.reduce(
+    (total, message) => total + estimateMessageTokens(message),
+    0,
+  )
 }
 
 function hasUnknownPostCompactionContext(branch: SessionEntry[]): boolean {
@@ -91,14 +112,17 @@ function hasUnknownPostCompactionContext(branch: SessionEntry[]): boolean {
     break
   }
   if (compactionIndex < 0) return false
-  return !branch.slice(compactionIndex + 1).some((entry) => (
-    entry.type === 'message' && Boolean(validAssistantUsage(entry.message))
-  ))
+  return !branch
+    .slice(compactionIndex + 1)
+    .some(
+      (entry) =>
+        entry.type === 'message' && Boolean(validAssistantUsage(entry.message)),
+    )
 }
 
 export function conversationUsageFromSession(
   sessionManager: UsageSessionManager,
-  contextWindow: number | null
+  contextWindow: number | null,
 ): AgentConversationUsage {
   const totalTokens = sessionManager.getEntries().reduce((total, entry) => {
     const usage = entryUsage(entry)
@@ -106,19 +130,31 @@ export function conversationUsageFromSession(
   }, 0)
 
   if (!contextWindow || contextWindow <= 0) {
-    return { totalTokens, contextTokens: null, contextWindow: null, contextPercent: null }
+    return {
+      totalTokens,
+      contextTokens: null,
+      contextWindow: null,
+      contextPercent: null,
+    }
   }
 
   const branch = sessionManager.getBranch()
   if (hasUnknownPostCompactionContext(branch)) {
-    return { totalTokens, contextTokens: null, contextWindow, contextPercent: null }
+    return {
+      totalTokens,
+      contextTokens: null,
+      contextWindow,
+      contextPercent: null,
+    }
   }
 
-  const tokens = estimateCurrentContext(sessionManager.buildSessionContext().messages)
+  const tokens = estimateCurrentContext(
+    sessionManager.buildSessionContext().messages,
+  )
   return {
     totalTokens,
     contextTokens: tokens,
     contextWindow,
-    contextPercent: (tokens / contextWindow) * 100
+    contextPercent: (tokens / contextWindow) * 100,
   }
 }

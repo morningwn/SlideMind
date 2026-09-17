@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type {
   PptistPresentation,
-  PresentationDocument
+  PresentationDocument,
 } from '../../../shared/presentation'
 import { reportDiagnosticEvent } from '../lib/logger'
 
@@ -33,19 +33,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isPptistPresentation(value: unknown): value is PptistPresentation {
-  return isRecord(value) &&
+  return (
+    isRecord(value) &&
     typeof value.title === 'string' &&
     Array.isArray(value.slides) &&
     isRecord(value.theme) &&
     typeof value.viewportSize === 'number' &&
     typeof value.viewportRatio === 'number'
+  )
 }
 
 export function PresentationEditor({
   document,
   onChange,
   onReload,
-  onSave
+  onSave,
 }: PresentationEditorProps): React.JSX.Element {
   const frameRef = useRef<HTMLIFrameElement>(null)
   const documentRef = useRef(document)
@@ -57,10 +59,15 @@ export function PresentationEditor({
   onSaveRef.current = onSave
 
   const loadEditor = (): void => {
-    frameRef.current?.contentWindow?.postMessage({
-      type: 'slidemind:pptist:load',
-      presentation: structuredClone(documentRef.current.document.presentation)
-    }, '*')
+    frameRef.current?.contentWindow?.postMessage(
+      {
+        type: 'slidemind:pptist:load',
+        presentation: structuredClone(
+          documentRef.current.document.presentation,
+        ),
+      },
+      '*',
+    )
   }
 
   useEffect(() => {
@@ -78,16 +85,17 @@ export function PresentationEditor({
         if (!isPptistPresentation(event.data.presentation)) return
         const nextDocument = {
           ...documentRef.current.document,
-          presentation: event.data.presentation
+          presentation: event.data.presentation,
         }
         onChangeRef.current(nextDocument)
         onSaveRef.current(nextDocument)
         return
       }
       if (event.data.type === 'slidemind:pptist:error') {
-        const message = typeof event.data.message === 'string'
-          ? event.data.message
-          : 'PPTist 编辑器运行失败'
+        const message =
+          typeof event.data.message === 'string'
+            ? event.data.message
+            : 'PPTist 编辑器运行失败'
         reportDiagnosticEvent('error', 'presentation.editor_failed', message)
         setSetupError(message)
         return
@@ -98,7 +106,7 @@ export function PresentationEditor({
       ) {
         onChangeRef.current({
           ...documentRef.current.document,
-          presentation: event.data.presentation
+          presentation: event.data.presentation,
         })
       }
     }
@@ -111,20 +119,31 @@ export function PresentationEditor({
   const error = document.error || setupError
   const editorUrl = new URL('./pptist.html', window.location.href).toString()
   return (
-    <section className="presentation-panel" aria-labelledby="active-presentation-title">
-      <h1 id="active-presentation-title" className="sr-only">{document.name}</h1>
+    <section
+      className="presentation-panel"
+      aria-labelledby="active-presentation-title"
+    >
+      <h1 id="active-presentation-title" className="sr-only">
+        {document.name}
+      </h1>
       {error ? (
         <div className="document-error" role="alert">
           <span>{error}</span>
-          {document.conflict ? <button type="button" onClick={onReload}>重新载入</button> : null}
+          {document.conflict ? (
+            <button type="button" onClick={onReload}>
+              重新载入
+            </button>
+          ) : null}
         </div>
       ) : null}
       <div className="presentation-statusbar" role="status">
-        <span>{document.isExporting
-          ? `正在保存并导出 ${document.exportingFormat === 'pdf' ? 'PDF' : 'PPTX'}…`
-          : document.lastExportPath
-            ? `已导出：${document.lastExportPath}`
-            : 'PPTist · 1000 × 562.5'}</span>
+        <span>
+          {document.isExporting
+            ? `正在保存并导出 ${document.exportingFormat === 'pdf' ? 'PDF' : 'PPTX'}…`
+            : document.lastExportPath
+              ? `已导出：${document.lastExportPath}`
+              : 'PPTist · 1000 × 562.5'}
+        </span>
       </div>
       <iframe
         className="presentation-pptist-frame"

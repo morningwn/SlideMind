@@ -25,12 +25,17 @@ export function formatToolArguments(args: unknown): string | undefined {
   if (args === undefined) return undefined
 
   try {
-    const serialized = JSON.stringify(args, (_key, value: unknown) => (
-      typeof value === 'string'
-        ? truncated(value, MAX_ARGUMENT_STRING_LENGTH)
-        : value
-    ), 2)
-    return serialized ? truncated(serialized, MAX_ARGUMENT_DETAIL_LENGTH) : undefined
+    const serialized = JSON.stringify(
+      args,
+      (_key, value: unknown) =>
+        typeof value === 'string'
+          ? truncated(value, MAX_ARGUMENT_STRING_LENGTH)
+          : value,
+      2,
+    )
+    return serialized
+      ? truncated(serialized, MAX_ARGUMENT_DETAIL_LENGTH)
+      : undefined
   } catch {
     return '参数无法序列化'
   }
@@ -39,7 +44,7 @@ export function formatToolArguments(args: unknown): string | undefined {
 export function createToolActivity(
   toolCallId: string,
   toolName: string,
-  args: unknown
+  args: unknown,
 ): AgentActivity {
   const invokedSkill = skillName(toolName, args)
   return {
@@ -47,7 +52,7 @@ export function createToolActivity(
     kind: invokedSkill ? 'skill' : 'tool',
     name: invokedSkill ?? toolName,
     status: 'running',
-    detail: formatToolArguments(args)
+    detail: formatToolArguments(args),
   }
 }
 
@@ -57,12 +62,13 @@ export function toolErrorDetail(result: unknown): string | undefined {
   if (!Array.isArray(content)) return undefined
 
   const detail = content
-    .filter((block): block is { type: 'text'; text: string } => (
-      Boolean(block) &&
-      typeof block === 'object' &&
-      (block as Record<string, unknown>).type === 'text' &&
-      typeof (block as Record<string, unknown>).text === 'string'
-    ))
+    .filter(
+      (block): block is { type: 'text'; text: string } =>
+        Boolean(block) &&
+        typeof block === 'object' &&
+        (block as Record<string, unknown>).type === 'text' &&
+        typeof (block as Record<string, unknown>).text === 'string',
+    )
     .map((block) => block.text)
     .join('\n')
     .trim()

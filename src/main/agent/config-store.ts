@@ -5,7 +5,7 @@ import {
   DEFAULT_DEEPSEEK_MODEL_ID,
   DEEPSEEK_MODEL_OPTIONS,
   DEEPSEEK_PROVIDER_ID,
-  type AgentConfigStatus
+  type AgentConfigStatus,
 } from '../../shared/agent'
 import { normalizeConfigInput } from './config-validation'
 import { getLogger } from '../logging/logger'
@@ -22,7 +22,9 @@ export interface AgentConfiguration {
   apiKey: string
 }
 
-const allowedModelIds: readonly string[] = DEEPSEEK_MODEL_OPTIONS.map((model) => model.id)
+const allowedModelIds: readonly string[] = DEEPSEEK_MODEL_OPTIONS.map(
+  (model) => model.id,
+)
 const logger = getLogger('agent-config')
 
 function isStoredAgentConfig(value: unknown): value is StoredAgentConfig {
@@ -49,19 +51,24 @@ export class AgentConfigStore {
         return undefined
       }
 
-      const modelId = stored.modelId === 'deepseek-v4-flash' || stored.modelId === 'deepseek-v4-flash-vision-exp'
-        ? 'deepseek-flash'
-        : stored.modelId
+      const modelId =
+        stored.modelId === 'deepseek-v4-flash' ||
+        stored.modelId === 'deepseek-v4-flash-vision-exp'
+          ? 'deepseek-flash'
+          : stored.modelId
       if (!allowedModelIds.includes(modelId)) return undefined
 
       if (!safeStorage.isEncryptionAvailable()) {
         return undefined
       }
 
-      const apiKey = safeStorage.decryptString(Buffer.from(stored.encryptedApiKey, 'base64')).trim()
+      const apiKey = safeStorage
+        .decryptString(Buffer.from(stored.encryptedApiKey, 'base64'))
+        .trim()
       return apiKey ? { modelId, apiKey } : undefined
     } catch (error) {
-      const code = error instanceof Error && 'code' in error ? error.code : undefined
+      const code =
+        error instanceof Error && 'code' in error ? error.code : undefined
       if (code !== 'ENOENT') {
         logger.warn('agent.config_read_failed', { error })
       }
@@ -72,7 +79,9 @@ export class AgentConfigStore {
   async getStatus(): Promise<AgentConfigStatus> {
     const config = await this.load()
     const modelId = config?.modelId ?? DEFAULT_DEEPSEEK_MODEL_ID
-    const model = DEEPSEEK_MODEL_OPTIONS.find((item) => item.id === modelId) ?? DEEPSEEK_MODEL_OPTIONS[0]
+    const model =
+      DEEPSEEK_MODEL_OPTIONS.find((item) => item.id === modelId) ??
+      DEEPSEEK_MODEL_OPTIONS[0]
 
     return {
       configured: Boolean(config),
@@ -80,13 +89,17 @@ export class AgentConfigStore {
       providerName: 'DeepSeek',
       modelId: model.id,
       modelName: model.name,
-      models: DEEPSEEK_MODEL_OPTIONS.map((item) => ({ ...item }))
+      models: DEEPSEEK_MODEL_OPTIONS.map((item) => ({ ...item })),
     }
   }
 
   async save(input: unknown): Promise<AgentConfigStatus> {
     const existing = await this.load()
-    const normalized = normalizeConfigInput(input, allowedModelIds, Boolean(existing?.apiKey))
+    const normalized = normalizeConfigInput(
+      input,
+      allowedModelIds,
+      Boolean(existing?.apiKey),
+    )
     const apiKey = normalized.apiKey ?? existing?.apiKey
 
     if (!apiKey) {
@@ -101,13 +114,13 @@ export class AgentConfigStore {
       version: 1,
       provider: DEEPSEEK_PROVIDER_ID,
       modelId: normalized.modelId,
-      encryptedApiKey: safeStorage.encryptString(apiKey).toString('base64')
+      encryptedApiKey: safeStorage.encryptString(apiKey).toString('base64'),
     }
 
     await mkdir(dirname(this.configPath), { recursive: true })
     await writeFile(this.configPath, `${JSON.stringify(stored, null, 2)}\n`, {
       encoding: 'utf8',
-      mode: 0o600
+      mode: 0o600,
     })
     await chmod(this.configPath, 0o600)
 

@@ -5,7 +5,8 @@ const MAX_CONTEXT_STRING_LENGTH = 500
 const MAX_ERROR_MESSAGE_LENGTH = 2_000
 const MAX_ERROR_STACK_LENGTH = 8_000
 const REDACTED = '[REDACTED]'
-const SENSITIVE_KEY_PATTERN = /^(?:api.?key|authorization|cookie|password|prompt|response|secret|token)$/i
+const SENSITIVE_KEY_PATTERN =
+  /^(?:api.?key|authorization|cookie|password|prompt|response|secret|token)$/i
 
 export interface SanitizedError {
   code?: string
@@ -29,19 +30,22 @@ function truncate(value: string, limit: number): string {
 export function sanitizeText(
   value: string,
   options: SanitizeOptions = {},
-  limit = MAX_ERROR_MESSAGE_LENGTH
+  limit = MAX_ERROR_MESSAGE_LENGTH,
 ): string {
   let sanitized = value
     .replace(/\bBearer\s+[^\s,;]+/gi, `Bearer ${REDACTED}`)
     .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/gi, REDACTED)
     .replace(
       /(\b(?:api[-_ ]?key|authorization|cookie|password|secret|token)\b["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,;&}]+)/gi,
-      (_match, prefix: string) => `${prefix}${REDACTED}`
+      (_match, prefix: string) => `${prefix}${REDACTED}`,
     )
 
   for (const path of options.sensitivePaths ?? []) {
     if (!path) continue
-    sanitized = sanitized.replace(new RegExp(escapeRegExp(path), 'g'), '[USER_PATH]')
+    sanitized = sanitized.replace(
+      new RegExp(escapeRegExp(path), 'g'),
+      '[USER_PATH]',
+    )
   }
 
   return truncate(sanitized, limit)
@@ -50,17 +54,19 @@ export function sanitizeText(
 function errorCode(error: Error): string | undefined {
   if (!('code' in error)) return undefined
   const code = error.code
-  return typeof code === 'string' || typeof code === 'number' ? String(code) : undefined
+  return typeof code === 'string' || typeof code === 'number'
+    ? String(code)
+    : undefined
 }
 
 export function sanitizeError(
   error: unknown,
-  options: SanitizeOptions = {}
+  options: SanitizeOptions = {},
 ): SanitizedError {
   if (!(error instanceof Error)) {
     return {
       name: 'NonError',
-      message: sanitizeText(String(error), options)
+      message: sanitizeText(String(error), options),
     }
   }
 
@@ -71,13 +77,13 @@ export function sanitizeError(
     ...(code ? { code: sanitizeText(code, options, 200) } : {}),
     ...(error.stack
       ? { stack: sanitizeText(error.stack, options, MAX_ERROR_STACK_LENGTH) }
-      : {})
+      : {}),
   }
 }
 
 export function sanitizeContext(
   context: Readonly<Record<string, DiagnosticContextValue>> | undefined,
-  options: SanitizeOptions = {}
+  options: SanitizeOptions = {},
 ): Record<string, DiagnosticContextValue> | undefined {
   if (!context) return undefined
 

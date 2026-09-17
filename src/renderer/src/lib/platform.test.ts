@@ -5,7 +5,7 @@ describe('getPlatformLabel', () => {
   it.each([
     ['darwin', 'macOS'],
     ['win32', 'Windows'],
-    ['linux', 'Desktop']
+    ['linux', 'Desktop'],
   ] as const)('maps %s to %s', (platform, label) => {
     expect(getPlatformLabel(platform)).toBe(label)
   })

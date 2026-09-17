@@ -3,7 +3,7 @@ import {
   PRESENTATION_FORMAT,
   PRESENTATION_FORMAT_VERSION,
   type PptistPresentation,
-  type PresentationDocument
+  type PresentationDocument,
 } from '../../../shared/presentation'
 
 export interface PptxImportRequest {
@@ -25,12 +25,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isPptistPresentation(value: unknown): value is PptistPresentation {
-  return isRecord(value) &&
+  return (
+    isRecord(value) &&
     typeof value.title === 'string' &&
     Array.isArray(value.slides) &&
     isRecord(value.theme) &&
     typeof value.viewportSize === 'number' &&
     typeof value.viewportRatio === 'number'
+  )
 }
 
 function blankPresentation(title: string): PptistPresentation {
@@ -39,21 +41,28 @@ function blankPresentation(title: string): PptistPresentation {
     viewportSize: 1000,
     viewportRatio: 0.5625,
     theme: {
-      themeColors: ['#5b9bd5', '#ed7d31', '#a5a5a5', '#ffc000', '#4472c4', '#70ad47'],
+      themeColors: [
+        '#5b9bd5',
+        '#ed7d31',
+        '#a5a5a5',
+        '#ffc000',
+        '#4472c4',
+        '#70ad47',
+      ],
       fontColor: '#333333',
       fontName: '',
       backgroundColor: '#ffffff',
       shadow: { h: 3, v: 3, blur: 2, color: '#808080' },
-      outline: { width: 2, color: '#525252', style: 'solid' }
+      outline: { width: 2, color: '#525252', style: 'solid' },
     },
-    slides: [{ id: crypto.randomUUID(), elements: [] }]
+    slides: [{ id: crypto.randomUUID(), elements: [] }],
   }
 }
 
 export function PptxImportFrame({
   request,
   onError,
-  onImported
+  onImported,
 }: PptxImportFrameProps): React.JSX.Element {
   const frameRef = useRef<HTMLIFrameElement>(null)
   const sentRequestIdRef = useRef<string | null>(null)
@@ -66,18 +75,26 @@ export function PptxImportFrame({
     const frameWindow = frameRef.current?.contentWindow
     if (!frameWindow || sentRequestIdRef.current === request.id) return
     sentRequestIdRef.current = request.id
-    frameWindow.postMessage({
-      type: 'slidemind:pptist:import',
-      requestId: request.id,
-      fileName: request.fileName,
-      bytes: request.bytes,
-      presentation: blankPresentation(request.title)
-    }, '*', [request.bytes])
+    frameWindow.postMessage(
+      {
+        type: 'slidemind:pptist:import',
+        requestId: request.id,
+        fileName: request.fileName,
+        bytes: request.bytes,
+        presentation: blankPresentation(request.title),
+      },
+      '*',
+      [request.bytes],
+    )
   }
 
   useEffect(() => {
     const receiveMessage = (event: MessageEvent): void => {
-      if (event.source !== frameRef.current?.contentWindow || !isRecord(event.data)) return
+      if (
+        event.source !== frameRef.current?.contentWindow ||
+        !isRecord(event.data)
+      )
+        return
       if (event.data.type === 'slidemind:pptist:ready') {
         startImport()
         return
@@ -90,7 +107,7 @@ export function PptxImportFrame({
         onImportedRef.current(request.id, {
           format: PRESENTATION_FORMAT,
           version: PRESENTATION_FORMAT_VERSION,
-          presentation: event.data.presentation
+          presentation: event.data.presentation,
         })
         return
       }
@@ -98,9 +115,10 @@ export function PptxImportFrame({
         event.data.type === 'slidemind:pptist:import-error' &&
         event.data.requestId === request.id
       ) {
-        const message = typeof event.data.message === 'string'
-          ? event.data.message
-          : '无法导入 PPTX 文件'
+        const message =
+          typeof event.data.message === 'string'
+            ? event.data.message
+            : '无法导入 PPTX 文件'
         onErrorRef.current(request.id, message)
       }
     }

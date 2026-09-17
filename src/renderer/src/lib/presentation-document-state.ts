@@ -5,13 +5,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isPresentationElement(value: Record<string, unknown>): boolean {
-  return typeof value.type === 'string' &&
+  return (
+    typeof value.type === 'string' &&
     typeof value.id === 'string' &&
     typeof value.left === 'number' &&
     typeof value.top === 'number'
+  )
 }
 
-function derivedDimension(value: Record<string, unknown>): 'height' | 'width' | null {
+function derivedDimension(
+  value: Record<string, unknown>,
+): 'height' | 'width' | null {
   if (!isPresentationElement(value)) return null
   if (value.type === 'table') return 'height'
   if (value.type !== 'text' || value.fixedHeight === true) return null
@@ -30,6 +34,8 @@ function sortObjectKeys(value: unknown): unknown {
   return sorted
 }
 
-export function serializePresentationDocumentState(document: PresentationDocument): string {
+export function serializePresentationDocumentState(
+  document: PresentationDocument,
+): string {
   return JSON.stringify(sortObjectKeys(document))
 }

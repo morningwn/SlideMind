@@ -8,7 +8,10 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = resolve(scriptDirectory, '../..')
 const packageRuntimeRoot = join(repositoryRoot, 'out/.pandoc-package-runtime')
 const runtimeManifest = JSON.parse(
-  await readFile(join(repositoryRoot, 'scripts/pandoc-p0/runtime-manifest.json'), 'utf8'),
+  await readFile(
+    join(repositoryRoot, 'scripts/pandoc-p0/runtime-manifest.json'),
+    'utf8',
+  ),
 )
 const expectedSource = runtimeManifest.correspondingSource
 const archNames = new Map([
@@ -84,7 +87,8 @@ export async function validateRuntime(
   }
 
   if (
-    manifest.correspondingSource?.path !== `runtime/${expectedSource.archive}` ||
+    manifest.correspondingSource?.path !==
+      `runtime/${expectedSource.archive}` ||
     manifest.correspondingSource?.url !== expectedSource.url ||
     manifest.correspondingSource?.bytes !== expectedSource.size ||
     manifest.correspondingSource?.sha256 !== expectedSource.sha256

@@ -2,7 +2,7 @@ import { BrowserWindow, ipcMain } from 'electron'
 import type {
   CompareProjectVersionFileInput,
   ProjectVersionCreatedEvent,
-  RestoreProjectVersionInput
+  RestoreProjectVersionInput,
 } from '../../shared/project-version'
 import type { ProjectRootRegistry } from '../project/project-root-registry'
 import type { ProjectMutationService } from './project-mutation-service'
@@ -27,7 +27,9 @@ function validatePath(value: unknown): string {
   return value
 }
 
-function validateComparisonInput(value: unknown): CompareProjectVersionFileInput {
+function validateComparisonInput(
+  value: unknown,
+): CompareProjectVersionFileInput {
   if (!value || typeof value !== 'object') throw new Error('版本比较参数无效')
   const input = value as Partial<CompareProjectVersionFileInput>
   if (input.target !== 'current' && input.target !== 'previous') {
@@ -36,14 +38,18 @@ function validateComparisonInput(value: unknown): CompareProjectVersionFileInput
   return {
     versionId: validateVersionId(input.versionId),
     path: validatePath(input.path),
-    target: input.target
+    target: input.target,
   }
 }
 
 function validateRestoreInput(value: unknown): RestoreProjectVersionInput {
   if (!value || typeof value !== 'object') throw new Error('版本恢复参数无效')
   const input = value as Partial<RestoreProjectVersionInput>
-  if (!Array.isArray(input.files) || input.files.length === 0 || input.files.length > 100) {
+  if (
+    !Array.isArray(input.files) ||
+    input.files.length === 0 ||
+    input.files.length > 100
+  ) {
     throw new Error('请选择要恢复的文件')
   }
   return {
@@ -59,16 +65,16 @@ function validateRestoreInput(value: unknown): RestoreProjectVersionInput {
       }
       return {
         path: validatePath(candidate.path),
-        currentRevision: candidate.currentRevision
+        currentRevision: candidate.currentRevision,
       }
-    })
+    }),
   }
 }
 
 export function registerProjectVersionIpc(
   projectRoots: ProjectRootRegistry,
   versions: ProjectVersionService,
-  mutations: ProjectMutationService
+  mutations: ProjectMutationService,
 ): void {
   versions.onCreated(({ projectPath, versionId }) => {
     const projectHandle = projectRoots.handleForPath(projectPath)
@@ -83,16 +89,20 @@ export function registerProjectVersionIpc(
     'project-version:list',
     (_event, projectHandle: unknown, cursor: unknown) => {
       if (cursor !== undefined) validateVersionId(cursor)
-      return versions.listVersions(projectRoots.resolve(projectHandle), cursor as string | undefined)
-    }
+      return versions.listVersions(
+        projectRoots.resolve(projectHandle),
+        cursor as string | undefined,
+      )
+    },
   )
 
   ipcMain.handle(
     'project-version:compare-file',
-    (_event, projectHandle: unknown, input: unknown) => versions.compareFile(
-      projectRoots.resolve(projectHandle),
-      validateComparisonInput(input)
-    )
+    (_event, projectHandle: unknown, input: unknown) =>
+      versions.compareFile(
+        projectRoots.resolve(projectHandle),
+        validateComparisonInput(input),
+      ),
   )
 
   ipcMain.handle(
@@ -103,8 +113,8 @@ export function registerProjectVersionIpc(
       return mutations.restoreVersion(
         projectPath,
         projectHandle,
-        validateRestoreInput(input)
+        validateRestoreInput(input),
       )
-    }
+    },
   )
 }

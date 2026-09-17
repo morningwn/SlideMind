@@ -4,15 +4,17 @@ import { reportDiagnosticEvent } from '../lib/logger'
 
 function toPersistedState(
   conversations: ProjectConversationState['conversations'],
-  selectedConversationId: string
+  selectedConversationId: string,
 ): ProjectConversationState {
   return {
     selectedConversationId,
     conversations: conversations.map((conversation) => ({
       id: conversation.id,
       title: conversation.title,
-      ...(conversation.archived !== undefined ? { archived: conversation.archived } : {})
-    }))
+      ...(conversation.archived !== undefined
+        ? { archived: conversation.archived }
+        : {}),
+    })),
   }
 }
 
@@ -27,10 +29,13 @@ export function useConversationPersistence({
   conversations,
   selectedConversationId,
   enabled,
-  onError
+  onError,
 }: ConversationPersistenceOptions) {
   const lastSavedConversationSnapshotRef = useRef('')
-  const latestConversationStateRef = useRef({ conversations, selectedConversationId })
+  const latestConversationStateRef = useRef({
+    conversations,
+    selectedConversationId,
+  })
   const canFlushConversationsRef = useRef(false)
   latestConversationStateRef.current = { conversations, selectedConversationId }
   canFlushConversationsRef.current = enabled
@@ -56,18 +61,26 @@ export function useConversationPersistence({
     return () => window.clearTimeout(timer)
   }, [enabled, conversations, projectHandle, selectedConversationId, onError])
 
-  useEffect(() => () => {
-    if (!canFlushConversationsRef.current) return
+  useEffect(
+    () => () => {
+      if (!canFlushConversationsRef.current) return
 
-    const latest = latestConversationStateRef.current
-    const state = toPersistedState(latest.conversations, latest.selectedConversationId)
-    const snapshot = JSON.stringify(state)
-    if (snapshot === lastSavedConversationSnapshotRef.current) return
+      const latest = latestConversationStateRef.current
+      const state = toPersistedState(
+        latest.conversations,
+        latest.selectedConversationId,
+      )
+      const snapshot = JSON.stringify(state)
+      if (snapshot === lastSavedConversationSnapshotRef.current) return
 
-    void window.projects.saveConversations(projectHandle, state).catch((error: unknown) => {
-      reportDiagnosticEvent('warn', 'conversation.flush_failed', error)
-    })
-  }, [projectHandle])
+      void window.projects
+        .saveConversations(projectHandle, state)
+        .catch((error: unknown) => {
+          reportDiagnosticEvent('warn', 'conversation.flush_failed', error)
+        })
+    },
+    [projectHandle],
+  )
 
   return lastSavedConversationSnapshotRef
 }

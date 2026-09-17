@@ -1,7 +1,13 @@
 :root {
   color: #15233d;
   background: #f3f6fb;
-  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --canvas: #f3f6fb;
@@ -106,7 +112,7 @@ button:disabled {
 .app-title-bar-linux {
   padding-right: calc(
     100vw - env(titlebar-area-x, 0px) -
-    env(titlebar-area-width, calc(100vw - 138px)) + 10px
+      env(titlebar-area-width, calc(100vw - 138px)) + 10px
   );
 }
 
@@ -169,7 +175,9 @@ button:disabled {
   cursor: pointer;
   font-size: 12px;
   font-weight: 680;
-  transition: border-color 140ms ease, background 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
 }
 
 .title-bar-project select:hover:not(:disabled) {
@@ -281,7 +289,10 @@ button:disabled {
   cursor: pointer;
   font-size: 13px;
   font-weight: 660;
-  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease,
+    background 150ms ease;
 }
 
 .settings-action:hover {
@@ -338,7 +349,10 @@ button:disabled {
   cursor: pointer;
   font-size: 13px;
   font-weight: 700;
-  transition: transform 150ms ease, background 150ms ease, box-shadow 150ms ease;
+  transition:
+    transform 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .open-project-action:hover,
@@ -395,7 +409,9 @@ button:disabled {
   text-align: left;
   background: transparent;
   cursor: pointer;
-  transition: border-color 140ms ease, background 140ms ease;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
 }
 
 .project-open:hover,
@@ -415,8 +431,9 @@ button:disabled {
   border-radius: 9px 9px 9px 3px;
   color: white;
   background: var(--project-color);
-  box-shadow: 5px 5px 0 color-mix(in srgb, var(--project-color) 20%, transparent);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  box-shadow: 5px 5px 0
+    color-mix(in srgb, var(--project-color) 20%, transparent);
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 11px;
   font-weight: 750;
   letter-spacing: -0.05em;
@@ -430,7 +447,7 @@ button:disabled {
   height: 23px;
   border-radius: 0 3px 3px 0;
   background: color-mix(in srgb, var(--project-color) 50%, white);
-  content: "";
+  content: '';
   opacity: 0.7;
 }
 
@@ -485,7 +502,10 @@ button:disabled {
   font-size: 17px;
   opacity: 0;
   transform: translateX(-4px);
-  transition: color 140ms ease, opacity 140ms ease, transform 140ms ease;
+  transition:
+    color 140ms ease,
+    opacity 140ms ease,
+    transform 140ms ease;
 }
 
 .project-item:hover .open-arrow,
@@ -511,7 +531,10 @@ button:disabled {
   cursor: pointer;
   font-size: 16px;
   opacity: 0;
-  transition: color 140ms ease, background 140ms ease, opacity 140ms ease;
+  transition:
+    color 140ms ease,
+    background 140ms ease,
+    opacity 140ms ease;
 }
 
 .project-item:hover .remove-project,
@@ -529,13 +552,20 @@ button:disabled {
   width: 100%;
   height: 86px;
   border-radius: 12px;
-  background: linear-gradient(100deg, rgb(21 35 61 / 3%), rgb(21 35 61 / 7%), rgb(21 35 61 / 3%));
+  background: linear-gradient(
+    100deg,
+    rgb(21 35 61 / 3%),
+    rgb(21 35 61 / 7%),
+    rgb(21 35 61 / 3%)
+  );
   background-size: 220% 100%;
   animation: shimmer 1.3s ease-in-out infinite;
 }
 
 @keyframes shimmer {
-  to { background-position: -120% 0; }
+  to {
+    background-position: -120% 0;
+  }
 }
 
 .empty-state {
@@ -568,7 +598,7 @@ button:disabled {
 
 .empty-state h2 {
   margin: 0 0 9px;
-  font-family: "Iowan Old Style", "Songti SC", Georgia, serif;
+  font-family: 'Iowan Old Style', 'Songti SC', Georgia, serif;
   font-size: 23px;
   font-weight: 590;
 }
@@ -707,7 +737,7 @@ button:disabled {
 .settings-intro h1 {
   margin: 0 0 8px;
   color: #1c2b46;
-  font-family: "Iowan Old Style", "Songti SC", Georgia, serif;
+  font-family: 'Iowan Old Style', 'Songti SC', Georgia, serif;
   font-size: clamp(32px, 3.6vw, 44px);
   font-weight: 590;
   letter-spacing: -0.045em;
@@ -761,7 +791,10 @@ button:disabled {
   text-align: left;
   background: transparent;
   cursor: pointer;
-  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+  transition:
+    border-color 140ms ease,
+    color 140ms ease,
+    background 140ms ease;
 }
 
 .settings-navigation > button:hover {
@@ -865,7 +898,7 @@ button:disabled {
 
 .settings-section-heading > span {
   color: var(--blue);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -949,7 +982,9 @@ button:disabled {
 }
 
 @keyframes startup-config-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1041,7 +1076,7 @@ button:disabled {
   color: white;
   background: var(--blue);
   box-shadow: 5px 5px 0 rgb(47 97 233 / 12%);
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 10px;
   font-weight: 780;
 }
@@ -1209,7 +1244,7 @@ button:disabled {
   border-radius: 11px 11px 11px 3px;
   color: #cbd6ee;
   background: #18243b;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 8px;
   letter-spacing: 0.06em;
 }
@@ -1711,7 +1746,7 @@ button.file-tree-item:not(.file-tree-directory) {
   place-items: center;
   border: 1px solid currentColor;
   border-radius: 4px;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 7px;
   font-weight: 780;
   letter-spacing: -0.03em;
@@ -2374,7 +2409,7 @@ button.file-tree-item:not(.file-tree-directory) {
 .history-detail-heading code {
   margin-left: 9px;
   color: #8a95a7;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-size: 9px;
 }
 
@@ -2536,7 +2571,7 @@ button.file-tree-item:not(.file-tree-directory) {
 .history-comparison-bar > span {
   overflow: hidden;
   color: #738097;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-size: 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2579,7 +2614,7 @@ button.file-tree-item:not(.file-tree-directory) {
 .history-diff-lines {
   min-width: max-content;
   padding: 9px 0 24px;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-size: 10px;
   line-height: 1.55;
 }
@@ -2794,7 +2829,7 @@ button.file-tree-item:not(.file-tree-directory) {
   padding: 0 15px;
   border-bottom: 1px solid #e6ebf3;
   color: #65738a;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   text-transform: uppercase;
 }
 
@@ -2872,7 +2907,7 @@ button.file-tree-item:not(.file-tree-directory) {
 .markdown-preview h2,
 .markdown-preview h3 {
   color: #1e2e4a;
-  font-family: "Iowan Old Style", "Songti SC", Georgia, serif;
+  font-family: 'Iowan Old Style', 'Songti SC', Georgia, serif;
   font-weight: 590;
   letter-spacing: -0.025em;
   line-height: 1.25;
@@ -2885,9 +2920,17 @@ button.file-tree-item:not(.file-tree-directory) {
   font-size: 30px;
 }
 
-.markdown-preview h2 { margin: 34px 0 14px; font-size: 22px; }
-.markdown-preview h3 { margin: 27px 0 12px; font-size: 17px; }
-.markdown-preview p { margin: 0 0 16px; }
+.markdown-preview h2 {
+  margin: 34px 0 14px;
+  font-size: 22px;
+}
+.markdown-preview h3 {
+  margin: 27px 0 12px;
+  font-size: 17px;
+}
+.markdown-preview p {
+  margin: 0 0 16px;
+}
 
 .markdown-preview a {
   color: var(--blue);
@@ -2907,7 +2950,7 @@ button.file-tree-item:not(.file-tree-directory) {
   border-radius: 5px;
   color: #334b83;
   background: #eef3ff;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 0.9em;
 }
 
@@ -2941,8 +2984,12 @@ button.file-tree-item:not(.file-tree-directory) {
   text-align: left;
 }
 
-.markdown-preview th { background: #f3f6fb; }
-.markdown-preview img { max-width: 100%; }
+.markdown-preview th {
+  background: #f3f6fb;
+}
+.markdown-preview img {
+  max-width: 100%;
+}
 .markdown-image-error {
   display: block;
   margin: 18px 0;
@@ -2953,7 +3000,11 @@ button.file-tree-item:not(.file-tree-directory) {
   background: #fff7f5;
   font-size: 10px;
 }
-.markdown-preview hr { margin: 34px 0; border: 0; border-top: 1px solid #dce3ef; }
+.markdown-preview hr {
+  margin: 34px 0;
+  border: 0;
+  border-top: 1px solid #dce3ef;
+}
 
 .markdown-preview-empty {
   display: flex;
@@ -2976,7 +3027,7 @@ button.file-tree-item:not(.file-tree-directory) {
   color: #5872aa;
   background: #f2f6ff;
   box-shadow: 6px 6px 0 rgb(47 97 233 / 8%);
-  font-family: "Iowan Old Style", Georgia, serif;
+  font-family: 'Iowan Old Style', Georgia, serif;
   font-size: 15px;
 }
 
@@ -3012,7 +3063,7 @@ button.file-tree-item:not(.file-tree-directory) {
   border-bottom: 1px solid #dbe2ed;
   color: #6d798d;
   background: #f8fafd;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 9px;
 }
 
@@ -3079,7 +3130,11 @@ button.file-tree-item:not(.file-tree-directory) {
     linear-gradient(-45deg, #dfe4ec 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, #dfe4ec 75%),
     linear-gradient(-45deg, transparent 75%, #dfe4ec 75%);
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
   background-size: 16px 16px;
 }
 
@@ -3129,7 +3184,9 @@ button.file-tree-item:not(.file-tree-directory) {
     padding: 6px 10px;
   }
 
-  .image-preview-canvas { padding: 20px; }
+  .image-preview-canvas {
+    padding: 20px;
+  }
 }
 
 .chat-panel {
@@ -3184,7 +3241,7 @@ button.file-tree-item:not(.file-tree-directory) {
 
 .chat-empty h2 {
   margin: 0 0 10px;
-  font-family: "Iowan Old Style", "Songti SC", Georgia, serif;
+  font-family: 'Iowan Old Style', 'Songti SC', Georgia, serif;
   font-size: 25px;
   font-weight: 590;
   letter-spacing: -0.025em;
@@ -3273,7 +3330,9 @@ button.file-tree-item:not(.file-tree-directory) {
   cursor: pointer;
 }
 
-.agent-activity-toggle:hover { background: #f0f4fa; }
+.agent-activity-toggle:hover {
+  background: #f0f4fa;
+}
 
 .agent-activity-toggle:focus-visible {
   outline: 2px solid rgb(47 97 233 / 34%);
@@ -3302,7 +3361,9 @@ button.file-tree-item:not(.file-tree-directory) {
   transition: transform 160ms ease;
 }
 
-.agent-activity-toggle[aria-expanded='true'] svg { transform: rotate(180deg); }
+.agent-activity-toggle[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
 
 .agent-activity-pulse {
   width: 6px;
@@ -3349,7 +3410,9 @@ button.file-tree-item:not(.file-tree-directory) {
   cursor: pointer;
 }
 
-.agent-activity-item summary::-webkit-details-marker { display: none; }
+.agent-activity-item summary::-webkit-details-marker {
+  display: none;
+}
 
 .agent-activity-item summary::before {
   position: absolute;
@@ -3363,9 +3426,15 @@ button.file-tree-item:not(.file-tree-directory) {
   content: '';
 }
 
-.agent-activity-item.is-running summary::before { background: var(--blue); }
-.agent-activity-item.is-stopped summary::before { background: #9a7b52; }
-.agent-activity-item.is-error summary::before { background: #c45555; }
+.agent-activity-item.is-running summary::before {
+  background: var(--blue);
+}
+.agent-activity-item.is-stopped summary::before {
+  background: #9a7b52;
+}
+.agent-activity-item.is-error summary::before {
+  background: #c45555;
+}
 
 .agent-activity-kind {
   width: fit-content;
@@ -3374,7 +3443,7 @@ button.file-tree-item:not(.file-tree-directory) {
   border-radius: 3px;
   color: #708098;
   background: #f5f7fa;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 7px;
   font-weight: 760;
   letter-spacing: 0.06em;
@@ -3408,8 +3477,12 @@ button.file-tree-item:not(.file-tree-directory) {
   font-size: 9px;
 }
 
-.agent-activity-item.is-error summary small { color: #ae4b4b; }
-.agent-activity-item.is-stopped summary small { color: #8d704a; }
+.agent-activity-item.is-error summary small {
+  color: #ae4b4b;
+}
+.agent-activity-item.is-stopped summary small {
+  color: #8d704a;
+}
 
 .agent-activity-item-chevron {
   width: 6px;
@@ -3444,11 +3517,15 @@ button.file-tree-item:not(.file-tree-directory) {
 }
 
 .agent-activity-item > pre {
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
 }
 
-.chat-message-content > :first-child { margin-top: 0; }
-.chat-message-content > :last-child { margin-bottom: 0; }
+.chat-message-content > :first-child {
+  margin-top: 0;
+}
+.chat-message-content > :last-child {
+  margin-bottom: 0;
+}
 
 .chat-message-content h1,
 .chat-message-content h2,
@@ -3458,20 +3535,30 @@ button.file-tree-item:not(.file-tree-directory) {
 .chat-message-content h6 {
   margin: 1.15em 0 0.45em;
   color: #23344f;
-  font-family: "Iowan Old Style", "Songti SC", Georgia, serif;
+  font-family: 'Iowan Old Style', 'Songti SC', Georgia, serif;
   font-weight: 620;
   letter-spacing: -0.018em;
   line-height: 1.3;
 }
 
-.chat-message-content h1 { font-size: 1.5em; }
-.chat-message-content h2 { font-size: 1.3em; }
-.chat-message-content h3 { font-size: 1.13em; }
+.chat-message-content h1 {
+  font-size: 1.5em;
+}
+.chat-message-content h2 {
+  font-size: 1.3em;
+}
+.chat-message-content h3 {
+  font-size: 1.13em;
+}
 .chat-message-content h4,
 .chat-message-content h5,
-.chat-message-content h6 { font-size: 1em; }
+.chat-message-content h6 {
+  font-size: 1em;
+}
 
-.chat-message-content p { margin: 0 0 0.8em; }
+.chat-message-content p {
+  margin: 0 0 0.8em;
+}
 
 .chat-message-content ul,
 .chat-message-content ol {
@@ -3479,7 +3566,9 @@ button.file-tree-item:not(.file-tree-directory) {
   padding-left: 1.6em;
 }
 
-.chat-message-content li + li { margin-top: 0.25em; }
+.chat-message-content li + li {
+  margin-top: 0.25em;
+}
 
 .chat-message-content blockquote {
   margin: 0.85em 0;
@@ -3493,7 +3582,7 @@ button.file-tree-item:not(.file-tree-directory) {
   border-radius: 4px;
   color: #334b83;
   background: #eaf0fb;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 0.9em;
 }
 
@@ -3539,7 +3628,9 @@ button.file-tree-item:not(.file-tree-directory) {
   white-space: nowrap;
 }
 
-.chat-message-content th { background: #edf2f9; }
+.chat-message-content th {
+  background: #edf2f9;
+}
 
 .chat-message-content img {
   display: block;
@@ -3595,8 +3686,12 @@ button.file-tree-item:not(.file-tree-directory) {
   animation: message-pulse 900ms ease-in-out infinite alternate;
 }
 
-.chat-message-loading i:nth-child(2) { animation-delay: 160ms; }
-.chat-message-loading i:nth-child(3) { animation-delay: 320ms; }
+.chat-message-loading i:nth-child(2) {
+  animation-delay: 160ms;
+}
+.chat-message-loading i:nth-child(3) {
+  animation-delay: 320ms;
+}
 
 .chat-message-streaming .chat-message-content::after {
   display: inline-block;
@@ -3611,11 +3706,16 @@ button.file-tree-item:not(.file-tree-directory) {
 }
 
 @keyframes message-pulse {
-  to { opacity: 0.3; transform: translateY(-2px); }
+  to {
+    opacity: 0.3;
+    transform: translateY(-2px);
+  }
 }
 
 @keyframes stream-caret {
-  to { opacity: 0.2; }
+  to {
+    opacity: 0.2;
+  }
 }
 
 .chat-composer {
@@ -3699,10 +3799,18 @@ button.file-tree-item:not(.file-tree-directory) {
   transition: width 240ms ease;
 }
 
-.conversation-usage-bar.is-warning .conversation-context-meter i { background: #c18b38; }
-.conversation-usage-bar.is-warning .conversation-context-usage small { color: #9a6b27; }
-.conversation-usage-bar.is-critical .conversation-context-meter i { background: #c85454; }
-.conversation-usage-bar.is-critical .conversation-context-usage small { color: #ae4242; }
+.conversation-usage-bar.is-warning .conversation-context-meter i {
+  background: #c18b38;
+}
+.conversation-usage-bar.is-warning .conversation-context-usage small {
+  color: #9a6b27;
+}
+.conversation-usage-bar.is-critical .conversation-context-meter i {
+  background: #c85454;
+}
+.conversation-usage-bar.is-critical .conversation-context-usage small {
+  color: #ae4242;
+}
 
 .conversation-usage-updating {
   display: flex;
@@ -3866,7 +3974,9 @@ button.file-tree-item:not(.file-tree-directory) {
 }
 
 @keyframes todo-pulse {
-  to { box-shadow: 0 0 0 5px rgb(47 97 233 / 4%); }
+  to {
+    box-shadow: 0 0 0 5px rgb(47 97 233 / 4%);
+  }
 }
 
 .composer-error {
@@ -3995,7 +4105,7 @@ button.file-tree-item:not(.file-tree-directory) {
   border-radius: 6px 6px 6px 2px;
   color: #506685;
   background: #f2f6fb;
-  font-family: "SFMono-Regular", Consolas, monospace;
+  font-family: 'SFMono-Regular', Consolas, monospace;
   font-size: 7px;
   font-weight: 780;
   letter-spacing: 0.04em;
@@ -4015,7 +4125,9 @@ button.file-tree-item:not(.file-tree-directory) {
   border-radius: 14px;
   background: white;
   box-shadow: 0 10px 32px rgb(40 58 91 / 9%);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .composer-box:focus-within {
@@ -4073,7 +4185,10 @@ button.file-tree-item:not(.file-tree-directory) {
   background: var(--blue);
   cursor: pointer;
   font-size: 17px;
-  transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
 }
 
 .composer-send:not(:disabled):hover {
@@ -4128,7 +4243,9 @@ button.file-tree-item:not(.file-tree-directory) {
 }
 
 @keyframes composer-send-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .composer-model-select {
@@ -4140,7 +4257,10 @@ button.file-tree-item:not(.file-tree-directory) {
   border: 1px solid #dbe3ef;
   border-radius: 9px;
   background: #f7f9fc;
-  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .composer-model-select:hover {
@@ -4220,7 +4340,10 @@ button.file-tree-item:not(.file-tree-directory) {
   border: 1px solid #dbe3ef;
   border-radius: 9px;
   background: #f7f9fc;
-  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease;
 }
 
 .composer-thinking-select:hover {
@@ -4250,12 +4373,18 @@ button.file-tree-item:not(.file-tree-directory) {
   background: #c8d1df;
 }
 
-.composer-thinking-select > i > b:nth-child(1) { height: 4px; }
-.composer-thinking-select > i > b:nth-child(2) { height: 8px; }
-.composer-thinking-select > i > b:nth-child(3) { height: 12px; }
+.composer-thinking-select > i > b:nth-child(1) {
+  height: 4px;
+}
+.composer-thinking-select > i > b:nth-child(2) {
+  height: 8px;
+}
+.composer-thinking-select > i > b:nth-child(3) {
+  height: 12px;
+}
 
 .composer-thinking-low > i > b:nth-child(1),
-.composer-thinking-high > i > b:nth-child(-n+2),
+.composer-thinking-high > i > b:nth-child(-n + 2),
 .composer-thinking-max > i > b {
   background: #5c78cf;
 }
@@ -4457,7 +4586,9 @@ button.file-tree-item:not(.file-tree-directory) {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .conversation-usage-updating { display: none; }
+  .conversation-usage-updating {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -4503,7 +4634,9 @@ button.file-tree-item:not(.file-tree-directory) {
   cursor: pointer;
 }
 
-.project-sidebar[hidden] { display: none; }
+.project-sidebar[hidden] {
+  display: none;
+}
 
 .workspace-resize-handle {
   position: relative;
@@ -4512,8 +4645,12 @@ button.file-tree-item:not(.file-tree-directory) {
   background: #e2e8f1;
 }
 
-.workspace-resize-vertical { cursor: col-resize; }
-.workspace-resize-horizontal { cursor: row-resize; }
+.workspace-resize-vertical {
+  cursor: col-resize;
+}
+.workspace-resize-horizontal {
+  cursor: row-resize;
+}
 
 .workspace-resize-handle:hover,
 .workspace-resize-handle:focus-visible,
@@ -4539,7 +4676,9 @@ button.file-tree-item:not(.file-tree-directory) {
   cursor: pointer;
 }
 
-.workspace-sidebar-toggle:hover { background: #edf2fb; }
+.workspace-sidebar-toggle:hover {
+  background: #edf2fb;
+}
 
 .composer-footer {
   flex-wrap: wrap;
@@ -4551,7 +4690,9 @@ button.file-tree-item:not(.file-tree-directory) {
   color: #68758b;
 }
 
-.composer-actions { margin-left: auto; }
+.composer-actions {
+  margin-left: auto;
+}
 
 .conversation-filter {
   padding: 0 8px 6px;

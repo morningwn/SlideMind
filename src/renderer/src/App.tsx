@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties
-} from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { AgentConfigStatus } from '../../shared/agent'
 import type { OpenedProject, ProjectInfo } from '../../shared/project'
 import { AppTitleBar } from './components/app-title-bar'
@@ -13,7 +7,14 @@ import { SettingsPage } from './components/settings-page'
 import { resolveAgentConfigGate } from './lib/agent-config-gate'
 import { resolveCloseBehavior } from './lib/close-behavior'
 
-const projectColors = ['#6f7cff', '#d59a32', '#48ad87', '#bd62c9', '#31a6bc', '#d8628c']
+const projectColors = [
+  '#6f7cff',
+  '#d59a32',
+  '#48ad87',
+  '#bd62c9',
+  '#31a6bc',
+  '#d8628c',
+]
 
 function projectColor(path: string): string {
   let hash = 0
@@ -88,20 +89,28 @@ function App(): React.JSX.Element {
   const [isAgentConfigChecked, setIsAgentConfigChecked] = useState(false)
   const [hasUnsavedDocuments, setHasUnsavedDocuments] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
-  const agentConfigGate = resolveAgentConfigGate(isAgentConfigChecked, agentConfig)
+  const agentConfigGate = resolveAgentConfigGate(
+    isAgentConfigChecked,
+    agentConfig,
+  )
   const requiresAgentSetup = agentConfigGate === 'required'
   const isSettingsVisible = isSettingsOpen || requiresAgentSetup
 
   useEffect(() => {
     let active = true
 
-    void window.agent.getConfig()
+    void window.agent
+      .getConfig()
       .then((status) => {
         if (active) setAgentConfig(status)
       })
       .catch((error: unknown) => {
         if (active) {
-          setProjectError(error instanceof Error ? error.message : '无法检查 DeepSeek 模型配置')
+          setProjectError(
+            error instanceof Error
+              ? error.message
+              : '无法检查 DeepSeek 模型配置',
+          )
         }
       })
       .finally(() => {
@@ -122,7 +131,10 @@ function App(): React.JSX.Element {
         if (active) setRecentProjects(projects)
       })
       .catch((error: unknown) => {
-        if (active) setProjectError(error instanceof Error ? error.message : '无法读取最近项目')
+        if (active)
+          setProjectError(
+            error instanceof Error ? error.message : '无法读取最近项目',
+          )
       })
       .finally(() => {
         if (active) setIsLoadingProjects(false)
@@ -138,9 +150,10 @@ function App(): React.JSX.Element {
       const behavior = resolveCloseBehavior(
         activeProject !== null,
         hasUnsavedDocuments,
-        () => window.confirm(
-          '当前项目有未保存的文件。关闭项目将丢失这些修改，是否继续？'
-        )
+        () =>
+          window.confirm(
+            '当前项目有未保存的文件。关闭项目将丢失这些修改，是否继续？',
+          ),
       )
 
       if (behavior === 'close-project') {
@@ -151,20 +164,32 @@ function App(): React.JSX.Element {
       }
 
       void window.desktop.resolveCloseRequest(
-        behavior === 'exit-application' ? 'exit-application' : 'keep-window-open'
+        behavior === 'exit-application'
+          ? 'exit-application'
+          : 'keep-window-open',
       )
     })
   }, [activeProject, hasUnsavedDocuments])
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent): void {
-      const shortcutModifier = window.desktop.platform === 'darwin' ? event.metaKey : event.ctrlKey
-      if (shortcutModifier && event.key.toLowerCase() === 'o' && !isSettingsVisible) {
+      const shortcutModifier =
+        window.desktop.platform === 'darwin' ? event.metaKey : event.ctrlKey
+      if (
+        shortcutModifier &&
+        event.key.toLowerCase() === 'o' &&
+        !isSettingsVisible
+      ) {
         event.preventDefault()
         if (!activeProject && !openingProject) void chooseProject()
       }
 
-      if (shortcutModifier && event.key.toLowerCase() === 'k' && !activeProject && !isSettingsVisible) {
+      if (
+        shortcutModifier &&
+        event.key.toLowerCase() === 'k' &&
+        !activeProject &&
+        !isSettingsVisible
+      ) {
         event.preventDefault()
         searchRef.current?.focus()
       }
@@ -176,13 +201,21 @@ function App(): React.JSX.Element {
 
     window.addEventListener('keydown', handleShortcut)
     return () => window.removeEventListener('keydown', handleShortcut)
-  }, [activeProject, isSettingsOpen, isSettingsVisible, openingProject, requiresAgentSetup])
+  }, [
+    activeProject,
+    isSettingsOpen,
+    isSettingsVisible,
+    openingProject,
+    requiresAgentSetup,
+  ])
 
   const filteredProjects = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase()
     if (!normalizedQuery) return recentProjects
     return recentProjects.filter((project) =>
-      `${project.name}\n${project.path}`.toLocaleLowerCase().includes(normalizedQuery)
+      `${project.name}\n${project.path}`
+        .toLocaleLowerCase()
+        .includes(normalizedQuery),
     )
   }, [query, recentProjects])
 
@@ -190,8 +223,11 @@ function App(): React.JSX.Element {
     if (
       activeProject &&
       hasUnsavedDocuments &&
-      !window.confirm('当前项目有未保存的文件。切换项目将丢失这些修改，是否继续？')
-    ) return
+      !window.confirm(
+        '当前项目有未保存的文件。切换项目将丢失这些修改，是否继续？',
+      )
+    )
+      return
 
     setOpeningProject('picker')
     setProjectError('')
@@ -215,8 +251,11 @@ function App(): React.JSX.Element {
     if (
       activeProject &&
       hasUnsavedDocuments &&
-      !window.confirm('当前项目有未保存的文件。切换项目将丢失这些修改，是否继续？')
-    ) return
+      !window.confirm(
+        '当前项目有未保存的文件。切换项目将丢失这些修改，是否继续？',
+      )
+    )
+      return
 
     setOpeningProject(project.path)
     setProjectError('')
@@ -237,15 +276,19 @@ function App(): React.JSX.Element {
     try {
       setRecentProjects(await window.projects.removeRecent(project.path))
     } catch (error) {
-      setProjectError(error instanceof Error ? error.message : '无法移除项目记录')
+      setProjectError(
+        error instanceof Error ? error.message : '无法移除项目记录',
+      )
     }
   }
 
   function rememberProject(project: ProjectInfo): void {
-    setRecentProjects((projects) => [
-      project,
-      ...projects.filter((candidate) => candidate.path !== project.path)
-    ].slice(0, 20))
+    setRecentProjects((projects) =>
+      [
+        project,
+        ...projects.filter((candidate) => candidate.path !== project.path),
+      ].slice(0, 20),
+    )
   }
 
   function handleAgentConfigured(config: AgentConfigStatus): void {
@@ -292,15 +335,33 @@ function App(): React.JSX.Element {
               <label className="project-search">
                 <SearchIcon />
                 <span className="sr-only">搜索项目</span>
-                <input ref={searchRef} type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索项目" autoComplete="off" />
-                <kbd>{window.desktop.platform === 'darwin' ? '⌘K' : 'Ctrl K'}</kbd>
+                <input
+                  ref={searchRef}
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="搜索项目"
+                  autoComplete="off"
+                />
+                <kbd>
+                  {window.desktop.platform === 'darwin' ? '⌘K' : 'Ctrl K'}
+                </kbd>
               </label>
               <div className="home-actions">
-                <button className="settings-action" type="button" onClick={() => setIsSettingsOpen(true)}>
+                <button
+                  className="settings-action"
+                  type="button"
+                  onClick={() => setIsSettingsOpen(true)}
+                >
                   <SettingsIcon />
                   设置
                 </button>
-                <button className="open-project-action" type="button" onClick={() => void chooseProject()} disabled={openingProject !== null}>
+                <button
+                  className="open-project-action"
+                  type="button"
+                  onClick={() => void chooseProject()}
+                  disabled={openingProject !== null}
+                >
                   <FolderIcon />
                   {openingProject === 'picker' ? '正在选择…' : '选择项目'}
                 </button>
@@ -309,40 +370,71 @@ function App(): React.JSX.Element {
 
             <div className="recent-heading">
               <h1 id="recent-title">最近项目</h1>
-              {!isLoadingProjects && recentProjects.length > 0 ? <span>{recentProjects.length} 个项目</span> : null}
+              {!isLoadingProjects && recentProjects.length > 0 ? (
+                <span>{recentProjects.length} 个项目</span>
+              ) : null}
             </div>
 
             {projectError ? (
               <div className="project-error" role="alert">
                 <span>{projectError}</span>
-                <button type="button" onClick={() => setProjectError('')}>关闭</button>
+                <button type="button" onClick={() => setProjectError('')}>
+                  关闭
+                </button>
               </div>
             ) : null}
 
             {isLoadingProjects ? (
               <div className="project-list" aria-label="正在加载最近项目">
-                {[0, 1, 2].map((item) => <span className="project-skeleton" key={item} />)}
+                {[0, 1, 2].map((item) => (
+                  <span className="project-skeleton" key={item} />
+                ))}
               </div>
             ) : filteredProjects.length > 0 ? (
               <div className="project-list">
                 {filteredProjects.map((project) => {
                   const isOpening = openingProject === project.path
-                  const style = { '--project-color': projectColor(project.path) } as CSSProperties
+                  const style = {
+                    '--project-color': projectColor(project.path),
+                  } as CSSProperties
                   return (
-                    <article className="project-item" key={project.path} style={style}>
-                      <button className="project-open" type="button" onClick={() => void openProject(project)} disabled={openingProject !== null}>
-                        <span className="project-mark" aria-hidden="true"><span>{projectInitial(project.name)}</span></span>
+                    <article
+                      className="project-item"
+                      key={project.path}
+                      style={style}
+                    >
+                      <button
+                        className="project-open"
+                        type="button"
+                        onClick={() => void openProject(project)}
+                        disabled={openingProject !== null}
+                      >
+                        <span className="project-mark" aria-hidden="true">
+                          <span>{projectInitial(project.name)}</span>
+                        </span>
                         <span className="project-copy">
                           <strong>{project.name}</strong>
                           <small title={project.path}>{project.path}</small>
                           <span className="project-time">
                             <ClockIcon />
-                            {isOpening ? '正在打开…' : formatLastOpened(project.lastOpenedAt)}
+                            {isOpening
+                              ? '正在打开…'
+                              : formatLastOpened(project.lastOpenedAt)}
                           </span>
                         </span>
-                        <span className="open-arrow" aria-hidden="true">→</span>
+                        <span className="open-arrow" aria-hidden="true">
+                          →
+                        </span>
                       </button>
-                      <button className="remove-project" type="button" onClick={() => void removeRecentProject(project)} aria-label={`从最近项目中移除 ${project.name}`} title="移除记录">×</button>
+                      <button
+                        className="remove-project"
+                        type="button"
+                        onClick={() => void removeRecentProject(project)}
+                        aria-label={`从最近项目中移除 ${project.name}`}
+                        title="移除记录"
+                      >
+                        ×
+                      </button>
                     </article>
                   )
                 })}
@@ -354,10 +446,15 @@ function App(): React.JSX.Element {
               </div>
             ) : (
               <div className="empty-state">
-                <span className="empty-mark" aria-hidden="true"><span /></span>
+                <span className="empty-mark" aria-hidden="true">
+                  <span />
+                </span>
                 <h2>从一个项目开始</h2>
                 <p>选择包含演示材料的文件夹，它会出现在最近项目中。</p>
-                <button type="button" onClick={() => void chooseProject()}><FolderIcon />选择项目</button>
+                <button type="button" onClick={() => void chooseProject()}>
+                  <FolderIcon />
+                  选择项目
+                </button>
               </div>
             )}
           </section>

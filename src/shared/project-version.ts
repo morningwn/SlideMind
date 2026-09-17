@@ -60,10 +60,7 @@ export interface ProjectVersionCreatedEvent {
 }
 
 export interface ProjectVersionApi {
-  list(
-    projectHandle: string,
-    cursor?: string,
-  ): Promise<ProjectVersionPage>
+  list(projectHandle: string, cursor?: string): Promise<ProjectVersionPage>
   compareFile(
     projectHandle: string,
     input: CompareProjectVersionFileInput,

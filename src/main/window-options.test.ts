@@ -6,7 +6,7 @@ describe('getTitleBarWindowOptions', () => {
     expect(getTitleBarWindowOptions('darwin')).toEqual({
       autoHideMenuBar: true,
       titleBarStyle: 'hidden',
-      trafficLightPosition: { x: 15, y: 17 }
+      trafficLightPosition: { x: 15, y: 17 },
     })
   })
 
@@ -17,8 +17,8 @@ describe('getTitleBarWindowOptions', () => {
       titleBarOverlay: {
         color: '#f3f6fb',
         symbolColor: '#4f5d73',
-        height: 46
-      }
+        height: 46,
+      },
     })
   })
 })

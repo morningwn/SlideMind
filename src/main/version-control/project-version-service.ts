@@ -1,7 +1,22 @@
 import { createHash, randomUUID } from 'node:crypto'
 import * as fs from 'node:fs'
-import { lstat, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import {
+  lstat,
+  mkdir,
+  readFile,
+  rename,
+  unlink,
+  writeFile,
+} from 'node:fs/promises'
+import {
+  basename,
+  dirname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path'
 import { TextDecoder } from 'node:util'
 import {
   add,
@@ -12,7 +27,7 @@ import {
   readCommit,
   remove,
   resolveRef,
-  statusMatrix
+  statusMatrix,
 } from 'isomorphic-git'
 import type { ProjectMutationSource } from '../../shared/project'
 import type {
@@ -23,7 +38,7 @@ import type {
   ProjectVersionPage,
   ProjectVersionSummary,
   RestoreProjectVersionInput,
-  RestoreProjectVersionResult
+  RestoreProjectVersionResult,
 } from '../../shared/project-version'
 import { getLogger } from '../logging/logger'
 
@@ -40,7 +55,7 @@ const EXCLUDED_SEGMENTS = new Set([
   'coverage',
   'node_modules',
   'out',
-  'release-dist'
+  'release-dist',
 ])
 const VERSION_SOURCES = new Set<ProjectMutationSource>([
   'agent',
@@ -48,7 +63,7 @@ const VERSION_SOURCES = new Set<ProjectMutationSource>([
   'import',
   'presentation-editor',
   'restore',
-  'text-editor'
+  'text-editor',
 ])
 
 type VersionChangeTuple = [string | null, string | null, string]
@@ -75,10 +90,16 @@ interface PendingVersion {
 }
 
 function isInsideProject(projectPath: string, candidatePath: string): boolean {
-  return candidatePath === projectPath || candidatePath.startsWith(`${projectPath}${sep}`)
+  return (
+    candidatePath === projectPath ||
+    candidatePath.startsWith(`${projectPath}${sep}`)
+  )
 }
 
-export function normalizeVersionedPath(projectPath: string, pathInput: unknown): string {
+export function normalizeVersionedPath(
+  projectPath: string,
+  pathInput: unknown,
+): string {
   if (
     typeof pathInput !== 'string' ||
     !pathInput.trim() ||
@@ -88,8 +109,11 @@ export function normalizeVersionedPath(projectPath: string, pathInput: unknown):
     throw new Error('版本文件路径无效')
   }
 
-  const targetPath = isAbsolute(pathInput) ? resolve(pathInput) : resolve(projectPath, pathInput)
-  if (!isInsideProject(projectPath, targetPath)) throw new Error('版本文件路径超出项目范围')
+  const targetPath = isAbsolute(pathInput)
+    ? resolve(pathInput)
+    : resolve(projectPath, pathInput)
+  if (!isInsideProject(projectPath, targetPath))
+    throw new Error('版本文件路径超出项目范围')
   return relative(projectPath, targetPath).replaceAll('\\', '/')
 }
 
@@ -103,14 +127,19 @@ export function isVersionedProjectPath(path: string): boolean {
 export class ProjectVersionService {
   private readonly pendingVersions = new Map<string, PendingVersion>()
   private readonly queues = new Map<string, Promise<void>>()
-  private readonly createdListeners = new Set<(event: VersionCreatedEvent) => void>()
+  private readonly createdListeners = new Set<
+    (event: VersionCreatedEvent) => void
+  >()
 
   onCreated(listener: (event: VersionCreatedEvent) => void): () => void {
     this.createdListeners.add(listener)
     return () => this.createdListeners.delete(listener)
   }
 
-  async ensureBaseline(projectPath: string, paths: readonly string[]): Promise<void> {
+  async ensureBaseline(
+    projectPath: string,
+    paths: readonly string[],
+  ): Promise<void> {
     const normalizedPaths = this.normalizePaths(projectPath, paths)
     if (normalizedPaths.length === 0) return
 
@@ -120,7 +149,7 @@ export class ProjectVersionService {
         fs,
         dir: projectPath,
         gitdir,
-        filepaths: normalizedPaths
+        filepaths: normalizedPaths,
       })
       const baselinePaths = matrix
         .filter(([, head, workdir]) => head === 0 && workdir === 2)
@@ -137,7 +166,7 @@ export class ProjectVersionService {
   record(
     projectPath: string,
     paths: readonly string[],
-    source: ProjectMutationSource
+    source: ProjectMutationSource,
   ): void {
     const normalizedPaths = this.normalizePaths(projectPath, paths)
     if (normalizedPaths.length === 0) return
@@ -154,7 +183,7 @@ export class ProjectVersionService {
     this.pendingVersions.set(projectPath, {
       paths: new Set(normalizedPaths),
       sources: new Set([source]),
-      timer: this.createTimer(projectPath)
+      timer: this.createTimer(projectPath),
     })
   }
 
@@ -167,30 +196,39 @@ export class ProjectVersionService {
 
     clearTimeout(pending.timer)
     this.pendingVersions.delete(projectPath)
-    await this.enqueue(projectPath, () => this.writeVersion(projectPath, pending))
+    await this.enqueue(projectPath, () =>
+      this.writeVersion(projectPath, pending),
+    )
   }
 
   async flushAll(): Promise<void> {
-    await Promise.all([...this.pendingVersions.keys()].map((projectPath) => this.flush(projectPath)))
+    await Promise.all(
+      [...this.pendingVersions.keys()].map((projectPath) =>
+        this.flush(projectPath),
+      ),
+    )
     await Promise.all(this.queues.values())
   }
 
-  async listVersions(projectPath: string, cursor?: string): Promise<ProjectVersionPage> {
+  async listVersions(
+    projectPath: string,
+    cursor?: string,
+  ): Promise<ProjectVersionPage> {
     if (cursor !== undefined) this.validateVersionId(cursor)
     await this.flush(projectPath)
     const gitdir = join(projectPath, VERSION_DIRECTORY)
-    if (!await this.hasRepository(projectPath, gitdir)) {
+    if (!(await this.hasRepository(projectPath, gitdir))) {
       return { versions: [], nextCursor: null }
     }
 
-    const commits = await log({
+    const commits = (await log({
       fs,
       dir: projectPath,
       gitdir,
       ref: cursor ?? 'HEAD',
       depth: VERSION_PAGE_SIZE + 3,
-      includeChanges: true
-    }) as VersionCommitWithChanges[]
+      includeChanges: true,
+    })) as VersionCommitWithChanges[]
     const visibleCommits = commits
       .filter((entry) => entry.oid !== cursor)
       .filter((entry) => entry.commit.message.trim() !== 'SlideMind baseline')
@@ -200,15 +238,16 @@ export class ProjectVersionService {
 
     return {
       versions,
-      nextCursor: visibleCommits.length > VERSION_PAGE_SIZE
-        ? versions.at(-1)?.id ?? null
-        : null
+      nextCursor:
+        visibleCommits.length > VERSION_PAGE_SIZE
+          ? (versions.at(-1)?.id ?? null)
+          : null,
     }
   }
 
   async compareFile(
     projectPath: string,
-    input: CompareProjectVersionFileInput
+    input: CompareProjectVersionFileInput,
   ): Promise<ProjectVersionFileComparison> {
     const versionId = this.validateVersionId(input.versionId)
     const path = normalizeVersionedPath(projectPath, input.path)
@@ -222,73 +261,122 @@ export class ProjectVersionService {
     const changedPaths = this.versionChanges(entry).map((change) => change.path)
     if (!changedPaths.includes(path)) throw new Error('所选文件不属于该版本')
 
-    const selectedBytes = await this.readVersionBytes(projectPath, versionId, path)
+    const selectedBytes = await this.readVersionBytes(
+      projectPath,
+      versionId,
+      path,
+    )
     const currentBytes = await this.readWorkingBytes(projectPath, path)
-    const beforeBytes = input.target === 'current'
-      ? selectedBytes
-      : entry.commit.parent[0]
-        ? await this.readVersionBytes(projectPath, entry.commit.parent[0], path)
-        : null
+    const beforeBytes =
+      input.target === 'current'
+        ? selectedBytes
+        : entry.commit.parent[0]
+          ? await this.readVersionBytes(
+              projectPath,
+              entry.commit.parent[0],
+              path,
+            )
+          : null
     const afterBytes = input.target === 'current' ? currentBytes : selectedBytes
 
     return {
       path,
       before: this.previewContent(beforeBytes),
       after: this.previewContent(afterBytes),
-      currentRevision: this.fileRevision(currentBytes)
+      currentRevision: this.fileRevision(currentBytes),
     }
   }
 
   async restoreFiles(
     projectPath: string,
-    input: RestoreProjectVersionInput
+    input: RestoreProjectVersionInput,
   ): Promise<RestoreProjectVersionResult> {
     const versionId = this.validateVersionId(input.versionId)
-    if (!Array.isArray(input.files) || input.files.length === 0 || input.files.length > 100) {
+    if (
+      !Array.isArray(input.files) ||
+      input.files.length === 0 ||
+      input.files.length > 100
+    ) {
       throw new Error('请选择要恢复的文件')
     }
 
-    const files = [...new Map(input.files.map((file) => {
-      const path = normalizeVersionedPath(projectPath, file.path)
-      if (!isVersionedProjectPath(path) || !/^(?:missing|[a-f0-9]{64})$/.test(file.currentRevision)) {
-        throw new Error('版本恢复参数无效')
-      }
-      return [path, { path, currentRevision: file.currentRevision }]
-    })).values()]
+    const files = [
+      ...new Map(
+        input.files.map((file) => {
+          const path = normalizeVersionedPath(projectPath, file.path)
+          if (
+            !isVersionedProjectPath(path) ||
+            !/^(?:missing|[a-f0-9]{64})$/.test(file.currentRevision)
+          ) {
+            throw new Error('版本恢复参数无效')
+          }
+          return [path, { path, currentRevision: file.currentRevision }]
+        }),
+      ).values(),
+    ]
 
     return this.enqueue(projectPath, async () => {
       const entry = await this.readVersionCommit(projectPath, versionId)
-      const changedPaths = new Set(this.versionChanges(entry).map((change) => change.path))
+      const changedPaths = new Set(
+        this.versionChanges(entry).map((change) => change.path),
+      )
       if (files.some((file) => !changedPaths.has(file.path))) {
         throw new Error('所选文件不属于该版本')
       }
 
-      const targets = await Promise.all(files.map(async (file) => {
-        const currentBytes = await this.readWorkingBytes(projectPath, file.path)
-        return {
-          ...file,
-          currentBytes,
-          targetBytes: await this.readVersionBytes(projectPath, versionId, file.path)
-        }
-      }))
+      const targets = await Promise.all(
+        files.map(async (file) => {
+          const currentBytes = await this.readWorkingBytes(
+            projectPath,
+            file.path,
+          )
+          return {
+            ...file,
+            currentBytes,
+            targetBytes: await this.readVersionBytes(
+              projectPath,
+              versionId,
+              file.path,
+            ),
+          }
+        }),
+      )
       const conflicts = targets
-        .filter((target) => this.fileRevision(target.currentBytes) !== target.currentRevision)
+        .filter(
+          (target) =>
+            this.fileRevision(target.currentBytes) !== target.currentRevision,
+        )
         .map((target) => target.path)
-      if (conflicts.length > 0) return { ok: false, reason: 'conflict', paths: conflicts }
+      if (conflicts.length > 0)
+        return { ok: false, reason: 'conflict', paths: conflicts }
 
       const changed = targets.filter(
-        (target) => this.fileRevision(target.currentBytes) !== this.fileRevision(target.targetBytes)
+        (target) =>
+          this.fileRevision(target.currentBytes) !==
+          this.fileRevision(target.targetBytes),
       )
       const applied: typeof changed = []
       try {
         for (const target of changed) {
-          await this.writeWorkingBytes(projectPath, target.path, target.targetBytes)
+          await this.writeWorkingBytes(
+            projectPath,
+            target.path,
+            target.targetBytes,
+          )
           applied.push(target)
         }
       } catch (error) {
-        const rollbackResults = await Promise.allSettled(applied.reverse().map((target) =>
-          this.writeWorkingBytes(projectPath, target.path, target.currentBytes)
-        ))
+        const rollbackResults = await Promise.allSettled(
+          applied
+            .reverse()
+            .map((target) =>
+              this.writeWorkingBytes(
+                projectPath,
+                target.path,
+                target.currentBytes,
+              ),
+            ),
+        )
         if (rollbackResults.some((result) => result.status === 'rejected')) {
           throw new Error('版本恢复未完整完成，且部分文件无法自动回滚')
         }
@@ -306,10 +394,18 @@ export class ProjectVersionService {
     }, VERSION_DELAY_MS)
   }
 
-  private async writeVersion(projectPath: string, pending: PendingVersion): Promise<void> {
+  private async writeVersion(
+    projectPath: string,
+    pending: PendingVersion,
+  ): Promise<void> {
     const gitdir = await this.ensureRepository(projectPath)
     const paths = [...pending.paths]
-    const matrix = await statusMatrix({ fs, dir: projectPath, gitdir, filepaths: paths })
+    const matrix = await statusMatrix({
+      fs,
+      dir: projectPath,
+      gitdir,
+      filepaths: paths,
+    })
     let hasChanges = false
 
     for (const [path, head, workdir] of matrix) {
@@ -326,12 +422,16 @@ export class ProjectVersionService {
     const sources = [...pending.sources].sort().join(', ')
     const message = `SlideMind auto version (${sources})\n\n${paths.sort().join('\n')}`
     const versionId = await this.commit(gitdir, projectPath, message)
-    for (const listener of this.createdListeners) listener({ projectPath, versionId })
+    for (const listener of this.createdListeners)
+      listener({ projectPath, versionId })
   }
 
   private async ensureRepository(projectPath: string): Promise<string> {
     const gitdir = join(projectPath, VERSION_DIRECTORY)
-    await mkdir(join(projectPath, '.slideMind'), { recursive: true, mode: 0o700 })
+    await mkdir(join(projectPath, '.slideMind'), {
+      recursive: true,
+      mode: 0o700,
+    })
     try {
       await resolveRef({ fs, dir: projectPath, gitdir, ref: 'HEAD' })
     } catch {
@@ -340,7 +440,11 @@ export class ProjectVersionService {
     return gitdir
   }
 
-  private commit(gitdir: string, projectPath: string, message: string): Promise<string> {
+  private commit(
+    gitdir: string,
+    projectPath: string,
+    message: string,
+  ): Promise<string> {
     return commit({
       fs,
       dir: projectPath,
@@ -348,12 +452,15 @@ export class ProjectVersionService {
       message,
       author: {
         name: 'SlideMind',
-        email: 'versions@slidemind.local'
-      }
+        email: 'versions@slidemind.local',
+      },
     })
   }
 
-  private async hasRepository(projectPath: string, gitdir: string): Promise<boolean> {
+  private async hasRepository(
+    projectPath: string,
+    gitdir: string,
+  ): Promise<boolean> {
     try {
       await resolveRef({ fs, dir: projectPath, gitdir, ref: 'HEAD' })
       return true
@@ -365,19 +472,20 @@ export class ProjectVersionService {
 
   private async readVersionCommit(
     projectPath: string,
-    versionId: string
+    versionId: string,
   ): Promise<VersionCommitWithChanges> {
     const gitdir = join(projectPath, VERSION_DIRECTORY)
-    if (!await this.hasRepository(projectPath, gitdir)) throw new Error('项目还没有版本历史')
+    if (!(await this.hasRepository(projectPath, gitdir)))
+      throw new Error('项目还没有版本历史')
     await readCommit({ fs, dir: projectPath, gitdir, oid: versionId })
-    const entries = await log({
+    const entries = (await log({
       fs,
       dir: projectPath,
       gitdir,
       ref: versionId,
       depth: 1,
-      includeChanges: true
-    }) as VersionCommitWithChanges[]
+      includeChanges: true,
+    })) as VersionCommitWithChanges[]
     const entry = entries[0]
     if (!entry || entry.commit.message.trim() === 'SlideMind baseline') {
       throw new Error('版本不存在或不可恢复')
@@ -385,12 +493,16 @@ export class ProjectVersionService {
     return entry
   }
 
-  private versionSummary(entry: VersionCommitWithChanges): ProjectVersionSummary {
+  private versionSummary(
+    entry: VersionCommitWithChanges,
+  ): ProjectVersionSummary {
     return {
       id: entry.oid,
-      createdAt: new Date(entry.commit.committer.timestamp * 1000).toISOString(),
+      createdAt: new Date(
+        entry.commit.committer.timestamp * 1000,
+      ).toISOString(),
       sources: this.versionSources(entry.commit.message),
-      changes: this.versionChanges(entry)
+      changes: this.versionChanges(entry),
     }
   }
 
@@ -400,21 +512,26 @@ export class ProjectVersionService {
     return match[1]
       .split(',')
       .map((source) => source.trim())
-      .filter((source): source is ProjectMutationSource => VERSION_SOURCES.has(
-        source as ProjectMutationSource
-      ))
+      .filter((source): source is ProjectMutationSource =>
+        VERSION_SOURCES.has(source as ProjectMutationSource),
+      )
   }
 
-  private versionChanges(entry: VersionCommitWithChanges): ProjectVersionChange[] {
+  private versionChanges(
+    entry: VersionCommitWithChanges,
+  ): ProjectVersionChange[] {
     return (entry.commit.changes ?? [])
-      .map(([nextOid, previousOid, path]): ProjectVersionChange => ({
-        path,
-        kind: previousOid === null
-          ? 'added'
-          : nextOid === null
-            ? 'removed'
-            : 'modified'
-      }))
+      .map(
+        ([nextOid, previousOid, path]): ProjectVersionChange => ({
+          path,
+          kind:
+            previousOid === null
+              ? 'added'
+              : nextOid === null
+                ? 'removed'
+                : 'modified',
+        }),
+      )
       .filter((change) => isVersionedProjectPath(change.path))
       .sort((left, right) => left.path.localeCompare(right.path))
   }
@@ -422,7 +539,7 @@ export class ProjectVersionService {
   private async readVersionBytes(
     projectPath: string,
     versionId: string,
-    path: string
+    path: string,
   ): Promise<Buffer | null> {
     try {
       const result = await readBlob({
@@ -430,7 +547,7 @@ export class ProjectVersionService {
         dir: projectPath,
         gitdir: join(projectPath, VERSION_DIRECTORY),
         oid: versionId,
-        filepath: path
+        filepath: path,
       })
       return Buffer.from(result.blob)
     } catch (error) {
@@ -439,7 +556,10 @@ export class ProjectVersionService {
     }
   }
 
-  private async readWorkingBytes(projectPath: string, path: string): Promise<Buffer | null> {
+  private async readWorkingBytes(
+    projectPath: string,
+    path: string,
+  ): Promise<Buffer | null> {
     const targetPath = await this.safeWorkingPath(projectPath, path)
     try {
       return await readFile(targetPath)
@@ -454,7 +574,8 @@ export class ProjectVersionService {
     if (bytes.byteLength > MAX_PREVIEW_BYTES) {
       return { status: 'too-large', byteLength: bytes.byteLength }
     }
-    if (bytes.includes(0)) return { status: 'binary', byteLength: bytes.byteLength }
+    if (bytes.includes(0))
+      return { status: 'binary', byteLength: bytes.byteLength }
 
     const contentBytes = bytes.subarray(0, UTF8_BOM.length).equals(UTF8_BOM)
       ? bytes.subarray(UTF8_BOM.length)
@@ -463,7 +584,7 @@ export class ProjectVersionService {
       return {
         status: 'text',
         content: new TextDecoder('utf-8', { fatal: true }).decode(contentBytes),
-        byteLength: bytes.byteLength
+        byteLength: bytes.byteLength,
       }
     } catch {
       return { status: 'binary', byteLength: bytes.byteLength }
@@ -471,13 +592,15 @@ export class ProjectVersionService {
   }
 
   private fileRevision(bytes: Buffer | null): string {
-    return bytes === null ? 'missing' : createHash('sha256').update(bytes).digest('hex')
+    return bytes === null
+      ? 'missing'
+      : createHash('sha256').update(bytes).digest('hex')
   }
 
   private async writeWorkingBytes(
     projectPath: string,
     path: string,
-    bytes: Buffer | null
+    bytes: Buffer | null,
   ): Promise<void> {
     const targetPath = await this.safeWorkingPath(projectPath, path)
     if (bytes === null) {
@@ -487,18 +610,23 @@ export class ProjectVersionService {
       return
     }
 
-    const stats = await lstat(targetPath).catch((error: NodeJS.ErrnoException) => {
-      if (error.code === 'ENOENT') return null
-      throw error
-    })
+    const stats = await lstat(targetPath).catch(
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return null
+        throw error
+      },
+    )
     await mkdir(dirname(targetPath), { recursive: true, mode: 0o700 })
     await this.safeWorkingPath(projectPath, path)
     const temporaryPath = join(
       dirname(targetPath),
-      `.${basename(targetPath)}.${process.pid}-${randomUUID()}.slidemind-tmp`
+      `.${basename(targetPath)}.${process.pid}-${randomUUID()}.slidemind-tmp`,
     )
     try {
-      await writeFile(temporaryPath, bytes, { flag: 'wx', mode: stats?.mode ?? 0o600 })
+      await writeFile(temporaryPath, bytes, {
+        flag: 'wx',
+        mode: stats?.mode ?? 0o600,
+      })
       await rename(temporaryPath, targetPath)
     } catch (error) {
       await unlink(temporaryPath).catch(() => undefined)
@@ -506,16 +634,21 @@ export class ProjectVersionService {
     }
   }
 
-  private async safeWorkingPath(projectPath: string, path: string): Promise<string> {
+  private async safeWorkingPath(
+    projectPath: string,
+    path: string,
+  ): Promise<string> {
     const targetPath = resolve(projectPath, path)
     const segments = relative(projectPath, targetPath).split(sep)
     let currentPath = projectPath
     for (let index = 0; index < segments.length; index += 1) {
       currentPath = resolve(currentPath, segments[index])
-      const stats = await lstat(currentPath).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === 'ENOENT') return null
-        throw error
-      })
+      const stats = await lstat(currentPath).catch(
+        (error: NodeJS.ErrnoException) => {
+          if (error.code === 'ENOENT') return null
+          throw error
+        },
+      )
       if (!stats) {
         break
       }
@@ -537,19 +670,33 @@ export class ProjectVersionService {
     return input
   }
 
-  private normalizePaths(projectPath: string, paths: readonly string[]): string[] {
-    return [...new Set(paths
-      .map((path) => normalizeVersionedPath(projectPath, path))
-      .filter(isVersionedProjectPath))]
+  private normalizePaths(
+    projectPath: string,
+    paths: readonly string[],
+  ): string[] {
+    return [
+      ...new Set(
+        paths
+          .map((path) => normalizeVersionedPath(projectPath, path))
+          .filter(isVersionedProjectPath),
+      ),
+    ]
   }
 
-  private enqueue<T>(projectPath: string, operation: () => Promise<T>): Promise<T> {
+  private enqueue<T>(
+    projectPath: string,
+    operation: () => Promise<T>,
+  ): Promise<T> {
     const previous = this.queues.get(projectPath) ?? Promise.resolve()
     const result = previous.then(operation, operation)
-    const queue = result.then(() => undefined, () => undefined)
+    const queue = result.then(
+      () => undefined,
+      () => undefined,
+    )
     this.queues.set(projectPath, queue)
     void queue.finally(() => {
-      if (this.queues.get(projectPath) === queue) this.queues.delete(projectPath)
+      if (this.queues.get(projectPath) === queue)
+        this.queues.delete(projectPath)
     })
     return result
   }

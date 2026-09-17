@@ -8,7 +8,9 @@ export type PresentationState = {
   viewportRatio: number
 }
 
-export function serializePptistPresentation(presentation: PresentationState): string {
+export function serializePptistPresentation(
+  presentation: PresentationState,
+): string {
   // The deep watcher already tracks edits. Snapshotting does not need to collect
   // reactive dependencies again for every element in the presentation.
   return JSON.stringify({
@@ -16,6 +18,6 @@ export function serializePptistPresentation(presentation: PresentationState): st
     theme: toRaw(presentation.theme),
     slides: toRaw(presentation.slides),
     viewportSize: presentation.viewportSize,
-    viewportRatio: presentation.viewportRatio
+    viewportRatio: presentation.viewportRatio,
   })
 }

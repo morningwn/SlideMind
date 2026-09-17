@@ -96,7 +96,7 @@ export function SettingsPage({
   initialConfig = null,
   onBack,
   onConfigured,
-  requiresConfiguration = false
+  requiresConfiguration = false,
 }: SettingsPageProps): React.JSX.Element {
   const {
     config,
@@ -107,15 +107,19 @@ export function SettingsPage({
     error,
     isLoading,
     isSaving,
-    save
+    save,
   } = useAgentConfig(initialConfig)
-  const [activeCategory, setActiveCategory] = useState<SettingsCategory>('model')
+  const [activeCategory, setActiveCategory] =
+    useState<SettingsCategory>('model')
   const [saved, setSaved] = useState(false)
-  const [diagnosticAction, setDiagnosticAction] = useState<DiagnosticAction>(null)
+  const [diagnosticAction, setDiagnosticAction] =
+    useState<DiagnosticAction>(null)
   const [diagnosticError, setDiagnosticError] = useState('')
   const [diagnosticMessage, setDiagnosticMessage] = useState('')
 
-  async function saveSettings(event: FormEvent<HTMLFormElement>): Promise<void> {
+  async function saveSettings(
+    event: FormEvent<HTMLFormElement>,
+  ): Promise<void> {
     event.preventDefault()
     setSaved(false)
     const status = await save()
@@ -188,7 +192,10 @@ export function SettingsPage({
             最近项目
           </button>
         ) : (
-          <span className="settings-required-label"><ShieldIcon />完成模型设置后继续</span>
+          <span className="settings-required-label">
+            <ShieldIcon />
+            完成模型设置后继续
+          </span>
         )}
         <span>SlideMind 设置</span>
       </header>
@@ -217,9 +224,13 @@ export function SettingsPage({
               <i aria-hidden="true" />
             </button>
             <button
-              className={activeCategory === 'diagnostics' ? 'is-active' : undefined}
+              className={
+                activeCategory === 'diagnostics' ? 'is-active' : undefined
+              }
               type="button"
-              aria-current={activeCategory === 'diagnostics' ? 'page' : undefined}
+              aria-current={
+                activeCategory === 'diagnostics' ? 'page' : undefined
+              }
               onClick={() => setActiveCategory('diagnostics')}
               disabled={requiresConfiguration}
             >
@@ -230,12 +241,19 @@ export function SettingsPage({
               </span>
               <i aria-hidden="true" />
             </button>
-            <p className="settings-local-note"><ShieldIcon />设置和凭证仅保存在当前设备。</p>
+            <p className="settings-local-note">
+              <ShieldIcon />
+              设置和凭证仅保存在当前设备。
+            </p>
           </nav>
 
           <main className="settings-content">
             <header className="settings-section-heading">
-              <span>{activeCategory === 'model' ? 'AI & MODEL' : 'DATA & DIAGNOSTICS'}</span>
+              <span>
+                {activeCategory === 'model'
+                  ? 'AI & MODEL'
+                  : 'DATA & DIAGNOSTICS'}
+              </span>
               <h2>{activeCategory === 'model' ? 'AI 与模型' : '数据与诊断'}</h2>
               <p>
                 {activeCategory === 'model'
@@ -249,21 +267,36 @@ export function SettingsPage({
                 <ShieldIcon />
                 <div>
                   <strong>开始前请先完成模型设置</strong>
-                  <span>选择 DeepSeek 模型并填写 API Key，保存后即可进入工作区。</span>
+                  <span>
+                    选择 DeepSeek 模型并填写 API Key，保存后即可进入工作区。
+                  </span>
                 </div>
               </div>
             ) : null}
 
             {activeCategory === 'model' ? (
-              <form className="provider-settings-card" onSubmit={(event) => void saveSettings(event)}>
+              <form
+                className="provider-settings-card"
+                onSubmit={(event) => void saveSettings(event)}
+              >
                 <header>
                   <div>
                     <span>PROVIDER</span>
                     <h3>模型供应商</h3>
                   </div>
-                  <span className={!isLoading && config?.configured ? 'provider-status provider-status-ready' : 'provider-status'}>
+                  <span
+                    className={
+                      !isLoading && config?.configured
+                        ? 'provider-status provider-status-ready'
+                        : 'provider-status'
+                    }
+                  >
                     <i aria-hidden="true" />
-                    {isLoading ? '读取中' : config?.configured ? '已连接' : '未配置'}
+                    {isLoading
+                      ? '读取中'
+                      : config?.configured
+                        ? '已连接'
+                        : '未配置'}
                   </span>
                 </header>
 
@@ -287,10 +320,15 @@ export function SettingsPage({
                     required
                   >
                     {config?.models.map((model) => (
-                      <option value={model.id} key={model.id}>{model.name}</option>
+                      <option value={model.id} key={model.id}>
+                        {model.name}
+                      </option>
                     ))}
                   </select>
-                  <small>{config?.models.find((model) => model.id === modelId)?.description ?? '正在读取可用模型…'}</small>
+                  <small>
+                    {config?.models.find((model) => model.id === modelId)
+                      ?.description ?? '正在读取可用模型…'}
+                  </small>
                 </label>
 
                 <label>
@@ -302,39 +340,75 @@ export function SettingsPage({
                       setApiKey(event.target.value)
                       setSaved(false)
                     }}
-                    placeholder={config?.configured ? '留空以继续使用已保存的 Key' : '输入 DeepSeek API Key'}
+                    placeholder={
+                      config?.configured
+                        ? '留空以继续使用已保存的 Key'
+                        : '输入 DeepSeek API Key'
+                    }
                     autoComplete="off"
                     disabled={isLoading || isSaving}
                     required={!config?.configured}
                   />
-                  <small className="credential-note"><ShieldIcon />凭证经系统安全存储加密，仅保存在当前设备。</small>
+                  <small className="credential-note">
+                    <ShieldIcon />
+                    凭证经系统安全存储加密，仅保存在当前设备。
+                  </small>
                 </label>
 
                 <div className="settings-form-status" aria-live="polite">
-                  {error ? <p className="settings-error" role="alert">{error}</p> : null}
-                  {saved ? <p className="settings-saved">配置已保存，新的对话将使用此模型。</p> : null}
+                  {error ? (
+                    <p className="settings-error" role="alert">
+                      {error}
+                    </p>
+                  ) : null}
+                  {saved ? (
+                    <p className="settings-saved">
+                      配置已保存，新的对话将使用此模型。
+                    </p>
+                  ) : null}
                 </div>
 
                 <footer>
-                  <button type="submit" disabled={isLoading || isSaving || !modelId}>
+                  <button
+                    type="submit"
+                    disabled={isLoading || isSaving || !modelId}
+                  >
                     {isSaving ? '正在保存…' : '保存更改'}
                   </button>
                 </footer>
               </form>
             ) : (
-              <section className="diagnostic-settings-card" aria-labelledby="diagnostic-settings-title">
+              <section
+                className="diagnostic-settings-card"
+                aria-labelledby="diagnostic-settings-title"
+              >
                 <header>
                   <div>
                     <span>LOCAL DATA</span>
                     <h3 id="diagnostic-settings-title">本地诊断</h3>
                   </div>
-                  <span className="diagnostic-local-status"><i aria-hidden="true" />仅存本机</span>
+                  <span className="diagnostic-local-status">
+                    <i aria-hidden="true" />
+                    仅存本机
+                  </span>
                 </header>
 
-                <div className="diagnostic-recorder" aria-label="日志和崩溃报告覆盖主进程、界面和导出任务">
-                  <span><i aria-hidden="true" />MAIN</span>
-                  <span><i aria-hidden="true" />UI</span>
-                  <span><i aria-hidden="true" />WORKER</span>
+                <div
+                  className="diagnostic-recorder"
+                  aria-label="日志和崩溃报告覆盖主进程、界面和导出任务"
+                >
+                  <span>
+                    <i aria-hidden="true" />
+                    MAIN
+                  </span>
+                  <span>
+                    <i aria-hidden="true" />
+                    UI
+                  </span>
+                  <span>
+                    <i aria-hidden="true" />
+                    WORKER
+                  </span>
                   <code>JSONL · 5 × 5 MB</code>
                 </div>
 
@@ -349,7 +423,10 @@ export function SettingsPage({
                     disabled={diagnosticAction !== null}
                   >
                     <FolderIcon />
-                    <span><strong>打开日志目录</strong><small>查看应用生成的滚动日志</small></span>
+                    <span>
+                      <strong>打开日志目录</strong>
+                      <small>查看应用生成的滚动日志</small>
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -357,7 +434,10 @@ export function SettingsPage({
                     disabled={diagnosticAction !== null}
                   >
                     <CrashReportIcon />
-                    <span><strong>崩溃报告目录</strong><small>查看本机生成的 minidump</small></span>
+                    <span>
+                      <strong>崩溃报告目录</strong>
+                      <small>查看本机生成的 minidump</small>
+                    </span>
                   </button>
                   <button
                     type="button"
@@ -366,7 +446,11 @@ export function SettingsPage({
                   >
                     <ExportIcon />
                     <span>
-                      <strong>{diagnosticAction === 'export' ? '正在导出…' : '导出诊断包'}</strong>
+                      <strong>
+                        {diagnosticAction === 'export'
+                          ? '正在导出…'
+                          : '导出诊断包'}
+                      </strong>
                       <small>生成压缩的 .json.gz 文件</small>
                     </span>
                   </button>
@@ -377,15 +461,22 @@ export function SettingsPage({
                     disabled={diagnosticAction !== null}
                   >
                     <ClearIcon />
-                    <span><strong>清除日志</strong><small>删除当前设备上的历史记录</small></span>
+                    <span>
+                      <strong>清除日志</strong>
+                      <small>删除当前设备上的历史记录</small>
+                    </span>
                   </button>
                 </div>
 
                 <div className="diagnostic-action-status" aria-live="polite">
-                  {diagnosticError
-                    ? <p className="settings-error" role="alert">{diagnosticError}</p>
-                    : null}
-                  {diagnosticMessage ? <p className="settings-saved">{diagnosticMessage}</p> : null}
+                  {diagnosticError ? (
+                    <p className="settings-error" role="alert">
+                      {diagnosticError}
+                    </p>
+                  ) : null}
+                  {diagnosticMessage ? (
+                    <p className="settings-saved">{diagnosticMessage}</p>
+                  ) : null}
                 </div>
               </section>
             )}

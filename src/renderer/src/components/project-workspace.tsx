@@ -7,7 +7,7 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
-  type KeyboardEvent
+  type KeyboardEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -17,14 +17,17 @@ import {
   type AgentPromptReference,
   type AgentSkillOption,
   type AgentThinkingLevel,
-  type AgentTodo
+  type AgentTodo,
 } from '../../../shared/agent'
-import { isPresentationPath, PRESENTATION_FILE_SUFFIX } from '../../../shared/presentation'
+import {
+  isPresentationPath,
+  PRESENTATION_FILE_SUFFIX,
+} from '../../../shared/presentation'
 import type {
   ConversationMessage,
   OpenedProject,
   ProjectFileChangedEvent,
-  ProjectFileEntry
+  ProjectFileEntry,
 } from '../../../shared/project'
 import { WorkspaceResizeHandle } from './workspace-resize-handle'
 import { AgentModelSelect } from './agent-model-select'
@@ -37,12 +40,12 @@ import { stopRunningAgentActivities } from '../lib/agent-activity'
 import {
   isOpenableProjectFile,
   projectFileDisplayKind,
-  type ProjectFileDisplayKind
+  type ProjectFileDisplayKind,
 } from '../lib/project-file-display'
 import {
   DocumentEditor,
   type MarkdownViewMode,
-  type OpenTextDocument
+  type OpenTextDocument,
 } from './document-editor'
 import type { OpenPresentationDocument } from './presentation-editor'
 import { ImagePreview, type OpenImageDocument } from './image-preview'
@@ -53,15 +56,12 @@ import {
   promptReferenceKey,
   collectComposerReferences,
   insertComposerReference,
-  type ComposerReferenceTrigger
+  type ComposerReferenceTrigger,
 } from '../lib/composer-references'
 import { reportDiagnosticEvent } from '../lib/logger'
 import { contextUsageTone, formatTokenCount } from '../lib/agent-usage'
 import { serializePresentationDocumentState } from '../lib/presentation-document-state'
-import {
-  PptxImportFrame,
-  type PptxImportRequest
-} from './pptx-import-frame'
+import { PptxImportFrame, type PptxImportRequest } from './pptx-import-frame'
 
 const PresentationEditor = lazy(async () => {
   const module = await import('./presentation-editor')
@@ -131,7 +131,7 @@ function createConversation(): Conversation {
   return {
     id: crypto.randomUUID(),
     title: '新对话',
-    messages: []
+    messages: [],
   }
 }
 
@@ -141,12 +141,18 @@ function parentDirectory(path: string): string {
 }
 
 function isPathInside(path: string, directoryPath: string): boolean {
-  return path === directoryPath ||
+  return (
+    path === directoryPath ||
     path.startsWith(`${directoryPath}/`) ||
     path.startsWith(`${directoryPath}\\`)
+  )
 }
 
-function replacePathDirectory(path: string, sourcePath: string, destinationPath: string): string {
+function replacePathDirectory(
+  path: string,
+  sourcePath: string,
+  destinationPath: string,
+): string {
   return isPathInside(path, sourcePath)
     ? `${destinationPath}${path.slice(sourcePath.length)}`
     : path
@@ -155,9 +161,11 @@ function replacePathDirectory(path: string, sourcePath: string, destinationPath:
 function nextAvailableEntryName(
   entries: readonly ProjectFileEntry[],
   stem: string,
-  extension = ''
+  extension = '',
 ): string {
-  const existingNames = new Set(entries.map((entry) => entry.name.toLocaleLowerCase()))
+  const existingNames = new Set(
+    entries.map((entry) => entry.name.toLocaleLowerCase()),
+  )
   let suffix = 1
   let name = `${stem}${extension}`
   while (existingNames.has(name.toLocaleLowerCase())) {
@@ -171,38 +179,47 @@ function composerReferenceOptions(
   trigger: ComposerReferenceTrigger | null,
   files: readonly ProjectFileEntry[],
   skills: readonly AgentSkillOption[],
-  selectedReferences: readonly AgentPromptReference[]
+  selectedReferences: readonly AgentPromptReference[],
 ): ComposerReferenceOption[] {
   if (!trigger) return []
   const selectedKeys = new Set(selectedReferences.map(promptReferenceKey))
   const query = trigger.query.toLocaleLowerCase()
-  const options: ComposerReferenceOption[] = trigger.type === 'file'
-    ? files.map((file) => ({
-        key: `file:${file.path}`,
-        reference: { type: 'file', path: file.path },
-        title: file.name,
-        description: file.path,
-        badge: 'FILE'
-      }))
-    : skills.map((skill) => ({
-        key: `skill:${skill.name}`,
-        reference: { type: 'skill', name: skill.name },
-        title: skill.name,
-        description: skill.description,
-        badge: 'SKILL'
-      }))
+  const options: ComposerReferenceOption[] =
+    trigger.type === 'file'
+      ? files.map((file) => ({
+          key: `file:${file.path}`,
+          reference: { type: 'file', path: file.path },
+          title: file.name,
+          description: file.path,
+          badge: 'FILE',
+        }))
+      : skills.map((skill) => ({
+          key: `skill:${skill.name}`,
+          reference: { type: 'skill', name: skill.name },
+          title: skill.name,
+          description: skill.description,
+          badge: 'SKILL',
+        }))
 
   return options
     .filter((option) => !selectedKeys.has(option.key))
-    .filter((option) => (
-      !query ||
-      option.title.toLocaleLowerCase().includes(query) ||
-      option.description.toLocaleLowerCase().includes(query)
-    ))
+    .filter(
+      (option) =>
+        !query ||
+        option.title.toLocaleLowerCase().includes(query) ||
+        option.description.toLocaleLowerCase().includes(query),
+    )
     .sort((left, right) => {
-      const leftStarts = left.title.toLocaleLowerCase().startsWith(query) ? 0 : 1
-      const rightStarts = right.title.toLocaleLowerCase().startsWith(query) ? 0 : 1
-      return leftStarts - rightStarts || left.title.localeCompare(right.title, 'zh-CN')
+      const leftStarts = left.title.toLocaleLowerCase().startsWith(query)
+        ? 0
+        : 1
+      const rightStarts = right.title.toLocaleLowerCase().startsWith(query)
+        ? 0
+        : 1
+      return (
+        leftStarts - rightStarts ||
+        left.title.localeCompare(right.title, 'zh-CN')
+      )
     })
     .slice(0, 8)
 }
@@ -213,7 +230,9 @@ function editableNameLength(entry: ProjectFileEntry): number {
     return entry.name.length - PRESENTATION_FILE_SUFFIX.length
   }
   const markdownSuffix = /\.(?:markdown|md)$/i.exec(entry.name)?.[0]
-  return markdownSuffix ? entry.name.length - markdownSuffix.length : entry.name.length
+  return markdownSuffix
+    ? entry.name.length - markdownSuffix.length
+    : entry.name.length
 }
 
 function ConversationIcon(): React.JSX.Element {
@@ -241,16 +260,25 @@ function FileIcon(): React.JSX.Element {
   )
 }
 
-function ProjectFileIcon({ kind }: { kind: ProjectFileDisplayKind }): React.JSX.Element {
+function ProjectFileIcon({
+  kind,
+}: {
+  kind: ProjectFileDisplayKind
+}): React.JSX.Element {
   if (kind === 'directory') return <FolderIcon />
-  if (kind === 'presentation') return <span className="file-type-badge">PPT</span>
+  if (kind === 'presentation')
+    return <span className="file-type-badge">PPT</span>
   if (kind === 'markdown') return <span className="file-type-badge">MD</span>
   if (kind === 'text') return <span className="file-type-badge">TXT</span>
   if (kind === 'image') return <span className="file-type-badge">IMG</span>
   return <FileIcon />
 }
 
-function OpenFileIcon({ kind }: { kind: ProjectFileDisplayKind }): React.JSX.Element {
+function OpenFileIcon({
+  kind,
+}: {
+  kind: ProjectFileDisplayKind
+}): React.JSX.Element {
   if (kind === 'presentation') {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -276,7 +304,10 @@ function OpenFileIcon({ kind }: { kind: ProjectFileDisplayKind }): React.JSX.Ele
   )
 }
 
-function openFileActionLabel(kind: ProjectFileDisplayKind, name: string): string {
+function openFileActionLabel(
+  kind: ProjectFileDisplayKind,
+  name: string,
+): string {
   if (kind === 'presentation') return `编辑演示文稿 ${name}`
   if (kind === 'markdown') return `编辑 Markdown 文档 ${name}`
   if (kind === 'image') return `预览图片 ${name}`
@@ -293,18 +324,30 @@ function HistoryIcon(): React.JSX.Element {
   )
 }
 
-function TodoProgress({ todos }: { todos: AgentTodo[] }): React.JSX.Element | null {
+function TodoProgress({
+  todos,
+}: {
+  todos: AgentTodo[]
+}): React.JSX.Element | null {
   if (todos.length === 0) return null
 
-  const completedCount = todos.filter((todo) => todo.status === 'completed').length
+  const completedCount = todos.filter(
+    (todo) => todo.status === 'completed',
+  ).length
   const progress = Math.round((completedCount / todos.length) * 100)
 
   return (
-    <section className="agent-todos" aria-label="Agent 工作清单" aria-live="polite">
+    <section
+      className="agent-todos"
+      aria-label="Agent 工作清单"
+      aria-live="polite"
+    >
       <header className="agent-todos-heading">
         <div>
           <span>工作清单</span>
-          <strong>{completedCount}/{todos.length} 已完成</strong>
+          <strong>
+            {completedCount}/{todos.length} 已完成
+          </strong>
         </div>
         <div
           className="agent-todos-progress"
@@ -321,7 +364,11 @@ function TodoProgress({ todos }: { todos: AgentTodo[] }): React.JSX.Element | nu
         {todos.map((todo) => (
           <li className={`agent-todo agent-todo-${todo.status}`} key={todo.id}>
             <span className="agent-todo-marker" aria-hidden="true">
-              {todo.status === 'completed' ? '✓' : todo.status === 'in_progress' ? '●' : ''}
+              {todo.status === 'completed'
+                ? '✓'
+                : todo.status === 'in_progress'
+                  ? '●'
+                  : ''}
             </span>
             <div>
               <span>{todo.subject}</span>
@@ -346,21 +393,24 @@ function TodoProgress({ todos }: { todos: AgentTodo[] }): React.JSX.Element | nu
 function ConversationUsageBar({
   isLoading,
   isUpdating,
-  usage
+  usage,
 }: {
   isLoading: boolean
   isUpdating: boolean
   usage?: AgentConversationUsage
 }): React.JSX.Element {
   const tone = contextUsageTone(usage?.contextPercent ?? null)
-  const percent = usage?.contextPercent === null || usage?.contextPercent === undefined
-    ? null
-    : Math.max(0, usage.contextPercent)
+  const percent =
+    usage?.contextPercent === null || usage?.contextPercent === undefined
+      ? null
+      : Math.max(0, usage.contextPercent)
   const meterWidth = percent === null ? 0 : Math.min(100, percent)
-  const contextLabel = usage?.contextTokens !== null && usage?.contextTokens !== undefined &&
+  const contextLabel =
+    usage?.contextTokens !== null &&
+    usage?.contextTokens !== undefined &&
     usage.contextWindow
-    ? `${formatTokenCount(usage.contextTokens)} / ${formatTokenCount(usage.contextWindow)}`
-    : '等待下一次回复'
+      ? `${formatTokenCount(usage.contextTokens)} / ${formatTokenCount(usage.contextWindow)}`
+      : '等待下一次回复'
 
   return (
     <section
@@ -387,13 +437,20 @@ function ConversationUsageBar({
           aria-label={percent === null ? undefined : '上下文使用比例'}
           aria-valuemin={percent === null ? undefined : 0}
           aria-valuemax={percent === null ? undefined : 100}
-          aria-valuenow={percent === null ? undefined : Math.min(100, Math.round(percent))}
+          aria-valuenow={
+            percent === null ? undefined : Math.min(100, Math.round(percent))
+          }
         >
           <i style={{ width: `${meterWidth}%` }} />
         </div>
         <small>{percent === null ? '—' : `${Math.round(percent)}%`}</small>
       </div>
-      {isUpdating ? <span className="conversation-usage-updating"><i />回复后更新</span> : null}
+      {isUpdating ? (
+        <span className="conversation-usage-updating">
+          <i />
+          回复后更新
+        </span>
+      ) : null}
     </section>
   )
 }
@@ -413,7 +470,7 @@ function FileTreeLevel({
   onRenameFile,
   onRenameRequestHandled,
   onSelectFile,
-  onToggle
+  onToggle,
 }: FileTreeLevelProps): React.JSX.Element {
   const entries = entriesByDirectory[directoryPath] ?? []
   const [renamingPath, setRenamingPath] = useState<string | null>(null)
@@ -421,7 +478,9 @@ function FileTreeLevel({
 
   useEffect(() => {
     if (!renameRequestedPath) return
-    const entry = entries.find((candidate) => candidate.path === renameRequestedPath)
+    const entry = entries.find(
+      (candidate) => candidate.path === renameRequestedPath,
+    )
     if (!entry) return
     setRenamingPath(entry.path)
     setRenameDraft(entry.name)
@@ -443,32 +502,56 @@ function FileTreeLevel({
   }
 
   return (
-    <div role={depth === 0 ? 'tree' : 'group'}
+    <div
+      role={depth === 0 ? 'tree' : 'group'}
       aria-label={depth === 0 ? '项目文件' : undefined}
-      onKeyDown={depth === 0 ? (event) => {
-        if (!(event.target instanceof HTMLButtonElement) || event.target.getAttribute('role') !== 'treeitem') return
-        const item = event.target
-        const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="treeitem"]')]
-        const index = items.indexOf(item)
-        let next: HTMLButtonElement | undefined
-        if (event.key === 'ArrowDown') next = items[Math.min(items.length - 1, index + 1)]
-        else if (event.key === 'ArrowUp') next = items[Math.max(0, index - 1)]
-        else if (event.key === 'Home') next = items[0]
-        else if (event.key === 'End') next = items[items.length - 1]
-        else if (event.key === 'ArrowRight') {
-          if (item.getAttribute('aria-expanded') === 'false') item.click()
-          else if (item.getAttribute('aria-expanded') === 'true') {
-            next = item.closest('.file-tree-branch')
-              ?.querySelector<HTMLButtonElement>(':scope > [role="group"] [role="treeitem"]') ?? undefined
-          }
-        } else if (event.key === 'ArrowLeft') {
-          if (item.getAttribute('aria-expanded') === 'true') item.click()
-          else next = item.closest('.file-tree-branch')?.parentElement?.closest('.file-tree-branch')
-            ?.querySelector<HTMLButtonElement>('[role="treeitem"]') ?? undefined
-        } else return
-        event.preventDefault()
-        next?.focus()
-      } : undefined}
+      onKeyDown={
+        depth === 0
+          ? (event) => {
+              if (
+                !(event.target instanceof HTMLButtonElement) ||
+                event.target.getAttribute('role') !== 'treeitem'
+              )
+                return
+              const item = event.target
+              const items = [
+                ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                  '[role="treeitem"]',
+                ),
+              ]
+              const index = items.indexOf(item)
+              let next: HTMLButtonElement | undefined
+              if (event.key === 'ArrowDown')
+                next = items[Math.min(items.length - 1, index + 1)]
+              else if (event.key === 'ArrowUp')
+                next = items[Math.max(0, index - 1)]
+              else if (event.key === 'Home') next = items[0]
+              else if (event.key === 'End') next = items[items.length - 1]
+              else if (event.key === 'ArrowRight') {
+                if (item.getAttribute('aria-expanded') === 'false') item.click()
+                else if (item.getAttribute('aria-expanded') === 'true') {
+                  next =
+                    item
+                      .closest('.file-tree-branch')
+                      ?.querySelector<HTMLButtonElement>(
+                        ':scope > [role="group"] [role="treeitem"]',
+                      ) ?? undefined
+                }
+              } else if (event.key === 'ArrowLeft') {
+                if (item.getAttribute('aria-expanded') === 'true') item.click()
+                else
+                  next =
+                    item
+                      .closest('.file-tree-branch')
+                      ?.parentElement?.closest('.file-tree-branch')
+                      ?.querySelector<HTMLButtonElement>('[role="treeitem"]') ??
+                    undefined
+              } else return
+              event.preventDefault()
+              next?.focus()
+            }
+          : undefined
+      }
     >
       {entries.map((entry) => {
         const isDirectory = entry.kind === 'directory'
@@ -498,10 +581,12 @@ function FileTreeLevel({
                     aria-label={`输入 ${entry.name} 的新名称`}
                     autoFocus
                     onChange={(event) => setRenameDraft(event.target.value)}
-                    onFocus={(event) => event.currentTarget.setSelectionRange(
-                      0,
-                      editableNameLength(entry)
-                    )}
+                    onFocus={(event) =>
+                      event.currentTarget.setSelectionRange(
+                        0,
+                        editableNameLength(entry),
+                      )
+                    }
                     onKeyDown={(event) => {
                       if (event.key === 'Escape') {
                         event.preventDefault()
@@ -509,13 +594,17 @@ function FileTreeLevel({
                       }
                     }}
                   />
-                  <button type="submit" aria-label="确认重命名" title="确认">✓</button>
+                  <button type="submit" aria-label="确认重命名" title="确认">
+                    ✓
+                  </button>
                   <button
                     type="button"
                     aria-label="取消重命名"
                     title="取消"
                     onClick={() => setRenamingPath(null)}
-                  >×</button>
+                  >
+                    ×
+                  </button>
                 </form>
               ) : (
                 <button
@@ -539,7 +628,13 @@ function FileTreeLevel({
                   onFocus={() => onSelectFile(entry.path)}
                 >
                   <span className="tree-chevron" aria-hidden="true">
-                    {isDirectory ? (isLoading ? '·' : isExpanded ? '⌄' : '›') : ''}
+                    {isDirectory
+                      ? isLoading
+                        ? '·'
+                        : isExpanded
+                          ? '⌄'
+                          : '›'
+                      : ''}
                   </span>
                   <span className="tree-entry-icon" aria-hidden="true">
                     <ProjectFileIcon kind={displayKind} />
@@ -554,9 +649,13 @@ function FileTreeLevel({
                       className={`file-tree-open-action file-tree-open-${displayKind}`}
                       type="button"
                       aria-label={openFileActionLabel(displayKind, entry.name)}
-                      title={displayKind === 'presentation'
-                        ? '编辑演示文稿'
-                        : displayKind === 'image' ? '预览图片' : '编辑文档'}
+                      title={
+                        displayKind === 'presentation'
+                          ? '编辑演示文稿'
+                          : displayKind === 'image'
+                            ? '预览图片'
+                            : '编辑文档'
+                      }
                       onClick={() => onOpenFile(entry)}
                     >
                       <OpenFileIcon kind={displayKind} />
@@ -567,13 +666,17 @@ function FileTreeLevel({
                     aria-label={`重命名 ${entry.name}`}
                     title="重命名"
                     onClick={() => startRenaming(entry)}
-                  >✎</button>
+                  >
+                    ✎
+                  </button>
                   <button
                     type="button"
                     aria-label={`删除 ${entry.name}`}
                     title="删除"
                     onClick={() => onDeleteFile(entry)}
-                  >×</button>
+                  >
+                    ×
+                  </button>
                 </span>
               ) : null}
             </div>
@@ -603,69 +706,106 @@ function FileTreeLevel({
   )
 }
 
-export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspaceProps): React.JSX.Element {
-  const [conversations, setConversations] = useState<Conversation[]>(() => [createConversation()])
-  const [conversationFilter, setConversationFilter] = useState<'active' | 'archived' | 'all'>('active')
-  const [isConversationFilterOpen, setIsConversationFilterOpen] = useState(false)
-  const [selectedConversationId, setSelectedConversationId] = useState(() => conversations[0].id)
+export function ProjectWorkspace({
+  project,
+  onDirtyChange,
+}: ProjectWorkspaceProps): React.JSX.Element {
+  const [conversations, setConversations] = useState<Conversation[]>(() => [
+    createConversation(),
+  ])
+  const [conversationFilter, setConversationFilter] = useState<
+    'active' | 'archived' | 'all'
+  >('active')
+  const [isConversationFilterOpen, setIsConversationFilterOpen] =
+    useState(false)
+  const [selectedConversationId, setSelectedConversationId] = useState(
+    () => conversations[0].id,
+  )
   const [draft, setDraft] = useState('')
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(292)
   const [conversationHeight, setConversationHeight] = useState(280)
-  const [workspaceSize, setWorkspaceSize] = useState({ width: 1180, height: 714 })
+  const [workspaceSize, setWorkspaceSize] = useState({
+    width: 1180,
+    height: 714,
+  })
   const workspaceRef = useRef<HTMLElement>(null)
   const sidebarMaxWidth = Math.min(420, Math.floor(workspaceSize.width * 0.4))
   const sidebarMaxHeight = Math.max(120, workspaceSize.height - 226)
   const effectiveSidebarWidth = Math.min(sidebarWidth, sidebarMaxWidth)
-  const effectiveConversationHeight = Math.min(conversationHeight, sidebarMaxHeight)
-  const [thinkingLevel, setThinkingLevel] = useState<AgentThinkingLevel>(loadThinkingLevel)
-  const [knownReferences, setKnownReferences] = useState<AgentPromptReference[]>([])
+  const effectiveConversationHeight = Math.min(
+    conversationHeight,
+    sidebarMaxHeight,
+  )
+  const [thinkingLevel, setThinkingLevel] =
+    useState<AgentThinkingLevel>(loadThinkingLevel)
+  const [knownReferences, setKnownReferences] = useState<
+    AgentPromptReference[]
+  >([])
   const promptReferences = collectComposerReferences(draft, knownReferences)
   const [referenceFiles, setReferenceFiles] = useState<ProjectFileEntry[]>([])
   const [skillOptions, setSkillOptions] = useState<AgentSkillOption[]>([])
-  const [referenceTrigger, setReferenceTrigger] = useState<ComposerReferenceTrigger | null>(null)
+  const [referenceTrigger, setReferenceTrigger] =
+    useState<ComposerReferenceTrigger | null>(null)
   const [activeReferenceIndex, setActiveReferenceIndex] = useState(0)
-  const [isReferenceOptionsLoading, setIsReferenceOptionsLoading] = useState(true)
+  const [isReferenceOptionsLoading, setIsReferenceOptionsLoading] =
+    useState(true)
   const [referenceOptionsError, setReferenceOptionsError] = useState('')
-  const [activeAgentRequest, setActiveAgentRequest] = useState<ActiveAgentRequest | null>(null)
+  const [activeAgentRequest, setActiveAgentRequest] =
+    useState<ActiveAgentRequest | null>(null)
   const [isStopping, setIsStopping] = useState(false)
   const [chatError, setChatError] = useState('')
   const [conversationError, setConversationError] = useState('')
   const [isConversationLoading, setIsConversationLoading] = useState(true)
   const [canPersistConversations, setCanPersistConversations] = useState(false)
-  const [loadedConversationIds, setLoadedConversationIds] = useState<Set<string>>(new Set())
-  const [loadingConversationIds, setLoadingConversationIds] = useState<Set<string>>(new Set())
-  const [todosByConversation, setTodosByConversation] = useState<Record<string, AgentTodo[]>>({})
+  const [loadedConversationIds, setLoadedConversationIds] = useState<
+    Set<string>
+  >(new Set())
+  const [loadingConversationIds, setLoadingConversationIds] = useState<
+    Set<string>
+  >(new Set())
+  const [todosByConversation, setTodosByConversation] = useState<
+    Record<string, AgentTodo[]>
+  >({})
   const [usageByConversation, setUsageByConversation] = useState<
     Record<string, AgentConversationUsage>
   >({})
   const [loadingUsageIds, setLoadingUsageIds] = useState<Set<string>>(new Set())
-  const [usageRevisionByConversation, setUsageRevisionByConversation] = useState<
-    Record<string, number>
+  const [usageRevisionByConversation, setUsageRevisionByConversation] =
+    useState<Record<string, number>>({})
+  const [entriesByDirectory, setEntriesByDirectory] = useState<
+    Record<string, ProjectFileEntry[]>
   >({})
-  const [entriesByDirectory, setEntriesByDirectory] = useState<Record<string, ProjectFileEntry[]>>({})
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set())
   const [loadingPaths, setLoadingPaths] = useState<Set<string>>(new Set(['']))
   const [fileError, setFileError] = useState('')
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
   const [pendingPresentationImport, setPendingPresentationImport] =
     useState<PptxImportRequest | null>(null)
-  const [renameRequestedPath, setRenameRequestedPath] = useState<string | null>(null)
+  const [renameRequestedPath, setRenameRequestedPath] = useState<string | null>(
+    null,
+  )
   const [openDocuments, setOpenDocuments] = useState<OpenTextDocument[]>([])
-  const [openPresentations, setOpenPresentations] = useState<OpenPresentationDocument[]>([])
+  const [openPresentations, setOpenPresentations] = useState<
+    OpenPresentationDocument[]
+  >([])
   const [openImages, setOpenImages] = useState<OpenImageDocument[]>([])
-  const [activeDocumentPath, setActiveDocumentPath] = useState<string | null>(null)
+  const [activeDocumentPath, setActiveDocumentPath] = useState<string | null>(
+    null,
+  )
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
   const [isHistoryActive, setIsHistoryActive] = useState(false)
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null)
-  const [openingFilePaths, setOpeningFilePaths] = useState<Set<string>>(new Set())
+  const [openingFilePaths, setOpeningFilePaths] = useState<Set<string>>(
+    new Set(),
+  )
   const streamBuffer = useAgentEvents(setConversations, setTodosByConversation)
   const lastSavedConversationSnapshotRef = useConversationPersistence({
     projectHandle: project.handle,
     conversations,
     selectedConversationId,
     enabled: canPersistConversations && !isConversationLoading,
-    onError: setConversationError
+    onError: setConversationError,
   })
   const followMessagesRef = useRef(true)
   const messageEndRef = useRef<HTMLDivElement>(null)
@@ -683,7 +823,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   let treeTabStopPath = selectedFilePath
   if (treeTabStopPath) {
     let directory = parentDirectory(treeTabStopPath)
-    if (!entriesByDirectory[directory]?.some((entry) => entry.path === treeTabStopPath)) treeTabStopPath = null
+    if (
+      !entriesByDirectory[directory]?.some(
+        (entry) => entry.path === treeTabStopPath,
+      )
+    )
+      treeTabStopPath = null
     while (directory) {
       if (!expandedPaths.has(directory)) treeTabStopPath = null
       directory = parentDirectory(directory)
@@ -692,35 +837,50 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   treeTabStopPath ??= entriesByDirectory['']?.[0]?.path ?? null
 
   const isSending = activeAgentRequest !== null
-  const visibleConversations = conversations.filter((conversation) =>
-    conversationFilter === 'all' || Boolean(conversation.archived) === (conversationFilter === 'archived')
+  const visibleConversations = conversations.filter(
+    (conversation) =>
+      conversationFilter === 'all' ||
+      Boolean(conversation.archived) === (conversationFilter === 'archived'),
   )
 
   const selectedConversation =
-    conversations.find((conversation) => conversation.id === selectedConversationId) ?? conversations[0]
+    conversations.find(
+      (conversation) => conversation.id === selectedConversationId,
+    ) ?? conversations[0]
   const isSelectedConversationSending =
     activeAgentRequest?.conversationId === selectedConversation.id
-  const activeDocument = openDocuments.find((document) => document.path === activeDocumentPath)
-  const activePresentation = openPresentations.find(
-    (presentation) => presentation.path === activeDocumentPath
+  const activeDocument = openDocuments.find(
+    (document) => document.path === activeDocumentPath,
   )
-  const activeImage = openImages.find((image) => image.path === activeDocumentPath)
+  const activePresentation = openPresentations.find(
+    (presentation) => presentation.path === activeDocumentPath,
+  )
+  const activeImage = openImages.find(
+    (image) => image.path === activeDocumentPath,
+  )
   const activeFile = activeDocument ?? activePresentation ?? activeImage
   const selectedTodos = todosByConversation[selectedConversation.id] ?? []
   const selectedUsage = usageByConversation[selectedConversation.id]
-  const selectedUsageRevision = usageRevisionByConversation[selectedConversation.id] ?? 0
-  const isSelectedConversationLoading = loadingConversationIds.has(selectedConversation.id)
+  const selectedUsageRevision =
+    usageRevisionByConversation[selectedConversation.id] ?? 0
+  const isSelectedConversationLoading = loadingConversationIds.has(
+    selectedConversation.id,
+  )
   const filteredReferenceOptions = composerReferenceOptions(
     referenceTrigger,
     referenceFiles,
     skillOptions,
-    promptReferences
+    promptReferences,
   )
-  const hasDirtyDocuments = openDocuments.some(
-    (document) => document.content !== document.savedContent
-  ) || openPresentations.some(
-    (presentation) => presentation.serializedDocument !== presentation.savedSerializedDocument
-  )
+  const hasDirtyDocuments =
+    openDocuments.some(
+      (document) => document.content !== document.savedContent,
+    ) ||
+    openPresentations.some(
+      (presentation) =>
+        presentation.serializedDocument !==
+        presentation.savedSerializedDocument,
+    )
   openDocumentsRef.current = openDocuments
   openPresentationsRef.current = openPresentations
   openImagesRef.current = openImages
@@ -728,7 +888,10 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   useLayoutEffect(() => {
     const element = workspaceRef.current!
     const observer = new ResizeObserver(() => {
-      setWorkspaceSize({ width: element.clientWidth, height: element.clientHeight })
+      setWorkspaceSize({
+        width: element.clientWidth,
+        height: element.clientHeight,
+      })
     })
     observer.observe(element)
     return () => observer.disconnect()
@@ -772,19 +935,25 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
 
     window.addEventListener('beforeunload', protectUnsavedDocuments)
-    return () => window.removeEventListener('beforeunload', protectUnsavedDocuments)
+    return () =>
+      window.removeEventListener('beforeunload', protectUnsavedDocuments)
   }, [hasDirtyDocuments])
 
   useEffect(() => {
     if (!isCreateMenuOpen) return
-    createMenuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')?.focus()
+    createMenuRef.current
+      ?.querySelector<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')
+      ?.focus()
     const closeOnPointerDown = (event: PointerEvent): void => {
-      if (!createMenuRef.current?.contains(event.target as Node)) setIsCreateMenuOpen(false)
+      if (!createMenuRef.current?.contains(event.target as Node))
+        setIsCreateMenuOpen(false)
     }
     const closeOnEscape = (event: globalThis.KeyboardEvent): void => {
       if (event.key === 'Escape') {
         setIsCreateMenuOpen(false)
-        createMenuRef.current?.querySelector<HTMLButtonElement>('.file-create-trigger')?.focus()
+        createMenuRef.current
+          ?.querySelector<HTMLButtonElement>('.file-create-trigger')
+          ?.focus()
       }
     }
     document.addEventListener('pointerdown', closeOnPointerDown)
@@ -797,8 +966,14 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   useEffect(() => {
     function openHistoryShortcut(event: globalThis.KeyboardEvent): void {
-      const shortcutModifier = window.desktop.platform === 'darwin' ? event.metaKey : event.ctrlKey
-      if (!shortcutModifier || !event.shiftKey || event.key.toLocaleLowerCase() !== 'h') return
+      const shortcutModifier =
+        window.desktop.platform === 'darwin' ? event.metaKey : event.ctrlKey
+      if (
+        !shortcutModifier ||
+        !event.shiftKey ||
+        event.key.toLocaleLowerCase() !== 'h'
+      )
+        return
       event.preventDefault()
       setIsHistoryOpen(true)
       setIsHistoryActive(true)
@@ -816,7 +991,10 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         if (active) setEntriesByDirectory({ '': entries })
       })
       .catch((error: unknown) => {
-        if (active) setFileError(error instanceof Error ? error.message : '无法读取项目文件')
+        if (active)
+          setFileError(
+            error instanceof Error ? error.message : '无法读取项目文件',
+          )
       })
       .finally(() => {
         if (active) setLoadingPaths(new Set())
@@ -836,72 +1014,103 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
     void Promise.all([
       window.projects.listFiles(project.handle),
-      window.agent.listSkills(project.handle)
-    ]).then(([files, skills]) => {
-      if (!active) return
-      setReferenceFiles(files)
-      setSkillOptions(skills)
-    }).catch((error: unknown) => {
-      if (!active) return
-      setReferenceOptionsError(
-        error instanceof Error ? error.message : '无法读取文件与 skill 列表'
-      )
-    }).finally(() => {
-      if (active) setIsReferenceOptionsLoading(false)
-    })
+      window.agent.listSkills(project.handle),
+    ])
+      .then(([files, skills]) => {
+        if (!active) return
+        setReferenceFiles(files)
+        setSkillOptions(skills)
+      })
+      .catch((error: unknown) => {
+        if (!active) return
+        setReferenceOptionsError(
+          error instanceof Error ? error.message : '无法读取文件与 skill 列表',
+        )
+      })
+      .finally(() => {
+        if (active) setIsReferenceOptionsLoading(false)
+      })
 
     return () => {
       active = false
     }
   }, [project.handle])
 
-  useEffect(() => window.presentations.onChanged((event) => {
-    if (event.projectHandle !== project.handle) return
-    void window.projects.listDirectory(project.handle, '').then((entries) => {
-      setEntriesByDirectory((current) => ({ ...current, '': entries }))
-    }).catch((error: unknown) => {
-      setFileError(error instanceof Error ? error.message : '无法刷新项目文件')
-    })
+  useEffect(
+    () =>
+      window.presentations.onChanged((event) => {
+        if (event.projectHandle !== project.handle) return
+        void window.projects
+          .listDirectory(project.handle, '')
+          .then((entries) => {
+            setEntriesByDirectory((current) => ({ ...current, '': entries }))
+          })
+          .catch((error: unknown) => {
+            setFileError(
+              error instanceof Error ? error.message : '无法刷新项目文件',
+            )
+          })
 
-    void window.presentations.read(project.handle, event.path).then((file) => {
-      setOpenPresentations((current) => current.map((presentation) => {
-        if (presentation.path !== event.path || presentation.isSaving) return presentation
-        if (presentation.serializedDocument !== presentation.savedSerializedDocument) {
-          return {
-            ...presentation,
-            conflict: true,
-            error: '演示文稿已被 Agent 或其他进程修改。重新载入会放弃当前未保存内容。'
-          }
-        }
-        const serializedDocument = serializePresentationDocumentState(file.document)
-        return {
-          ...presentation,
-          document: file.document,
-          serializedDocument,
-          savedSerializedDocument: serializedDocument,
-          revision: file.revision,
-          reloadKey: crypto.randomUUID(),
-          conflict: false,
-          error: ''
-        }
-      }))
-    }).catch(() => undefined)
-  }), [project.handle])
+        void window.presentations
+          .read(project.handle, event.path)
+          .then((file) => {
+            setOpenPresentations((current) =>
+              current.map((presentation) => {
+                if (presentation.path !== event.path || presentation.isSaving)
+                  return presentation
+                if (
+                  presentation.serializedDocument !==
+                  presentation.savedSerializedDocument
+                ) {
+                  return {
+                    ...presentation,
+                    conflict: true,
+                    error:
+                      '演示文稿已被 Agent 或其他进程修改。重新载入会放弃当前未保存内容。',
+                  }
+                }
+                const serializedDocument = serializePresentationDocumentState(
+                  file.document,
+                )
+                return {
+                  ...presentation,
+                  document: file.document,
+                  serializedDocument,
+                  savedSerializedDocument: serializedDocument,
+                  revision: file.revision,
+                  reloadKey: crypto.randomUUID(),
+                  conflict: false,
+                  error: '',
+                }
+              }),
+            )
+          })
+          .catch(() => undefined)
+      }),
+    [project.handle],
+  )
 
   useEffect(() => {
     void window.projects
       .watchExternalChanges(project.handle, { files: [], directories: [''] })
       .catch((error: unknown) => {
-        setFileError(error instanceof Error ? error.message : '无法监听外部文件修改')
+        setFileError(
+          error instanceof Error ? error.message : '无法监听外部文件修改',
+        )
       })
   }, [project.handle])
 
-  useEffect(() => () => {
-    void window.projects.watchExternalChanges(project.handle, {
-      files: [],
-      directories: []
-    }).catch(() => undefined)
-  }, [project.handle])
+  useEffect(
+    () => () => {
+      void window.projects
+        .watchExternalChanges(project.handle, {
+          files: [],
+          directories: [],
+        })
+        .catch(() => undefined)
+    },
+    [project.handle],
+  )
 
   useEffect(() => {
     let referenceRefreshTimeout: ReturnType<typeof setTimeout> | undefined
@@ -910,7 +1119,10 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       if (event.kind !== 'change') {
         clearTimeout(referenceRefreshTimeout)
         referenceRefreshTimeout = setTimeout(() => {
-          void window.projects.listFiles(project.handle).then(setReferenceFiles).catch(() => undefined)
+          void window.projects
+            .listFiles(project.handle)
+            .then(setReferenceFiles)
+            .catch(() => undefined)
         }, 250)
       }
       void handleProjectFileChanged(event)
@@ -923,17 +1135,20 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   useEffect(() => {
     function refreshVisibleProjectFiles(): void {
-      for (const directory of ['', ...expandedPaths]) void refreshDirectory(directory)
+      for (const directory of ['', ...expandedPaths])
+        void refreshDirectory(directory)
       for (const path of [
         ...openDocumentsRef.current.map((document) => document.path),
-        ...openPresentationsRef.current.map((presentation) => presentation.path),
-        ...openImagesRef.current.map((image) => image.path)
+        ...openPresentationsRef.current.map(
+          (presentation) => presentation.path,
+        ),
+        ...openImagesRef.current.map((image) => image.path),
       ]) {
         void handleProjectFileChanged({
           projectHandle: project.handle,
           path,
           kind: 'change',
-          source: 'external'
+          source: 'external',
         })
       }
     }
@@ -959,30 +1174,40 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
     void (async () => {
       try {
-        const storedState = await window.projects.loadConversations(project.handle)
+        const storedState = await window.projects.loadConversations(
+          project.handle,
+        )
         if (!active) return
 
         if (storedState) {
-          const storedConversations = storedState.conversations.map((conversation) => ({
-            ...conversation,
-            messages: []
-          }))
+          const storedConversations = storedState.conversations.map(
+            (conversation) => ({
+              ...conversation,
+              messages: [],
+            }),
+          )
           setConversations(storedConversations)
           setSelectedConversationId(storedState.selectedConversationId)
           lastSavedConversationSnapshotRef.current = JSON.stringify(storedState)
-          setLoadingConversationIds(new Set([storedState.selectedConversationId]))
+          setLoadingConversationIds(
+            new Set([storedState.selectedConversationId]),
+          )
 
           const messages = await window.projects.loadConversationMessages(
             project.handle,
-            storedState.selectedConversationId
+            storedState.selectedConversationId,
           )
           if (!active) return
-          setConversations((current) => current.map((conversation) =>
-            conversation.id === storedState.selectedConversationId
-              ? { ...conversation, messages }
-              : conversation
-          ))
-          setLoadedConversationIds(new Set([storedState.selectedConversationId]))
+          setConversations((current) =>
+            current.map((conversation) =>
+              conversation.id === storedState.selectedConversationId
+                ? { ...conversation, messages }
+                : conversation,
+            ),
+          )
+          setLoadedConversationIds(
+            new Set([storedState.selectedConversationId]),
+          )
           setLoadingConversationIds(new Set())
         } else {
           const conversation = createConversation()
@@ -995,7 +1220,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       } catch (error) {
         if (!active) return
         setConversationError(
-          `${error instanceof Error ? error.message : '无法加载项目会话'}；已停止自动保存以保护原记录`
+          `${error instanceof Error ? error.message : '无法加载项目会话'}；已停止自动保存以保护原记录`,
         )
       } finally {
         if (active) {
@@ -1018,69 +1243,89 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     if (!followMessagesRef.current) return
     messageEndRef.current?.scrollIntoView({
       behavior: 'auto',
-      block: 'end'
+      block: 'end',
     })
   }, [
     activeDocumentPath,
     isHistoryActive,
     isSelectedConversationSending,
     selectedConversation.id,
-    selectedConversation.messages
+    selectedConversation.messages,
   ])
 
   useEffect(() => {
     if (
       isConversationLoading ||
-      Object.prototype.hasOwnProperty.call(todosByConversation, selectedConversation.id)
-    ) return
+      Object.prototype.hasOwnProperty.call(
+        todosByConversation,
+        selectedConversation.id,
+      )
+    )
+      return
 
     let active = true
     const conversationId = selectedConversation.id
-    void window.agent.getTodos({
-      projectHandle: project.handle,
-      conversationId
-    }).then((todos) => {
-      if (!active) return
-      setTodosByConversation((current) => (
-        Object.prototype.hasOwnProperty.call(current, conversationId)
-          ? current
-          : { ...current, [conversationId]: todos }
-      ))
-    }).catch((error: unknown) => {
-      reportDiagnosticEvent('warn', 'agent.todos_load_failed', error)
-    })
+    void window.agent
+      .getTodos({
+        projectHandle: project.handle,
+        conversationId,
+      })
+      .then((todos) => {
+        if (!active) return
+        setTodosByConversation((current) =>
+          Object.prototype.hasOwnProperty.call(current, conversationId)
+            ? current
+            : { ...current, [conversationId]: todos },
+        )
+      })
+      .catch((error: unknown) => {
+        reportDiagnosticEvent('warn', 'agent.todos_load_failed', error)
+      })
 
     return () => {
       active = false
     }
-  }, [isConversationLoading, project.handle, selectedConversation.id, todosByConversation])
+  }, [
+    isConversationLoading,
+    project.handle,
+    selectedConversation.id,
+    todosByConversation,
+  ])
 
   useEffect(() => {
     if (
       isConversationLoading ||
       isSelectedConversationLoading ||
       isSelectedConversationSending
-    ) return
+    )
+      return
 
     let active = true
     const conversationId = selectedConversation.id
     setLoadingUsageIds((current) => new Set(current).add(conversationId))
-    void window.agent.getUsage({
-      projectHandle: project.handle,
-      conversationId
-    }).then((usage) => {
-      if (!active) return
-      setUsageByConversation((current) => ({ ...current, [conversationId]: usage }))
-    }).catch((error: unknown) => {
-      reportDiagnosticEvent('warn', 'agent.usage_load_failed', error)
-    }).finally(() => {
-      if (!active) return
-      setLoadingUsageIds((current) => {
-        const next = new Set(current)
-        next.delete(conversationId)
-        return next
+    void window.agent
+      .getUsage({
+        projectHandle: project.handle,
+        conversationId,
       })
-    })
+      .then((usage) => {
+        if (!active) return
+        setUsageByConversation((current) => ({
+          ...current,
+          [conversationId]: usage,
+        }))
+      })
+      .catch((error: unknown) => {
+        reportDiagnosticEvent('warn', 'agent.usage_load_failed', error)
+      })
+      .finally(() => {
+        if (!active) return
+        setLoadingUsageIds((current) => {
+          const next = new Set(current)
+          next.delete(conversationId)
+          return next
+        })
+      })
 
     return () => {
       active = false
@@ -1091,15 +1336,18 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     isSelectedConversationSending,
     project.handle,
     selectedConversation.id,
-    selectedUsageRevision
+    selectedUsageRevision,
   ])
 
   function startConversation(): void {
     if (isConversationLoading) return
     setActiveDocumentPath(null)
     setConversationFilter('active')
-    const existingDraft = conversations.find((conversation) =>
-      !conversation.archived && loadedConversationIds.has(conversation.id) && conversation.messages.length === 0
+    const existingDraft = conversations.find(
+      (conversation) =>
+        !conversation.archived &&
+        loadedConversationIds.has(conversation.id) &&
+        conversation.messages.length === 0,
     )
     if (existingDraft) {
       setSelectedConversationId(existingDraft.id)
@@ -1126,20 +1374,34 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setChatError('')
     setKnownReferences([])
     setReferenceTrigger(null)
-    if (loadedConversationIds.has(conversationId) || loadingConversationIds.has(conversationId)) {
+    if (
+      loadedConversationIds.has(conversationId) ||
+      loadingConversationIds.has(conversationId)
+    ) {
       return
     }
 
     setLoadingConversationIds((current) => new Set(current).add(conversationId))
     try {
-      const messages = await window.projects.loadConversationMessages(project.handle, conversationId)
-      setConversations((current) => current.map((conversation) =>
-        conversation.id === conversationId ? { ...conversation, messages } : conversation
-      ))
-      setLoadedConversationIds((current) => new Set(current).add(conversationId))
+      const messages = await window.projects.loadConversationMessages(
+        project.handle,
+        conversationId,
+      )
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === conversationId
+            ? { ...conversation, messages }
+            : conversation,
+        ),
+      )
+      setLoadedConversationIds((current) =>
+        new Set(current).add(conversationId),
+      )
       setConversationError('')
     } catch (error) {
-      setConversationError(error instanceof Error ? error.message : '无法加载 Pi 会话')
+      setConversationError(
+        error instanceof Error ? error.message : '无法加载 Pi 会话',
+      )
     } finally {
       setLoadingConversationIds((current) => {
         const next = new Set(current)
@@ -1151,11 +1413,16 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   async function refreshDirectory(directory: string): Promise<void> {
     try {
-      const entries = await window.projects.listDirectory(project.handle, directory)
+      const entries = await window.projects.listDirectory(
+        project.handle,
+        directory,
+      )
       setEntriesByDirectory((current) => ({ ...current, [directory]: entries }))
     } catch (error) {
       if (directory === '' || expandedPaths.has(directory)) {
-        setFileError(error instanceof Error ? error.message : '无法刷新项目文件')
+        setFileError(
+          error instanceof Error ? error.message : '无法刷新项目文件',
+        )
       }
     }
   }
@@ -1163,100 +1430,148 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   async function refreshVisibleFileTree(): Promise<void> {
     await Promise.all([
       ...['', ...expandedPathsRef.current].map(refreshDirectory),
-      window.projects.listFiles(project.handle).then(setReferenceFiles).catch((error: unknown) => {
-        setFileError(error instanceof Error ? error.message : '无法刷新项目文件')
-      })
+      window.projects
+        .listFiles(project.handle)
+        .then(setReferenceFiles)
+        .catch((error: unknown) => {
+          setFileError(
+            error instanceof Error ? error.message : '无法刷新项目文件',
+          )
+        }),
     ])
   }
 
-  async function handleProjectFileChanged(event: ProjectFileChangedEvent): Promise<void> {
-    if (event.source === 'text-editor' || event.source === 'presentation-editor') return
-    const directory = parentDirectory(event.path)
-    if (directory === '' || expandedPaths.has(directory)) await refreshDirectory(directory)
-    const confirmedRestore = event.source === 'restore' && confirmedRestorePathsRef.current.delete(
-      event.path
+  async function handleProjectFileChanged(
+    event: ProjectFileChangedEvent,
+  ): Promise<void> {
+    if (
+      event.source === 'text-editor' ||
+      event.source === 'presentation-editor'
     )
+      return
+    const directory = parentDirectory(event.path)
+    if (directory === '' || expandedPaths.has(directory))
+      await refreshDirectory(directory)
+    const confirmedRestore =
+      event.source === 'restore' &&
+      confirmedRestorePathsRef.current.delete(event.path)
 
     const textDocument = openDocumentsRef.current.find(
-      (document) => document.path === event.path
+      (document) => document.path === event.path,
     )
     const presentation = openPresentationsRef.current.find(
-      (candidate) => candidate.path === event.path
+      (candidate) => candidate.path === event.path,
     )
-    const image = openImagesRef.current.find((candidate) => candidate.path === event.path)
+    const image = openImagesRef.current.find(
+      (candidate) => candidate.path === event.path,
+    )
     if (!textDocument && !presentation && !image) return
 
     if (event.kind === 'remove' || event.kind === 'remove-directory') {
       if (confirmedRestore) {
-        setOpenDocuments((current) => current.filter((document) => document.path !== event.path))
-        setOpenPresentations((current) => current.filter((candidate) => candidate.path !== event.path))
-        setOpenImages((current) => current.filter((candidate) => candidate.path !== event.path))
-        setActiveDocumentPath((current) => current === event.path ? null : current)
+        setOpenDocuments((current) =>
+          current.filter((document) => document.path !== event.path),
+        )
+        setOpenPresentations((current) =>
+          current.filter((candidate) => candidate.path !== event.path),
+        )
+        setOpenImages((current) =>
+          current.filter((candidate) => candidate.path !== event.path),
+        )
+        setActiveDocumentPath((current) =>
+          current === event.path ? null : current,
+        )
         return
       }
       if (textDocument) {
-        setOpenDocuments((current) => current.map((document) =>
-          document.path === event.path
-            ? {
-                ...document,
-                conflict: true,
-                error: '文件已被外部程序删除。当前编辑内容仍保留在 SlideMind 中。'
-              }
-            : document
-        ))
+        setOpenDocuments((current) =>
+          current.map((document) =>
+            document.path === event.path
+              ? {
+                  ...document,
+                  conflict: true,
+                  error:
+                    '文件已被外部程序删除。当前编辑内容仍保留在 SlideMind 中。',
+                }
+              : document,
+          ),
+        )
       }
       if (presentation) {
-        setOpenPresentations((current) => current.map((candidate) =>
-          candidate.path === event.path
-            ? {
-                ...candidate,
-                conflict: true,
-                error: '演示文稿已被外部程序删除。当前编辑内容仍保留在 SlideMind 中。'
-              }
-            : candidate
-        ))
+        setOpenPresentations((current) =>
+          current.map((candidate) =>
+            candidate.path === event.path
+              ? {
+                  ...candidate,
+                  conflict: true,
+                  error:
+                    '演示文稿已被外部程序删除。当前编辑内容仍保留在 SlideMind 中。',
+                }
+              : candidate,
+          ),
+        )
       }
       if (image) {
-        setOpenImages((current) => current.map((candidate) =>
-          candidate.path === event.path
-            ? { ...candidate, error: '图片已被外部程序删除。' }
-            : candidate
-        ))
+        setOpenImages((current) =>
+          current.map((candidate) =>
+            candidate.path === event.path
+              ? { ...candidate, error: '图片已被外部程序删除。' }
+              : candidate,
+          ),
+        )
       }
       return
     }
 
     if (textDocument) {
       try {
-        const file = await window.projects.readTextFile(project.handle, event.path)
-        setOpenDocuments((current) => current.map((document) => {
-          if (document.path !== event.path || document.revision === file.revision) return document
-          if (!confirmedRestore && document.content !== document.savedContent) {
-            return {
-              ...document,
-              conflict: true,
-              error: '文件已在 SlideMind 外部修改。重新载入会放弃当前未保存内容。'
-            }
-          }
-          return {
-            ...document,
-            ...file,
-            savedContent: file.content,
-            isSaving: false,
-            conflict: false,
-            error: ''
-          }
-        }))
-      } catch (error) {
-        setOpenDocuments((current) => current.map((document) =>
-          document.path === event.path
-            ? {
+        const file = await window.projects.readTextFile(
+          project.handle,
+          event.path,
+        )
+        setOpenDocuments((current) =>
+          current.map((document) => {
+            if (
+              document.path !== event.path ||
+              document.revision === file.revision
+            )
+              return document
+            if (
+              !confirmedRestore &&
+              document.content !== document.savedContent
+            ) {
+              return {
                 ...document,
                 conflict: true,
-                error: error instanceof Error ? error.message : '无法读取外部修改后的文件'
+                error:
+                  '文件已在 SlideMind 外部修改。重新载入会放弃当前未保存内容。',
               }
-            : document
-        ))
+            }
+            return {
+              ...document,
+              ...file,
+              savedContent: file.content,
+              isSaving: false,
+              conflict: false,
+              error: '',
+            }
+          }),
+        )
+      } catch (error) {
+        setOpenDocuments((current) =>
+          current.map((document) =>
+            document.path === event.path
+              ? {
+                  ...document,
+                  conflict: true,
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : '无法读取外部修改后的文件',
+                }
+              : document,
+          ),
+        )
       }
       return
     }
@@ -1264,58 +1579,85 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     if (presentation) {
       try {
         const file = await window.presentations.read(project.handle, event.path)
-        const serializedDocument = serializePresentationDocumentState(file.document)
-        setOpenPresentations((current) => current.map((candidate) => {
-          if (candidate.path !== event.path || candidate.revision === file.revision) return candidate
-          if (!confirmedRestore && candidate.serializedDocument !== candidate.savedSerializedDocument) {
-            return {
-              ...candidate,
-              conflict: true,
-              error: '演示文稿已在 SlideMind 外部修改。重新载入会放弃当前未保存内容。'
-            }
-          }
-          return {
-            ...candidate,
-            document: file.document,
-            serializedDocument,
-            savedSerializedDocument: serializedDocument,
-            revision: file.revision,
-            reloadKey: crypto.randomUUID(),
-            isSaving: false,
-            conflict: false,
-            error: ''
-          }
-        }))
-      } catch (error) {
-        setOpenPresentations((current) => current.map((candidate) =>
-          candidate.path === event.path
-            ? {
+        const serializedDocument = serializePresentationDocumentState(
+          file.document,
+        )
+        setOpenPresentations((current) =>
+          current.map((candidate) => {
+            if (
+              candidate.path !== event.path ||
+              candidate.revision === file.revision
+            )
+              return candidate
+            if (
+              !confirmedRestore &&
+              candidate.serializedDocument !== candidate.savedSerializedDocument
+            ) {
+              return {
                 ...candidate,
                 conflict: true,
-                error: error instanceof Error ? error.message : '无法读取外部修改后的演示文稿'
+                error:
+                  '演示文稿已在 SlideMind 外部修改。重新载入会放弃当前未保存内容。',
               }
-            : candidate
-        ))
+            }
+            return {
+              ...candidate,
+              document: file.document,
+              serializedDocument,
+              savedSerializedDocument: serializedDocument,
+              revision: file.revision,
+              reloadKey: crypto.randomUUID(),
+              isSaving: false,
+              conflict: false,
+              error: '',
+            }
+          }),
+        )
+      } catch (error) {
+        setOpenPresentations((current) =>
+          current.map((candidate) =>
+            candidate.path === event.path
+              ? {
+                  ...candidate,
+                  conflict: true,
+                  error:
+                    error instanceof Error
+                      ? error.message
+                      : '无法读取外部修改后的演示文稿',
+                }
+              : candidate,
+          ),
+        )
       }
       return
     }
 
     try {
-      const file = await window.projects.readImageFile(project.handle, event.path)
-      setOpenImages((current) => current.map((candidate) =>
-        candidate.path === event.path && candidate.revision !== file.revision
-          ? { ...candidate, ...file, error: '' }
-          : candidate
-      ))
+      const file = await window.projects.readImageFile(
+        project.handle,
+        event.path,
+      )
+      setOpenImages((current) =>
+        current.map((candidate) =>
+          candidate.path === event.path && candidate.revision !== file.revision
+            ? { ...candidate, ...file, error: '' }
+            : candidate,
+        ),
+      )
     } catch (error) {
-      setOpenImages((current) => current.map((candidate) =>
-        candidate.path === event.path
-          ? {
-              ...candidate,
-              error: error instanceof Error ? error.message : '无法读取外部修改后的图片'
-            }
-          : candidate
-      ))
+      setOpenImages((current) =>
+        current.map((candidate) =>
+          candidate.path === event.path
+            ? {
+                ...candidate,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : '无法读取外部修改后的图片',
+              }
+            : candidate,
+        ),
+      )
     }
   }
 
@@ -1333,8 +1675,14 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setLoadingPaths((current) => new Set(current).add(entry.path))
     setFileError('')
     try {
-      const entries = await window.projects.listDirectory(project.handle, entry.path)
-      setEntriesByDirectory((current) => ({ ...current, [entry.path]: entries }))
+      const entries = await window.projects.listDirectory(
+        project.handle,
+        entry.path,
+      )
+      setEntriesByDirectory((current) => ({
+        ...current,
+        [entry.path]: entries,
+      }))
     } catch (error) {
       setFileError(error instanceof Error ? error.message : '无法读取项目文件')
       setExpandedPaths((current) => {
@@ -1352,7 +1700,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
   }
 
   async function openFile(entry: ProjectFileEntry): Promise<void> {
-    const existingDocument = openDocuments.find((document) => document.path === entry.path)
+    const existingDocument = openDocuments.find(
+      (document) => document.path === entry.path,
+    )
     if (existingDocument) {
       setIsHistoryActive(false)
       setActiveDocumentPath(existingDocument.path)
@@ -1360,7 +1710,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       return
     }
     const existingPresentation = openPresentations.find(
-      (presentation) => presentation.path === entry.path
+      (presentation) => presentation.path === entry.path,
     )
     if (existingPresentation) {
       setIsHistoryActive(false)
@@ -1383,7 +1733,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     try {
       if (isPresentationPath(entry.path)) {
         const file = await window.presentations.read(project.handle, entry.path)
-        const serializedDocument = serializePresentationDocumentState(file.document)
+        const serializedDocument = serializePresentationDocumentState(
+          file.document,
+        )
         const presentation: OpenPresentationDocument = {
           ...file,
           name: entry.name,
@@ -1393,30 +1745,40 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
           isSaving: false,
           isExporting: false,
           conflict: false,
-          error: ''
+          error: '',
         }
         setOpenPresentations((current) =>
           current.some((candidate) => candidate.path === file.path)
             ? current
-            : [...current, presentation]
+            : [...current, presentation],
         )
         setIsHistoryActive(false)
         setActiveDocumentPath(file.path)
         return
       }
       if (projectFileDisplayKind(entry) === 'image') {
-        const file = await window.projects.readImageFile(project.handle, entry.path)
-        const image: OpenImageDocument = { ...file, name: entry.name, error: '' }
+        const file = await window.projects.readImageFile(
+          project.handle,
+          entry.path,
+        )
+        const image: OpenImageDocument = {
+          ...file,
+          name: entry.name,
+          error: '',
+        }
         setOpenImages((current) =>
           current.some((candidate) => candidate.path === file.path)
             ? current
-            : [...current, image]
+            : [...current, image],
         )
         setIsHistoryActive(false)
         setActiveDocumentPath(file.path)
         return
       }
-      const file = await window.projects.readTextFile(project.handle, entry.path)
+      const file = await window.projects.readTextFile(
+        project.handle,
+        entry.path,
+      )
       const document: OpenTextDocument = {
         ...file,
         name: entry.name,
@@ -1427,12 +1789,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         error: '',
         exportError: '',
         exportWarnings: [],
-        viewMode: file.kind === 'markdown' ? 'split' : 'edit'
+        viewMode: file.kind === 'markdown' ? 'split' : 'edit',
       }
       setOpenDocuments((current) =>
         current.some((candidate) => candidate.path === file.path)
           ? current
-          : [...current, document]
+          : [...current, document],
       )
       setIsHistoryActive(false)
       setActiveDocumentPath(file.path)
@@ -1447,35 +1809,51 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }
 
-  async function renameEntry(entry: ProjectFileEntry, name: string): Promise<boolean> {
-    const matchesEntry = (path: string): boolean => entry.kind === 'directory'
-      ? isPathInside(path, entry.path)
-      : path === entry.path
-    const matchingDocuments = openDocumentsRef.current.filter((document) => (
-      matchesEntry(document.path)
-    ))
-    const matchingPresentations = openPresentationsRef.current.filter((presentation) => (
-      matchesEntry(presentation.path)
-    ))
-    const matchingImages = openImagesRef.current.filter((image) => matchesEntry(image.path))
+  async function renameEntry(
+    entry: ProjectFileEntry,
+    name: string,
+  ): Promise<boolean> {
+    const matchesEntry = (path: string): boolean =>
+      entry.kind === 'directory'
+        ? isPathInside(path, entry.path)
+        : path === entry.path
+    const matchingDocuments = openDocumentsRef.current.filter((document) =>
+      matchesEntry(document.path),
+    )
+    const matchingPresentations = openPresentationsRef.current.filter(
+      (presentation) => matchesEntry(presentation.path),
+    )
+    const matchingImages = openImagesRef.current.filter((image) =>
+      matchesEntry(image.path),
+    )
     if (
-      matchingDocuments.some((document) => document.isSaving || document.conflict) ||
-      matchingPresentations.some((presentation) => (
-        presentation.isSaving || presentation.isExporting || presentation.conflict
-      ))
+      matchingDocuments.some(
+        (document) => document.isSaving || document.conflict,
+      ) ||
+      matchingPresentations.some(
+        (presentation) =>
+          presentation.isSaving ||
+          presentation.isExporting ||
+          presentation.conflict,
+      )
     ) {
       setFileError('文件或文件夹正在处理或存在冲突，暂时无法重命名')
       return false
     }
     if (
-      matchingDocuments.some((document) => document.content !== document.savedContent) ||
-      matchingPresentations.some((presentation) => (
-        presentation.serializedDocument !== presentation.savedSerializedDocument
-      ))
+      matchingDocuments.some(
+        (document) => document.content !== document.savedContent,
+      ) ||
+      matchingPresentations.some(
+        (presentation) =>
+          presentation.serializedDocument !==
+          presentation.savedSerializedDocument,
+      )
     ) {
-      setFileError(entry.kind === 'directory'
-        ? '请先保存文件夹内所有文件，再进行重命名'
-        : '请先保存文件，再进行重命名'
+      setFileError(
+        entry.kind === 'directory'
+          ? '请先保存文件夹内所有文件，再进行重命名'
+          : '请先保存文件，再进行重命名',
       )
       return false
     }
@@ -1483,54 +1861,93 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setSelectedFilePath(entry.path)
     setFileError('')
     try {
-      const renamed = entry.kind === 'directory'
-        ? await window.projects.renameDirectory(project.handle, { path: entry.path, name })
-        : await window.projects.renameFile(project.handle, { path: entry.path, name })
+      const renamed =
+        entry.kind === 'directory'
+          ? await window.projects.renameDirectory(project.handle, {
+              path: entry.path,
+              name,
+            })
+          : await window.projects.renameFile(project.handle, {
+              path: entry.path,
+              name,
+            })
       if (entry.kind === 'directory') {
-        setOpenDocuments((current) => current.map((document) => matchesEntry(document.path)
-          ? {
-              ...document,
-              path: replacePathDirectory(document.path, entry.path, renamed.path),
-              conflict: false,
-              error: ''
-            }
-          : document
-        ))
-        setOpenPresentations((current) => current.map((presentation) => (
-          matchesEntry(presentation.path)
-            ? {
-                ...presentation,
-                path: replacePathDirectory(presentation.path, entry.path, renamed.path),
-                conflict: false,
-                error: ''
-              }
-            : presentation
-        )))
-        setOpenImages((current) => current.map((image) => matchesEntry(image.path)
-          ? {
-              ...image,
-              path: replacePathDirectory(image.path, entry.path, renamed.path),
-              error: ''
-            }
-          : image
-        ))
-        setActiveDocumentPath((current) => current && matchesEntry(current)
-          ? replacePathDirectory(current, entry.path, renamed.path)
-          : current
+        setOpenDocuments((current) =>
+          current.map((document) =>
+            matchesEntry(document.path)
+              ? {
+                  ...document,
+                  path: replacePathDirectory(
+                    document.path,
+                    entry.path,
+                    renamed.path,
+                  ),
+                  conflict: false,
+                  error: '',
+                }
+              : document,
+          ),
         )
-        setSelectedFilePath((current) => current && matchesEntry(current)
-          ? replacePathDirectory(current, entry.path, renamed.path)
-          : renamed.path
+        setOpenPresentations((current) =>
+          current.map((presentation) =>
+            matchesEntry(presentation.path)
+              ? {
+                  ...presentation,
+                  path: replacePathDirectory(
+                    presentation.path,
+                    entry.path,
+                    renamed.path,
+                  ),
+                  conflict: false,
+                  error: '',
+                }
+              : presentation,
+          ),
         )
-        setExpandedPaths((current) => new Set(
-          [...current].filter((path) => !isPathInside(path, entry.path))
-        ))
-        setLoadingPaths((current) => new Set(
-          [...current].filter((path) => !isPathInside(path, entry.path))
-        ))
-        setEntriesByDirectory((current) => Object.fromEntries(
-          Object.entries(current).filter(([path]) => !isPathInside(path, entry.path))
-        ))
+        setOpenImages((current) =>
+          current.map((image) =>
+            matchesEntry(image.path)
+              ? {
+                  ...image,
+                  path: replacePathDirectory(
+                    image.path,
+                    entry.path,
+                    renamed.path,
+                  ),
+                  error: '',
+                }
+              : image,
+          ),
+        )
+        setActiveDocumentPath((current) =>
+          current && matchesEntry(current)
+            ? replacePathDirectory(current, entry.path, renamed.path)
+            : current,
+        )
+        setSelectedFilePath((current) =>
+          current && matchesEntry(current)
+            ? replacePathDirectory(current, entry.path, renamed.path)
+            : renamed.path,
+        )
+        setExpandedPaths(
+          (current) =>
+            new Set(
+              [...current].filter((path) => !isPathInside(path, entry.path)),
+            ),
+        )
+        setLoadingPaths(
+          (current) =>
+            new Set(
+              [...current].filter((path) => !isPathInside(path, entry.path)),
+            ),
+        )
+        setEntriesByDirectory((current) =>
+          Object.fromEntries(
+            Object.entries(current).filter(
+              ([path]) => !isPathInside(path, entry.path),
+            ),
+          ),
+        )
         await refreshDirectory(parentDirectory(entry.path))
         return true
       }
@@ -1538,86 +1955,118 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       const openDocument = matchingDocuments[0]
       const openPresentation = matchingPresentations[0]
       const openImage = matchingImages[0]
-      const keepsTextDocument = Boolean(openDocument) && /\.(?:md|markdown|txt)$/i.test(renamed.path)
-      const keepsPresentation = Boolean(openPresentation) && isPresentationPath(renamed.path)
-      const keepsImage = Boolean(openImage) && /\.(?:gif|jpe?g|png|webp)$/i.test(renamed.path)
-      setOpenDocuments((current) => keepsTextDocument
-        ? current.map((document) => document.path === entry.path
-          ? {
-              ...document,
-              path: renamed.path,
-              name: renamed.name,
-              kind: /\.(?:md|markdown)$/i.test(renamed.path) ? 'markdown' : 'text',
-              viewMode: /\.(?:md|markdown)$/i.test(renamed.path) ? document.viewMode : 'edit',
-              conflict: false,
-              error: ''
-            }
-          : document)
-        : current.filter((document) => document.path !== entry.path)
+      const keepsTextDocument =
+        Boolean(openDocument) && /\.(?:md|markdown|txt)$/i.test(renamed.path)
+      const keepsPresentation =
+        Boolean(openPresentation) && isPresentationPath(renamed.path)
+      const keepsImage =
+        Boolean(openImage) && /\.(?:gif|jpe?g|png|webp)$/i.test(renamed.path)
+      setOpenDocuments((current) =>
+        keepsTextDocument
+          ? current.map((document) =>
+              document.path === entry.path
+                ? {
+                    ...document,
+                    path: renamed.path,
+                    name: renamed.name,
+                    kind: /\.(?:md|markdown)$/i.test(renamed.path)
+                      ? 'markdown'
+                      : 'text',
+                    viewMode: /\.(?:md|markdown)$/i.test(renamed.path)
+                      ? document.viewMode
+                      : 'edit',
+                    conflict: false,
+                    error: '',
+                  }
+                : document,
+            )
+          : current.filter((document) => document.path !== entry.path),
       )
-      setOpenPresentations((current) => keepsPresentation
-        ? current.map((presentation) => presentation.path === entry.path
-          ? {
-              ...presentation,
-              path: renamed.path,
-              name: renamed.name,
-              conflict: false,
-              error: ''
-            }
-          : presentation)
-        : current.filter((presentation) => presentation.path !== entry.path)
+      setOpenPresentations((current) =>
+        keepsPresentation
+          ? current.map((presentation) =>
+              presentation.path === entry.path
+                ? {
+                    ...presentation,
+                    path: renamed.path,
+                    name: renamed.name,
+                    conflict: false,
+                    error: '',
+                  }
+                : presentation,
+            )
+          : current.filter((presentation) => presentation.path !== entry.path),
       )
-      setOpenImages((current) => keepsImage
-        ? current.map((image) => image.path === entry.path
-          ? { ...image, path: renamed.path, name: renamed.name, error: '' }
-          : image)
-        : current.filter((image) => image.path !== entry.path)
+      setOpenImages((current) =>
+        keepsImage
+          ? current.map((image) =>
+              image.path === entry.path
+                ? {
+                    ...image,
+                    path: renamed.path,
+                    name: renamed.name,
+                    error: '',
+                  }
+                : image,
+            )
+          : current.filter((image) => image.path !== entry.path),
       )
-      setActiveDocumentPath((current) => current === entry.path
-        ? keepsTextDocument || keepsPresentation || keepsImage ? renamed.path : null
-        : current
+      setActiveDocumentPath((current) =>
+        current === entry.path
+          ? keepsTextDocument || keepsPresentation || keepsImage
+            ? renamed.path
+            : null
+          : current,
       )
       setSelectedFilePath(renamed.path)
       await refreshDirectory(parentDirectory(entry.path))
       return true
     } catch (error) {
-      setFileError(error instanceof Error ? error.message : '无法重命名文件或文件夹')
+      setFileError(
+        error instanceof Error ? error.message : '无法重命名文件或文件夹',
+      )
       return false
     }
   }
 
   async function deleteEntry(entry: ProjectFileEntry): Promise<void> {
-    const matchesEntry = (path: string): boolean => entry.kind === 'directory'
-      ? isPathInside(path, entry.path)
-      : path === entry.path
-    const matchingDocuments = openDocumentsRef.current.filter((document) => (
-      matchesEntry(document.path)
-    ))
-    const matchingPresentations = openPresentationsRef.current.filter((presentation) => (
-      matchesEntry(presentation.path)
-    ))
+    const matchesEntry = (path: string): boolean =>
+      entry.kind === 'directory'
+        ? isPathInside(path, entry.path)
+        : path === entry.path
+    const matchingDocuments = openDocumentsRef.current.filter((document) =>
+      matchesEntry(document.path),
+    )
+    const matchingPresentations = openPresentationsRef.current.filter(
+      (presentation) => matchesEntry(presentation.path),
+    )
     if (
       matchingDocuments.some((document) => document.isSaving) ||
-      matchingPresentations.some((presentation) => (
-        presentation.isSaving || presentation.isExporting
-      ))
+      matchingPresentations.some(
+        (presentation) => presentation.isSaving || presentation.isExporting,
+      )
     ) {
       setFileError('文件或文件夹正在处理，暂时无法删除')
       return
     }
     const hasUnsavedChanges = Boolean(
-      matchingDocuments.some((document) => document.content !== document.savedContent) ||
-      matchingPresentations.some((presentation) => (
-        presentation.serializedDocument !== presentation.savedSerializedDocument
-      ))
+      matchingDocuments.some(
+        (document) => document.content !== document.savedContent,
+      ) ||
+        matchingPresentations.some(
+          (presentation) =>
+            presentation.serializedDocument !==
+            presentation.savedSerializedDocument,
+        ),
     )
-    const warning = entry.kind === 'directory'
-      ? `\n文件夹及其中的全部内容都将被移除。${
-          hasUnsavedChanges ? '\n当前未保存内容也会丢失。' : ''
-        }`
-      : hasUnsavedChanges
-        ? '\n当前未保存内容也会丢失。'
-        : '\n文件将从当前项目中移除。'
+    const warning =
+      entry.kind === 'directory'
+        ? `\n文件夹及其中的全部内容都将被移除。${
+            hasUnsavedChanges ? '\n当前未保存内容也会丢失。' : ''
+          }`
+        : hasUnsavedChanges
+          ? '\n当前未保存内容也会丢失。'
+          : '\n文件将从当前项目中移除。'
     if (!window.confirm(`确定删除“${entry.name}”吗？${warning}`)) return
 
     setSelectedFilePath(entry.path)
@@ -1628,27 +2077,47 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       } else {
         await window.projects.deleteFile(project.handle, entry.path)
       }
-      setOpenDocuments((current) => current.filter((document) => !matchesEntry(document.path)))
-      setOpenPresentations((current) => current.filter(
-        (presentation) => !matchesEntry(presentation.path)
-      ))
-      setOpenImages((current) => current.filter((image) => !matchesEntry(image.path)))
-      setActiveDocumentPath((current) => current && matchesEntry(current) ? null : current)
-      setSelectedFilePath((current) => current && matchesEntry(current) ? null : current)
+      setOpenDocuments((current) =>
+        current.filter((document) => !matchesEntry(document.path)),
+      )
+      setOpenPresentations((current) =>
+        current.filter((presentation) => !matchesEntry(presentation.path)),
+      )
+      setOpenImages((current) =>
+        current.filter((image) => !matchesEntry(image.path)),
+      )
+      setActiveDocumentPath((current) =>
+        current && matchesEntry(current) ? null : current,
+      )
+      setSelectedFilePath((current) =>
+        current && matchesEntry(current) ? null : current,
+      )
       if (entry.kind === 'directory') {
-        setExpandedPaths((current) => new Set(
-          [...current].filter((path) => !isPathInside(path, entry.path))
-        ))
-        setLoadingPaths((current) => new Set(
-          [...current].filter((path) => !isPathInside(path, entry.path))
-        ))
-        setEntriesByDirectory((current) => Object.fromEntries(
-          Object.entries(current).filter(([path]) => !isPathInside(path, entry.path))
-        ))
+        setExpandedPaths(
+          (current) =>
+            new Set(
+              [...current].filter((path) => !isPathInside(path, entry.path)),
+            ),
+        )
+        setLoadingPaths(
+          (current) =>
+            new Set(
+              [...current].filter((path) => !isPathInside(path, entry.path)),
+            ),
+        )
+        setEntriesByDirectory((current) =>
+          Object.fromEntries(
+            Object.entries(current).filter(
+              ([path]) => !isPathInside(path, entry.path),
+            ),
+          ),
+        )
       }
       await refreshDirectory(parentDirectory(entry.path))
     } catch (error) {
-      setFileError(error instanceof Error ? error.message : '无法删除文件或文件夹')
+      setFileError(
+        error instanceof Error ? error.message : '无法删除文件或文件夹',
+      )
     }
   }
 
@@ -1656,17 +2125,25 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setIsCreateMenuOpen(false)
     setFileError('')
     try {
-      const rootEntries = await window.projects.listDirectory(project.handle, '')
+      const rootEntries = await window.projects.listDirectory(
+        project.handle,
+        '',
+      )
       setEntriesByDirectory((current) => ({ ...current, '': rootEntries }))
       const fileName = nextAvailableEntryName(
         rootEntries,
         'presentation',
-        PRESENTATION_FILE_SUFFIX
+        PRESENTATION_FILE_SUFFIX,
       )
       const path = fileName
       const title = '未命名演示文稿'
-      const file = await window.presentations.create(project.handle, { path, title })
-      const serializedDocument = serializePresentationDocumentState(file.document)
+      const file = await window.presentations.create(project.handle, {
+        path,
+        title,
+      })
+      const serializedDocument = serializePresentationDocumentState(
+        file.document,
+      )
       const presentation: OpenPresentationDocument = {
         ...file,
         name: fileName,
@@ -1676,7 +2153,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         isSaving: false,
         isExporting: false,
         conflict: false,
-        error: ''
+        error: '',
       }
       setOpenPresentations((current) => [...current, presentation])
       setIsHistoryActive(false)
@@ -1695,7 +2172,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     pptxImportInputRef.current?.click()
   }
 
-  async function preparePptxImport(event: ChangeEvent<HTMLInputElement>): Promise<void> {
+  async function preparePptxImport(
+    event: ChangeEvent<HTMLInputElement>,
+  ): Promise<void> {
     const file = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
     if (!file || pendingPresentationImport) return
@@ -1710,62 +2189,86 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
     setFileError('')
     try {
-      const rootEntries = await window.projects.listDirectory(project.handle, '')
+      const rootEntries = await window.projects.listDirectory(
+        project.handle,
+        '',
+      )
       setEntriesByDirectory((current) => ({ ...current, '': rootEntries }))
-      const rawStem = file.name.replace(/\.pptx$/i, '').normalize('NFC').trim()
-      const safeStem = rawStem
-        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-')
-        .replace(/[. ]+$/g, '')
-        .slice(0, 120) || 'presentation'
-      const path = nextAvailableEntryName(rootEntries, safeStem, PRESENTATION_FILE_SUFFIX)
+      const rawStem = file.name
+        .replace(/\.pptx$/i, '')
+        .normalize('NFC')
+        .trim()
+      const safeStem =
+        rawStem
+          .replace(/[<>:"/\\|?*\u0000-\u001f]/g, '-')
+          .replace(/[. ]+$/g, '')
+          .slice(0, 120) || 'presentation'
+      const path = nextAvailableEntryName(
+        rootEntries,
+        safeStem,
+        PRESENTATION_FILE_SUFFIX,
+      )
       setPendingPresentationImport({
         id: crypto.randomUUID(),
         bytes: await file.arrayBuffer(),
         fileName: file.name,
         path,
-        title: safeStem
+        title: safeStem,
       })
     } catch (error) {
-      setFileError(error instanceof Error ? error.message : '无法读取 PPTX 文件')
+      setFileError(
+        error instanceof Error ? error.message : '无法读取 PPTX 文件',
+      )
     }
   }
 
   async function completePptxImport(
     requestId: string,
-    document: OpenPresentationDocument['document']
+    document: OpenPresentationDocument['document'],
   ): Promise<void> {
     const request = pendingPresentationImport
     if (!request || request.id !== requestId) return
     try {
       const file = await window.presentations.import(project.handle, {
         path: request.path,
-        document
+        document,
       })
-      const serializedDocument = serializePresentationDocumentState(file.document)
-      setOpenPresentations((current) => [...current, {
-        ...file,
-        name: request.path,
-        serializedDocument,
-        savedSerializedDocument: serializedDocument,
-        reloadKey: crypto.randomUUID(),
-        isSaving: false,
-        isExporting: false,
-        conflict: false,
-        error: ''
-      }])
+      const serializedDocument = serializePresentationDocumentState(
+        file.document,
+      )
+      setOpenPresentations((current) => [
+        ...current,
+        {
+          ...file,
+          name: request.path,
+          serializedDocument,
+          savedSerializedDocument: serializedDocument,
+          reloadKey: crypto.randomUUID(),
+          isSaving: false,
+          isExporting: false,
+          conflict: false,
+          error: '',
+        },
+      ])
       setIsHistoryActive(false)
       setActiveDocumentPath(file.path)
       setSelectedFilePath(file.path)
       await refreshDirectory('')
     } catch (error) {
-      setFileError(error instanceof Error ? error.message : '无法保存导入的演示文稿')
+      setFileError(
+        error instanceof Error ? error.message : '无法保存导入的演示文稿',
+      )
     } finally {
-      setPendingPresentationImport((current) => current?.id === requestId ? null : current)
+      setPendingPresentationImport((current) =>
+        current?.id === requestId ? null : current,
+      )
     }
   }
 
   function failPptxImport(requestId: string, message: string): void {
-    setPendingPresentationImport((current) => current?.id === requestId ? null : current)
+    setPendingPresentationImport((current) =>
+      current?.id === requestId ? null : current,
+    )
     setFileError(`无法导入 PPTX：${message}`)
   }
 
@@ -1773,7 +2276,10 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setIsCreateMenuOpen(false)
     setFileError('')
     try {
-      const rootEntries = await window.projects.listDirectory(project.handle, '')
+      const rootEntries = await window.projects.listDirectory(
+        project.handle,
+        '',
+      )
       setEntriesByDirectory((current) => ({ ...current, '': rootEntries }))
       const path = nextAvailableEntryName(rootEntries, 'folder')
       const entry = await window.projects.createDirectory(project.handle, path)
@@ -1791,24 +2297,41 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     setIsCreateMenuOpen(false)
     setFileError('')
     try {
-      const rootEntries = await window.projects.listDirectory(project.handle, '')
+      const rootEntries = await window.projects.listDirectory(
+        project.handle,
+        '',
+      )
       setEntriesByDirectory((current) => ({ ...current, '': rootEntries }))
       const path = nextAvailableEntryName(rootEntries, 'document', '.md')
-      const entry = await window.projects.createMarkdownFile(project.handle, path)
+      const entry = await window.projects.createMarkdownFile(
+        project.handle,
+        path,
+      )
       await refreshDirectory('')
       await openFile(entry)
       setRenameRequestedPath(entry.path)
     } catch (error) {
-      setFileError(error instanceof Error ? error.message : '无法新建 Markdown 文档')
+      setFileError(
+        error instanceof Error ? error.message : '无法新建 Markdown 文档',
+      )
     }
   }
 
-  function updatePresentation(path: string, document: OpenPresentationDocument['document']): void {
+  function updatePresentation(
+    path: string,
+    document: OpenPresentationDocument['document'],
+  ): void {
     const serializedDocument = serializePresentationDocumentState(document)
     setOpenPresentations((current) => {
-      const presentationIndex = current.findIndex((presentation) => presentation.path === path)
+      const presentationIndex = current.findIndex(
+        (presentation) => presentation.path === path,
+      )
       const presentation = current[presentationIndex]
-      if (!presentation || presentation.serializedDocument === serializedDocument) return current
+      if (
+        !presentation ||
+        presentation.serializedDocument === serializedDocument
+      )
+        return current
 
       const next = [...current]
       next[presentationIndex] = {
@@ -1816,7 +2339,7 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         document,
         serializedDocument,
         error: '',
-        lastExportPath: undefined
+        lastExportPath: undefined,
       }
       return next
     })
@@ -1824,113 +2347,154 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   async function savePresentation(
     path: string,
-    documentOverride?: OpenPresentationDocument['document']
+    documentOverride?: OpenPresentationDocument['document'],
   ): Promise<boolean> {
-    const presentation = openPresentationsRef.current.find((candidate) => candidate.path === path)
-    if (!presentation || presentation.isSaving || presentation.conflict) return false
+    const presentation = openPresentationsRef.current.find(
+      (candidate) => candidate.path === path,
+    )
+    if (!presentation || presentation.isSaving || presentation.conflict)
+      return false
     const document = documentOverride ?? presentation.document
     const serializedDocument = serializePresentationDocumentState(document)
     if (serializedDocument === presentation.savedSerializedDocument) return true
 
-    setOpenPresentations((current) => current.map((candidate) =>
-      candidate.path === path ? { ...candidate, isSaving: true, error: '' } : candidate
-    ))
+    setOpenPresentations((current) =>
+      current.map((candidate) =>
+        candidate.path === path
+          ? { ...candidate, isSaving: true, error: '' }
+          : candidate,
+      ),
+    )
     try {
       const result = await window.presentations.save(project.handle, {
         path,
         revision: presentation.revision,
-        document
+        document,
       })
       if (!result.ok) {
-        setOpenPresentations((current) => current.map((candidate) =>
+        setOpenPresentations((current) =>
+          current.map((candidate) =>
+            candidate.path === path
+              ? {
+                  ...candidate,
+                  isSaving: false,
+                  conflict: true,
+                  error:
+                    '演示文稿已被其他程序修改。重新载入会放弃当前未保存内容。',
+                }
+              : candidate,
+          ),
+        )
+        return false
+      }
+      setOpenPresentations((current) =>
+        current.map((candidate) =>
           candidate.path === path
             ? {
                 ...candidate,
                 isSaving: false,
-                conflict: true,
-                error: '演示文稿已被其他程序修改。重新载入会放弃当前未保存内容。'
+                revision: result.revision,
+                savedSerializedDocument: serializedDocument,
+                conflict: false,
+                error: '',
               }
-            : candidate
-        ))
-        return false
-      }
-      setOpenPresentations((current) => current.map((candidate) =>
-        candidate.path === path
-          ? {
-              ...candidate,
-              isSaving: false,
-              revision: result.revision,
-              savedSerializedDocument: serializedDocument,
-              conflict: false,
-              error: ''
-            }
-          : candidate
-      ))
+            : candidate,
+        ),
+      )
       return true
     } catch (error) {
-      setOpenPresentations((current) => current.map((candidate) =>
-        candidate.path === path
-          ? {
-              ...candidate,
-              isSaving: false,
-              error: error instanceof Error ? error.message : '无法保存演示文稿'
-            }
-          : candidate
-      ))
+      setOpenPresentations((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? {
+                ...candidate,
+                isSaving: false,
+                error:
+                  error instanceof Error ? error.message : '无法保存演示文稿',
+              }
+            : candidate,
+        ),
+      )
       return false
     }
   }
 
   async function reloadPresentation(path: string): Promise<void> {
-    const presentation = openPresentations.find((candidate) => candidate.path === path)
+    const presentation = openPresentations.find(
+      (candidate) => candidate.path === path,
+    )
     if (!presentation) return
     if (
-      presentation.serializedDocument !== presentation.savedSerializedDocument &&
+      presentation.serializedDocument !==
+        presentation.savedSerializedDocument &&
       !window.confirm(`重新载入 ${presentation.name}？当前未保存内容将丢失。`)
-    ) return
+    )
+      return
 
     try {
       const file = await window.presentations.read(project.handle, path)
-      const serializedDocument = serializePresentationDocumentState(file.document)
-      setOpenPresentations((current) => current.map((candidate) =>
-        candidate.path === path
-          ? {
-              ...candidate,
-              document: file.document,
-              serializedDocument,
-              savedSerializedDocument: serializedDocument,
-              revision: file.revision,
-              reloadKey: crypto.randomUUID(),
-              isSaving: false,
-              conflict: false,
-              error: ''
-            }
-          : candidate
-      ))
+      const serializedDocument = serializePresentationDocumentState(
+        file.document,
+      )
+      setOpenPresentations((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? {
+                ...candidate,
+                document: file.document,
+                serializedDocument,
+                savedSerializedDocument: serializedDocument,
+                revision: file.revision,
+                reloadKey: crypto.randomUUID(),
+                isSaving: false,
+                conflict: false,
+                error: '',
+              }
+            : candidate,
+        ),
+      )
     } catch (error) {
-      setOpenPresentations((current) => current.map((candidate) =>
-        candidate.path === path
-          ? { ...candidate, error: error instanceof Error ? error.message : '无法重新载入演示文稿' }
-          : candidate
-      ))
+      setOpenPresentations((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? {
+                ...candidate,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : '无法重新载入演示文稿',
+              }
+            : candidate,
+        ),
+      )
     }
   }
 
   function closePresentation(path: string): void {
-    const presentationIndex = openPresentations.findIndex((presentation) => presentation.path === path)
+    const presentationIndex = openPresentations.findIndex(
+      (presentation) => presentation.path === path,
+    )
     const presentation = openPresentations[presentationIndex]
     if (!presentation) return
     if (
-      presentation.serializedDocument !== presentation.savedSerializedDocument &&
+      presentation.serializedDocument !==
+        presentation.savedSerializedDocument &&
       !window.confirm(`关闭 ${presentation.name}？当前未保存内容将丢失。`)
-    ) return
+    )
+      return
 
-    const remaining = openPresentations.filter((candidate) => candidate.path !== path)
+    const remaining = openPresentations.filter(
+      (candidate) => candidate.path !== path,
+    )
     setOpenPresentations(remaining)
     if (activeDocumentPath === path) {
-      const nextPresentation = remaining[Math.min(presentationIndex, remaining.length - 1)]
+      const nextPresentation =
+        remaining[Math.min(presentationIndex, remaining.length - 1)]
       setActiveDocumentPath(
-        nextPresentation?.path ?? openDocuments.at(-1)?.path ?? openImages.at(-1)?.path ?? null
+        nextPresentation?.path ??
+          openDocuments.at(-1)?.path ??
+          openImages.at(-1)?.path ??
+          null,
       )
     }
   }
@@ -1943,112 +2507,175 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     if (activeDocumentPath === path) {
       const nextImage = remaining[Math.min(imageIndex, remaining.length - 1)]
       setActiveDocumentPath(
-        nextImage?.path ?? openDocuments.at(-1)?.path ?? openPresentations.at(-1)?.path ?? null
+        nextImage?.path ??
+          openDocuments.at(-1)?.path ??
+          openPresentations.at(-1)?.path ??
+          null,
       )
     }
   }
 
-  async function exportPresentation(path: string, format: 'pptx' | 'pdf'): Promise<void> {
+  async function exportPresentation(
+    path: string,
+    format: 'pptx' | 'pdf',
+  ): Promise<void> {
     if (exportingPathsRef.current.has(path)) return
     exportingPathsRef.current.add(path)
-    setOpenPresentations((current) => current.map((candidate) =>
-      candidate.path === path
-        ? { ...candidate, isExporting: true, exportingFormat: format, error: '', lastExportPath: undefined }
-        : candidate
-    ))
+    setOpenPresentations((current) =>
+      current.map((candidate) =>
+        candidate.path === path
+          ? {
+              ...candidate,
+              isExporting: true,
+              exportingFormat: format,
+              error: '',
+              lastExportPath: undefined,
+            }
+          : candidate,
+      ),
+    )
     try {
       const saved = await savePresentation(path)
       if (!saved) return
-      const result = format === 'pdf'
-        ? await window.presentations.exportPdf(project.handle, { path })
-        : await window.presentations.export(project.handle, { path })
-      if (!result || ('status' in result && result.status === 'canceled')) return
-      if ('status' in result && result.status === 'failed') throw new Error(result.message)
-      setOpenPresentations((current) => current.map((candidate) =>
-        candidate.path === path
-          ? { ...candidate, lastExportPath: result.outputPath }
-          : candidate
-      ))
+      const result =
+        format === 'pdf'
+          ? await window.presentations.exportPdf(project.handle, { path })
+          : await window.presentations.export(project.handle, { path })
+      if (!result || ('status' in result && result.status === 'canceled'))
+        return
+      if ('status' in result && result.status === 'failed')
+        throw new Error(result.message)
+      setOpenPresentations((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? { ...candidate, lastExportPath: result.outputPath }
+            : candidate,
+        ),
+      )
       await refreshVisibleFileTree()
     } catch (error) {
-      setOpenPresentations((current) => current.map((candidate) =>
-        candidate.path === path
-          ? {
-              ...candidate,
-              error: error instanceof Error ? error.message : `无法导出 ${format === 'pdf' ? 'PDF' : 'PowerPoint'}`
-            }
-          : candidate
-      ))
+      setOpenPresentations((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? {
+                ...candidate,
+                error:
+                  error instanceof Error
+                    ? error.message
+                    : `无法导出 ${format === 'pdf' ? 'PDF' : 'PowerPoint'}`,
+              }
+            : candidate,
+        ),
+      )
     } finally {
       exportingPathsRef.current.delete(path)
-      setOpenPresentations((current) => current.map((candidate) =>
-        candidate.path === path ? { ...candidate, isExporting: false, exportingFormat: undefined } : candidate
-      ))
+      setOpenPresentations((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? { ...candidate, isExporting: false, exportingFormat: undefined }
+            : candidate,
+        ),
+      )
     }
   }
 
-  async function exportMarkdown(path: string, format: 'word' | 'pdf'): Promise<void> {
+  async function exportMarkdown(
+    path: string,
+    format: 'word' | 'pdf',
+  ): Promise<void> {
     const document = openDocuments.find((candidate) => candidate.path === path)
-    if (!document || document.kind !== 'markdown' || exportingPathsRef.current.has(path)) return
+    if (
+      !document ||
+      document.kind !== 'markdown' ||
+      exportingPathsRef.current.has(path)
+    )
+      return
     exportingPathsRef.current.add(path)
 
     const content = document.content
-    setOpenDocuments((current) => current.map((candidate) =>
-      candidate.path === path
-        ? {
-            ...candidate,
-            isExporting: true,
-            exportingFormat: format,
-            exportError: '',
-            lastExportPath: undefined,
-            exportWarnings: []
-          }
-        : candidate
-    ))
-    try {
-      const result = format === 'pdf'
-        ? await window.documentExport.exportPdf(project.handle, { path, content })
-        : await window.documentExport.exportWord(project.handle, { path, content })
-      setOpenDocuments((current) => current.map((candidate) => {
-        if (candidate.path !== path) return candidate
-        if (result.status === 'canceled') return candidate
-        if (result.status === 'failed') {
-          return { ...candidate, exportError: result.message }
-        }
-        return {
-          ...candidate,
-          lastExportPath: result.outputPath,
-          exportWarnings: 'warnings' in result ? result.warnings : []
-        }
-      }))
-      if (result.status === 'exported') await refreshVisibleFileTree()
-    } catch (error) {
-      setOpenDocuments((current) => current.map((candidate) =>
+    setOpenDocuments((current) =>
+      current.map((candidate) =>
         candidate.path === path
           ? {
               ...candidate,
-              exportError: error instanceof Error ? error.message : `无法导出 ${format === 'pdf' ? 'PDF' : 'Word'}`
+              isExporting: true,
+              exportingFormat: format,
+              exportError: '',
+              lastExportPath: undefined,
+              exportWarnings: [],
             }
-          : candidate
-      ))
+          : candidate,
+      ),
+    )
+    try {
+      const result =
+        format === 'pdf'
+          ? await window.documentExport.exportPdf(project.handle, {
+              path,
+              content,
+            })
+          : await window.documentExport.exportWord(project.handle, {
+              path,
+              content,
+            })
+      setOpenDocuments((current) =>
+        current.map((candidate) => {
+          if (candidate.path !== path) return candidate
+          if (result.status === 'canceled') return candidate
+          if (result.status === 'failed') {
+            return { ...candidate, exportError: result.message }
+          }
+          return {
+            ...candidate,
+            lastExportPath: result.outputPath,
+            exportWarnings: 'warnings' in result ? result.warnings : [],
+          }
+        }),
+      )
+      if (result.status === 'exported') await refreshVisibleFileTree()
+    } catch (error) {
+      setOpenDocuments((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? {
+                ...candidate,
+                exportError:
+                  error instanceof Error
+                    ? error.message
+                    : `无法导出 ${format === 'pdf' ? 'PDF' : 'Word'}`,
+              }
+            : candidate,
+        ),
+      )
     } finally {
       exportingPathsRef.current.delete(path)
-      setOpenDocuments((current) => current.map((candidate) =>
-        candidate.path === path ? { ...candidate, isExporting: false, exportingFormat: undefined } : candidate
-      ))
+      setOpenDocuments((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? { ...candidate, isExporting: false, exportingFormat: undefined }
+            : candidate,
+        ),
+      )
     }
   }
 
   function updateDocument(path: string, content: string): void {
-    setOpenDocuments((current) => current.map((document) =>
-      document.path === path ? { ...document, content, error: '' } : document
-    ))
+    setOpenDocuments((current) =>
+      current.map((document) =>
+        document.path === path ? { ...document, content, error: '' } : document,
+      ),
+    )
   }
 
-  function updateDocumentViewMode(path: string, viewMode: MarkdownViewMode): void {
-    setOpenDocuments((current) => current.map((document) =>
-      document.path === path ? { ...document, viewMode } : document
-    ))
+  function updateDocumentViewMode(
+    path: string,
+    viewMode: MarkdownViewMode,
+  ): void {
+    setOpenDocuments((current) =>
+      current.map((document) =>
+        document.path === path ? { ...document, viewMode } : document,
+      ),
+    )
   }
 
   async function saveDocument(path: string): Promise<void> {
@@ -2058,48 +2685,57 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       document.isSaving ||
       document.conflict ||
       document.content === document.savedContent
-    ) return
+    )
+      return
 
     const savedContent = document.content
-    setOpenDocuments((current) => current.map((candidate) =>
-      candidate.path === path ? { ...candidate, isSaving: true, error: '' } : candidate
-    ))
+    setOpenDocuments((current) =>
+      current.map((candidate) =>
+        candidate.path === path
+          ? { ...candidate, isSaving: true, error: '' }
+          : candidate,
+      ),
+    )
     try {
       const result = await window.projects.saveTextFile(project.handle, {
         path,
         content: savedContent,
         revision: document.revision,
-        hasBom: document.hasBom
+        hasBom: document.hasBom,
       })
-      setOpenDocuments((current) => current.map((candidate) => {
-        if (candidate.path !== path) return candidate
-        if (!result.ok) {
-          return {
-            ...candidate,
-            isSaving: false,
-            conflict: true,
-            error: '文件已被其他程序修改。重新载入会放弃当前未保存内容。'
-          }
-        }
-        return {
-          ...candidate,
-          savedContent,
-          revision: result.revision,
-          isSaving: false,
-          conflict: false,
-          error: ''
-        }
-      }))
-    } catch (error) {
-      setOpenDocuments((current) => current.map((candidate) =>
-        candidate.path === path
-          ? {
+      setOpenDocuments((current) =>
+        current.map((candidate) => {
+          if (candidate.path !== path) return candidate
+          if (!result.ok) {
+            return {
               ...candidate,
               isSaving: false,
-              error: error instanceof Error ? error.message : '无法保存文件'
+              conflict: true,
+              error: '文件已被其他程序修改。重新载入会放弃当前未保存内容。',
             }
-          : candidate
-      ))
+          }
+          return {
+            ...candidate,
+            savedContent,
+            revision: result.revision,
+            isSaving: false,
+            conflict: false,
+            error: '',
+          }
+        }),
+      )
+    } catch (error) {
+      setOpenDocuments((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? {
+                ...candidate,
+                isSaving: false,
+                error: error instanceof Error ? error.message : '无法保存文件',
+              }
+            : candidate,
+        ),
+      )
     }
   }
 
@@ -2109,46 +2745,64 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     if (
       document.content !== document.savedContent &&
       !window.confirm(`重新载入 ${document.name}？当前未保存内容将丢失。`)
-    ) return
+    )
+      return
 
     try {
       const file = await window.projects.readTextFile(project.handle, path)
-      setOpenDocuments((current) => current.map((candidate) =>
-        candidate.path === path
-          ? {
-              ...candidate,
-              ...file,
-              savedContent: file.content,
-              isSaving: false,
-              conflict: false,
-              error: ''
-            }
-          : candidate
-      ))
+      setOpenDocuments((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? {
+                ...candidate,
+                ...file,
+                savedContent: file.content,
+                isSaving: false,
+                conflict: false,
+                error: '',
+              }
+            : candidate,
+        ),
+      )
     } catch (error) {
-      setOpenDocuments((current) => current.map((candidate) =>
-        candidate.path === path
-          ? { ...candidate, error: error instanceof Error ? error.message : '无法重新载入文件' }
-          : candidate
-      ))
+      setOpenDocuments((current) =>
+        current.map((candidate) =>
+          candidate.path === path
+            ? {
+                ...candidate,
+                error:
+                  error instanceof Error ? error.message : '无法重新载入文件',
+              }
+            : candidate,
+        ),
+      )
     }
   }
 
   function closeDocument(path: string): void {
-    const documentIndex = openDocuments.findIndex((document) => document.path === path)
+    const documentIndex = openDocuments.findIndex(
+      (document) => document.path === path,
+    )
     const document = openDocuments[documentIndex]
     if (!document) return
     if (
       document.content !== document.savedContent &&
       !window.confirm(`关闭 ${document.name}？当前未保存内容将丢失。`)
-    ) return
+    )
+      return
 
-    const remaining = openDocuments.filter((candidate) => candidate.path !== path)
+    const remaining = openDocuments.filter(
+      (candidate) => candidate.path !== path,
+    )
     setOpenDocuments(remaining)
     if (activeDocumentPath === path) {
-      const nextDocument = remaining[Math.min(documentIndex, remaining.length - 1)]
+      const nextDocument =
+        remaining[Math.min(documentIndex, remaining.length - 1)]
       setActiveDocumentPath(
-        nextDocument?.path ?? openPresentations.at(-1)?.path ?? openImages.at(-1)?.path ?? null
+        nextDocument?.path ??
+          openPresentations.at(-1)?.path ??
+          openImages.at(-1)?.path ??
+          null,
       )
     }
   }
@@ -2161,7 +2815,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       isSending ||
       isConversationLoading ||
       loadingConversationIds.has(selectedConversation.id)
-    ) return
+    )
+      return
 
     if (promptReferences.length > 20) {
       setChatError('单条消息最多引用 20 个文件或 skill')
@@ -2170,27 +2825,40 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
     const conversationId = selectedConversation.id
     const requestId = crypto.randomUUID()
-    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', text: prompt }
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      text: prompt,
+    }
     const assistantMessage: ChatMessage = {
       id: requestId,
       role: 'assistant',
       text: '',
-      isStreaming: true
+      isStreaming: true,
     }
     setDraft('')
     setKnownReferences([])
     setReferenceTrigger(null)
     setChatError('')
     setActiveAgentRequest({ requestId, conversationId })
-    setConversations((current) => current.map((conversation) =>
-      conversation.id === conversationId
-        ? {
-            ...conversation,
-            title: conversation.messages.length === 0 ? prompt.slice(0, 24) : conversation.title,
-            messages: [...conversation.messages, userMessage, assistantMessage]
-          }
-        : conversation
-    ))
+    setConversations((current) =>
+      current.map((conversation) =>
+        conversation.id === conversationId
+          ? {
+              ...conversation,
+              title:
+                conversation.messages.length === 0
+                  ? prompt.slice(0, 24)
+                  : conversation.title,
+              messages: [
+                ...conversation.messages,
+                userMessage,
+                assistantMessage,
+              ],
+            }
+          : conversation,
+      ),
+    )
 
     try {
       const result = await window.agent.prompt({
@@ -2199,64 +2867,74 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
         projectHandle: project.handle,
         input: prompt,
         references: promptReferences,
-        thinkingLevel
+        thinkingLevel,
       })
       streamBuffer.flush()
       const wasStopped = stoppedRequestIdsRef.current.has(requestId)
-      setConversations((current) => current.map((conversation) =>
-        conversation.id === conversationId
-          ? {
-              ...conversation,
-              messages: conversation.messages.map((message) =>
-                message.id === requestId
-                  ? {
-                      ...message,
-                      text: result.text,
-                      isStreaming: false,
-                      activities: wasStopped
-                        ? stopRunningAgentActivities(message.activities ?? [])
-                        : message.activities
-                    }
-                  : message
-              )
-            }
-          : conversation
-      ))
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === conversationId
+            ? {
+                ...conversation,
+                messages: conversation.messages.map((message) =>
+                  message.id === requestId
+                    ? {
+                        ...message,
+                        text: result.text,
+                        isStreaming: false,
+                        activities: wasStopped
+                          ? stopRunningAgentActivities(message.activities ?? [])
+                          : message.activities,
+                      }
+                    : message,
+                ),
+              }
+            : conversation,
+        ),
+      )
     } catch (error) {
       streamBuffer.flush()
       const wasStopped = stoppedRequestIdsRef.current.has(requestId)
-      setConversations((current) => current.map((conversation) =>
-        conversation.id === conversationId
-          ? {
-              ...conversation,
-              messages: conversation.messages.flatMap((message) => {
-                if (message.id !== requestId) return [message]
-                if (!message.text && !message.activities?.length) return []
-                return [{
-                  ...message,
-                  isStreaming: false,
-                  activities: wasStopped
-                    ? stopRunningAgentActivities(message.activities ?? [])
-                    : message.activities?.map((activity) => (
-                        activity.status === 'running'
-                          ? { ...activity, status: 'error' as const }
-                          : activity
-                      ))
-                }]
-              })
-            }
-          : conversation
-      ))
+      setConversations((current) =>
+        current.map((conversation) =>
+          conversation.id === conversationId
+            ? {
+                ...conversation,
+                messages: conversation.messages.flatMap((message) => {
+                  if (message.id !== requestId) return [message]
+                  if (!message.text && !message.activities?.length) return []
+                  return [
+                    {
+                      ...message,
+                      isStreaming: false,
+                      activities: wasStopped
+                        ? stopRunningAgentActivities(message.activities ?? [])
+                        : message.activities?.map((activity) =>
+                            activity.status === 'running'
+                              ? { ...activity, status: 'error' as const }
+                              : activity,
+                          ),
+                    },
+                  ]
+                }),
+              }
+            : conversation,
+        ),
+      )
       if (!wasStopped) {
-        setChatError(error instanceof Error ? error.message : '暂时无法获取回复')
+        setChatError(
+          error instanceof Error ? error.message : '暂时无法获取回复',
+        )
       }
     } finally {
       stoppedRequestIdsRef.current.delete(requestId)
-      setActiveAgentRequest((current) => current?.requestId === requestId ? null : current)
+      setActiveAgentRequest((current) =>
+        current?.requestId === requestId ? null : current,
+      )
       setIsStopping(false)
       setUsageRevisionByConversation((current) => ({
         ...current,
-        [conversationId]: (current[conversationId] ?? 0) + 1
+        [conversationId]: (current[conversationId] ?? 0) + 1,
       }))
     }
   }
@@ -2272,9 +2950,10 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       const result = await window.agent.stop({
         requestId: request.requestId,
         conversationId: request.conversationId,
-        projectHandle: project.handle
+        projectHandle: project.handle,
       })
-      if (!result.stopped) stoppedRequestIdsRef.current.delete(request.requestId)
+      if (!result.stopped)
+        stoppedRequestIdsRef.current.delete(request.requestId)
     } catch (error) {
       stoppedRequestIdsRef.current.delete(request.requestId)
       setChatError(error instanceof Error ? error.message : '无法终止当前回复')
@@ -2282,23 +2961,32 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }
 
-  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
+  function handleComposerKeyDown(
+    event: KeyboardEvent<HTMLTextAreaElement>,
+  ): void {
     if (event.nativeEvent.isComposing) return
     if (referenceTrigger) {
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault()
         if (filteredReferenceOptions.length > 0) {
           const direction = event.key === 'ArrowDown' ? 1 : -1
-          setActiveReferenceIndex((current) => (
-            current + direction + filteredReferenceOptions.length
-          ) % filteredReferenceOptions.length)
+          setActiveReferenceIndex(
+            (current) =>
+              (current + direction + filteredReferenceOptions.length) %
+              filteredReferenceOptions.length,
+          )
         }
         return
       }
-      if ((event.key === 'Enter' || event.key === 'Tab') && filteredReferenceOptions.length > 0) {
+      if (
+        (event.key === 'Enter' || event.key === 'Tab') &&
+        filteredReferenceOptions.length > 0
+      ) {
         event.preventDefault()
         selectComposerReference(
-          filteredReferenceOptions[Math.min(activeReferenceIndex, filteredReferenceOptions.length - 1)]
+          filteredReferenceOptions[
+            Math.min(activeReferenceIndex, filteredReferenceOptions.length - 1)
+          ],
         )
         return
       }
@@ -2315,7 +3003,10 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }
   }
 
-  function updateReferenceTrigger(value: string, selectionStart: number | null): void {
+  function updateReferenceTrigger(
+    value: string,
+    selectionStart: number | null,
+  ): void {
     setReferenceTrigger(findComposerReferenceTrigger(value, selectionStart))
     setActiveReferenceIndex(0)
   }
@@ -2327,11 +3018,17 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       return
     }
 
-    const next = insertComposerReference(draft, referenceTrigger, option.reference)
+    const next = insertComposerReference(
+      draft,
+      referenceTrigger,
+      option.reference,
+    )
     setDraft(next.value)
     setKnownReferences((current) => [
-      ...current.filter((reference) => promptReferenceKey(reference) !== option.key),
-      option.reference
+      ...current.filter(
+        (reference) => promptReferenceKey(reference) !== option.key,
+      ),
+      option.reference,
     ])
     setReferenceTrigger(null)
     setChatError('')
@@ -2348,17 +3045,23 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
 
   function confirmVersionRestore(paths: string[]): boolean {
     const dirtyPaths = paths.filter((path) => {
-      const document = openDocumentsRef.current.find((candidate) => candidate.path === path)
+      const document = openDocumentsRef.current.find(
+        (candidate) => candidate.path === path,
+      )
       if (document && document.content !== document.savedContent) return true
-      const presentation = openPresentationsRef.current.find((candidate) => candidate.path === path)
+      const presentation = openPresentationsRef.current.find(
+        (candidate) => candidate.path === path,
+      )
       return Boolean(
         presentation &&
-        presentation.serializedDocument !== presentation.savedSerializedDocument
+          presentation.serializedDocument !==
+            presentation.savedSerializedDocument,
       )
     })
-    const message = dirtyPaths.length > 0
-      ? `以下文件有未保存内容，恢复会放弃这些修改：\n\n${dirtyPaths.join('\n')}\n\n继续恢复吗？`
-      : `将 ${paths.length} 个文件恢复为所选版本状态。恢复后的文件状态会纳入自动版本记录，是否继续？`
+    const message =
+      dirtyPaths.length > 0
+        ? `以下文件有未保存内容，恢复会放弃这些修改：\n\n${dirtyPaths.join('\n')}\n\n继续恢复吗？`
+        : `将 ${paths.length} 个文件恢复为所选版本状态。恢复后的文件状态会纳入自动版本记录，是否继续？`
     if (!window.confirm(message)) return false
     for (const path of paths) confirmedRestorePathsRef.current.add(path)
     return true
@@ -2370,115 +3073,174 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
     }, 3_000)
   }
 
-  const titleBarActionSlot = globalThis.document.getElementById('app-title-bar-actions')
+  const titleBarActionSlot = globalThis.document.getElementById(
+    'app-title-bar-actions',
+  )
 
   return (
     <section
       ref={workspaceRef}
       className="project-workspace"
-      style={{ gridTemplateColumns: isSidebarCollapsed ? 'minmax(0, 1fr)' : `${effectiveSidebarWidth}px 6px minmax(0, 1fr)` }}
+      style={{
+        gridTemplateColumns: isSidebarCollapsed
+          ? 'minmax(0, 1fr)'
+          : `${effectiveSidebarWidth}px 6px minmax(0, 1fr)`,
+      }}
       aria-label={`${project.name} 项目工作区`}
     >
       {pendingPresentationImport ? (
         <PptxImportFrame
           request={pendingPresentationImport}
-          onImported={(requestId, document) => void completePptxImport(requestId, document)}
+          onImported={(requestId, document) =>
+            void completePptxImport(requestId, document)
+          }
           onError={failPptxImport}
         />
       ) : null}
-      {titleBarActionSlot ? createPortal(
-        <div className="title-bar-actions" aria-label="编辑操作">
-          {activeFile || isHistoryActive ? (
-            <button
-              className={`workspace-history-button${isHistoryActive ? ' workspace-history-button-active' : ''}`}
-              type="button"
-              title="版本历史 (Ctrl/⌘ Shift H)"
-              aria-pressed={isHistoryActive}
-              onClick={openHistory}
-            >
-              <HistoryIcon />
-              <span>版本历史</span>
-            </button>
-          ) : null}
-          {!isHistoryActive && activeDocument ? (
-            <>
-              {activeDocument.kind === 'markdown' ? (
+      {titleBarActionSlot
+        ? createPortal(
+            <div className="title-bar-actions" aria-label="编辑操作">
+              {activeFile || isHistoryActive ? (
+                <button
+                  className={`workspace-history-button${isHistoryActive ? ' workspace-history-button-active' : ''}`}
+                  type="button"
+                  title="版本历史 (Ctrl/⌘ Shift H)"
+                  aria-pressed={isHistoryActive}
+                  onClick={openHistory}
+                >
+                  <HistoryIcon />
+                  <span>版本历史</span>
+                </button>
+              ) : null}
+              {!isHistoryActive && activeDocument ? (
                 <>
-                  <div className="workspace-view-switch" aria-label="Markdown 查看方式">
-                    {(['edit', 'split', 'preview'] as const).map((mode) => (
-                      <button
-                        className={activeDocument.viewMode === mode ? 'workspace-view-active' : ''}
-                        key={mode}
-                        type="button"
-                        aria-pressed={activeDocument.viewMode === mode}
-                        onClick={() => updateDocumentViewMode(activeDocument.path, mode)}
+                  {activeDocument.kind === 'markdown' ? (
+                    <>
+                      <div
+                        className="workspace-view-switch"
+                        aria-label="Markdown 查看方式"
                       >
-                        {mode === 'edit' ? '编辑' : mode === 'split' ? '分栏' : '预览'}
-                      </button>
-                    ))}
-                  </div>
+                        {(['edit', 'split', 'preview'] as const).map((mode) => (
+                          <button
+                            className={
+                              activeDocument.viewMode === mode
+                                ? 'workspace-view-active'
+                                : ''
+                            }
+                            key={mode}
+                            type="button"
+                            aria-pressed={activeDocument.viewMode === mode}
+                            onClick={() =>
+                              updateDocumentViewMode(activeDocument.path, mode)
+                            }
+                          >
+                            {mode === 'edit'
+                              ? '编辑'
+                              : mode === 'split'
+                                ? '分栏'
+                                : '预览'}
+                          </button>
+                        ))}
+                      </div>
+                      <WorkspaceExportMenu
+                        key={activeDocument.path}
+                        options={[
+                          {
+                            format: 'word',
+                            label: 'Word',
+                            description: '导出当前内容，不保存源文件',
+                          },
+                          {
+                            format: 'pdf',
+                            label: 'PDF',
+                            description: '导出当前内容，不保存源文件',
+                          },
+                        ]}
+                        exportingFormat={activeDocument.exportingFormat}
+                        disabled={activeDocument.isExporting}
+                        onExport={(format) =>
+                          void exportMarkdown(activeDocument.path, format)
+                        }
+                      />
+                    </>
+                  ) : null}
+                  <button
+                    className="workspace-save-button"
+                    type="button"
+                    title="保存 (Ctrl/⌘S)"
+                    aria-label={`保存 ${activeDocument.name}`}
+                    onClick={() => void saveDocument(activeDocument.path)}
+                    disabled={
+                      activeDocument.content === activeDocument.savedContent ||
+                      activeDocument.isSaving ||
+                      activeDocument.conflict
+                    }
+                  >
+                    保存
+                  </button>
+                </>
+              ) : !isHistoryActive && activePresentation ? (
+                <>
                   <WorkspaceExportMenu
-                    key={activeDocument.path}
+                    key={activePresentation.path}
                     options={[
-                      { format: 'word', label: 'Word', description: '导出当前内容，不保存源文件' },
-                      { format: 'pdf', label: 'PDF', description: '导出当前内容，不保存源文件' }
+                      {
+                        format: 'pptx',
+                        label: 'PPTX',
+                        description: '先保存演示文稿，再导出',
+                      },
+                      {
+                        format: 'pdf',
+                        label: 'PDF',
+                        description: '先保存；动画和视频使用静态画面',
+                      },
                     ]}
-                    exportingFormat={activeDocument.exportingFormat}
-                    disabled={activeDocument.isExporting}
-                    onExport={(format) => void exportMarkdown(activeDocument.path, format)}
+                    exportingFormat={activePresentation.exportingFormat}
+                    disabled={
+                      activePresentation.isSaving ||
+                      activePresentation.isExporting ||
+                      activePresentation.conflict
+                    }
+                    onExport={(format) =>
+                      void exportPresentation(activePresentation.path, format)
+                    }
                   />
+                  <button
+                    className="workspace-save-button"
+                    type="button"
+                    title="保存 (Ctrl/⌘S)"
+                    aria-label={`保存 ${activePresentation.name}`}
+                    onClick={() =>
+                      void savePresentation(activePresentation.path)
+                    }
+                    disabled={
+                      activePresentation.serializedDocument ===
+                        activePresentation.savedSerializedDocument ||
+                      activePresentation.isSaving ||
+                      activePresentation.isExporting ||
+                      activePresentation.conflict
+                    }
+                  >
+                    保存
+                  </button>
                 </>
               ) : null}
-              <button
-                className="workspace-save-button"
-                type="button"
-                title="保存 (Ctrl/⌘S)"
-                aria-label={`保存 ${activeDocument.name}`}
-                onClick={() => void saveDocument(activeDocument.path)}
-                disabled={
-                  activeDocument.content === activeDocument.savedContent ||
-                  activeDocument.isSaving ||
-                  activeDocument.conflict
-                }
-              >保存</button>
-            </>
-          ) : !isHistoryActive && activePresentation ? (
-            <>
-              <WorkspaceExportMenu
-                key={activePresentation.path}
-                options={[
-                  { format: 'pptx', label: 'PPTX', description: '先保存演示文稿，再导出' },
-                  { format: 'pdf', label: 'PDF', description: '先保存；动画和视频使用静态画面' }
-                ]}
-                exportingFormat={activePresentation.exportingFormat}
-                disabled={activePresentation.isSaving || activePresentation.isExporting || activePresentation.conflict}
-                onExport={(format) => void exportPresentation(activePresentation.path, format)}
-              />
-              <button
-                className="workspace-save-button"
-                type="button"
-                title="保存 (Ctrl/⌘S)"
-                aria-label={`保存 ${activePresentation.name}`}
-                onClick={() => void savePresentation(activePresentation.path)}
-                disabled={
-                  activePresentation.serializedDocument === activePresentation.savedSerializedDocument ||
-                  activePresentation.isSaving ||
-                  activePresentation.isExporting ||
-                  activePresentation.conflict
-                }
-              >保存</button>
-            </>
-          ) : null}
-        </div>,
-        titleBarActionSlot
-      ) : null}
+            </div>,
+            titleBarActionSlot,
+          )
+        : null}
       <aside
         className="project-sidebar"
         id="project-sidebar"
         hidden={isSidebarCollapsed}
-        style={{ gridTemplateRows: `${effectiveConversationHeight}px 6px minmax(0, 1fr)` }}
+        style={{
+          gridTemplateRows: `${effectiveConversationHeight}px 6px minmax(0, 1fr)`,
+        }}
       >
-        <section className="conversation-pane" aria-labelledby="conversation-list-title">
+        <section
+          className="conversation-pane"
+          aria-labelledby="conversation-list-title"
+        >
           <header className="sidebar-section-heading">
             <div>
               <span>{project.name}</span>
@@ -2490,22 +3252,50 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               disabled={isConversationLoading}
               aria-label="新建对话"
               title="新建对话"
-            >＋</button>
+            >
+              ＋
+            </button>
           </header>
           <div className="conversation-filter">
-            <button type="button" aria-label="筛选会话" aria-expanded={isConversationFilterOpen}
+            <button
+              type="button"
+              aria-label="筛选会话"
+              aria-expanded={isConversationFilterOpen}
               aria-controls="conversation-filter-options"
-              onClick={() => setIsConversationFilterOpen((open) => !open)}>
-              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 5h14M6 10h8M8 15h4" /></svg>
-              {conversationFilter === 'active' ? '未归档' : conversationFilter === 'archived' ? '已归档' : '全部会话'}
+              onClick={() => setIsConversationFilterOpen((open) => !open)}
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M3 5h14M6 10h8M8 15h4" />
+              </svg>
+              {conversationFilter === 'active'
+                ? '未归档'
+                : conversationFilter === 'archived'
+                  ? '已归档'
+                  : '全部会话'}
               <span>⌄</span>
             </button>
             {isConversationFilterOpen ? (
-              <div id="conversation-filter-options" className="conversation-filter-options" role="group" aria-label="会话筛选条件">
+              <div
+                id="conversation-filter-options"
+                className="conversation-filter-options"
+                role="group"
+                aria-label="会话筛选条件"
+              >
                 {(['active', 'archived', 'all'] as const).map((filter) => (
-                  <button key={filter} type="button" aria-pressed={conversationFilter === filter}
-                    onClick={() => { setConversationFilter(filter); setIsConversationFilterOpen(false) }}>
-                    {filter === 'active' ? '未归档' : filter === 'archived' ? '已归档' : '全部'}
+                  <button
+                    key={filter}
+                    type="button"
+                    aria-pressed={conversationFilter === filter}
+                    onClick={() => {
+                      setConversationFilter(filter)
+                      setIsConversationFilterOpen(false)
+                    }}
+                  >
+                    {filter === 'active'
+                      ? '未归档'
+                      : filter === 'archived'
+                        ? '已归档'
+                        : '全部'}
                   </button>
                 ))}
               </div>
@@ -2515,7 +3305,11 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             {visibleConversations.map((conversation) => (
               <div className="conversation-row" key={conversation.id}>
                 <button
-                  className={conversation.id === selectedConversation.id ? 'conversation-item conversation-item-active' : 'conversation-item'}
+                  className={
+                    conversation.id === selectedConversation.id
+                      ? 'conversation-item conversation-item-active'
+                      : 'conversation-item'
+                  }
                   type="button"
                   title={conversation.title}
                   onClick={() => void selectConversation(conversation.id)}
@@ -2524,26 +3318,53 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                   <span>{conversation.title}</span>
                   {conversation.archived ? <small>已归档</small> : null}
                 </button>
-                <button className="conversation-archive-button" type="button"
+                <button
+                  className="conversation-archive-button"
+                  type="button"
                   disabled={!canPersistConversations || isConversationLoading}
                   aria-label={`${conversation.archived ? '取消归档' : '归档'}：${conversation.title}`}
                   title={conversation.archived ? '取消归档' : '归档'}
-                  onClick={() => setConversations((current) => current.map((item) => item.id === conversation.id ? { ...item, archived: !item.archived } : item))}>
+                  onClick={() =>
+                    setConversations((current) =>
+                      current.map((item) =>
+                        item.id === conversation.id
+                          ? { ...item, archived: !item.archived }
+                          : item,
+                      ),
+                    )
+                  }
+                >
                   <svg viewBox="0 0 20 20" aria-hidden="true">
                     <path d="M3 7h14V4H3zM4 7v10h12V7" />
-                    <path d={conversation.archived ? 'M10 14V9m-2 2 2-2 2 2' : 'M8 10h4'} />
+                    <path
+                      d={
+                        conversation.archived
+                          ? 'M10 14V9m-2 2 2-2 2 2'
+                          : 'M8 10h4'
+                      }
+                    />
                   </svg>
                 </button>
               </div>
             ))}
             {visibleConversations.length === 0 ? (
-              <p className="conversation-empty">{conversationFilter === 'archived' ? '暂无已归档会话' : '暂无未归档会话'}</p>
+              <p className="conversation-empty">
+                {conversationFilter === 'archived'
+                  ? '暂无已归档会话'
+                  : '暂无未归档会话'}
+              </p>
             ) : null}
           </div>
         </section>
 
-        <WorkspaceResizeHandle orientation="horizontal" label="调整对话与文件区域高度"
-          value={effectiveConversationHeight} min={120} max={sidebarMaxHeight} onChange={setConversationHeight} />
+        <WorkspaceResizeHandle
+          orientation="horizontal"
+          label="调整对话与文件区域高度"
+          value={effectiveConversationHeight}
+          min={120}
+          max={sidebarMaxHeight}
+          onChange={setConversationHeight}
+        />
         <section className="file-pane" aria-labelledby="project-files-title">
           <header className="sidebar-section-heading file-heading">
             <div>
@@ -2574,30 +3395,67 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                   }
                 }}
                 onClick={() => setIsCreateMenuOpen((current) => !current)}
-              >＋</button>
+              >
+                ＋
+              </button>
               {isCreateMenuOpen ? (
-                <div className="file-create-menu" role="menu" aria-label="新建项目内容"
+                <div
+                  className="file-create-menu"
+                  role="menu"
+                  aria-label="新建项目内容"
                   style={{ width: Math.min(218, effectiveSidebarWidth - 32) }}
                   onClick={(event) => {
-                    if (!(event.target instanceof HTMLButtonElement) || event.target.disabled) return
-                    createMenuRef.current?.querySelector<HTMLButtonElement>('.file-create-trigger')?.focus()
+                    if (
+                      !(event.target instanceof HTMLButtonElement) ||
+                      event.target.disabled
+                    )
+                      return
+                    createMenuRef.current
+                      ?.querySelector<HTMLButtonElement>('.file-create-trigger')
+                      ?.focus()
                   }}
                   onKeyDown={(event) => {
                     if (event.key === 'Tab') {
                       setIsCreateMenuOpen(false)
-                      createMenuRef.current?.querySelector<HTMLButtonElement>('.file-create-trigger')?.focus()
+                      createMenuRef.current
+                        ?.querySelector<HTMLButtonElement>(
+                          '.file-create-trigger',
+                        )
+                        ?.focus()
                       return
                     }
-                    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
+                    if (
+                      !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(
+                        event.key,
+                      )
+                    )
+                      return
                     event.preventDefault()
-                    const items = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')]
-                    const index = items.indexOf(event.target as HTMLButtonElement)
-                    const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
-                      : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length
+                    const items = [
+                      ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                        '[role="menuitem"]:not(:disabled)',
+                      ),
+                    ]
+                    const index = items.indexOf(
+                      event.target as HTMLButtonElement,
+                    )
+                    const next =
+                      event.key === 'Home'
+                        ? 0
+                        : event.key === 'End'
+                          ? items.length - 1
+                          : (index +
+                              (event.key === 'ArrowUp' ? -1 : 1) +
+                              items.length) %
+                            items.length
                     items[next].focus()
                   }}
                 >
-                  <button type="button" role="menuitem" onClick={() => void createDirectory()}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => void createDirectory()}
+                  >
                     新建文件夹
                   </button>
                   <button
@@ -2605,17 +3463,23 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     role="menuitem"
                     disabled={Boolean(pendingPresentationImport)}
                     onClick={choosePptxImport}
-                  >从 PowerPoint (.pptx) 导入</button>
+                  >
+                    从 PowerPoint (.pptx) 导入
+                  </button>
                   <button
                     type="button"
                     role="menuitem"
                     onClick={() => void createPresentation()}
-                  >新建演示文稿</button>
+                  >
+                    新建演示文稿
+                  </button>
                   <button
                     type="button"
                     role="menuitem"
                     onClick={() => void createMarkdownDocument()}
-                  >新建 Markdown 文档</button>
+                  >
+                    新建 Markdown 文档
+                  </button>
                 </div>
               ) : null}
             </div>
@@ -2626,7 +3490,11 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                 正在导入 {pendingPresentationImport.fileName}…
               </p>
             ) : null}
-            {fileError ? <p className="sidebar-error" role="alert">{fileError}</p> : null}
+            {fileError ? (
+              <p className="sidebar-error" role="alert">
+                {fileError}
+              </p>
+            ) : null}
             {loadingPaths.has('') ? (
               <p className="sidebar-loading">正在读取文件…</p>
             ) : (
@@ -2653,26 +3521,58 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
       </aside>
 
       {!isSidebarCollapsed ? (
-        <WorkspaceResizeHandle orientation="vertical" label="调整侧栏宽度"
-          value={effectiveSidebarWidth} min={220} max={sidebarMaxWidth} onChange={setSidebarWidth} />
+        <WorkspaceResizeHandle
+          orientation="vertical"
+          label="调整侧栏宽度"
+          value={effectiveSidebarWidth}
+          min={220}
+          max={sidebarMaxWidth}
+          onChange={setSidebarWidth}
+        />
       ) : null}
       <section className="workspace-main">
         <header className="workspace-bar">
-          <button className="workspace-sidebar-toggle" type="button"
+          <button
+            className="workspace-sidebar-toggle"
+            type="button"
             aria-label={isSidebarCollapsed ? '展开侧栏' : '收起侧栏'}
             title={isSidebarCollapsed ? '展开侧栏' : '收起侧栏'}
-            aria-expanded={!isSidebarCollapsed} aria-controls="project-sidebar"
+            aria-expanded={!isSidebarCollapsed}
+            aria-controls="project-sidebar"
             onClick={() => setIsSidebarCollapsed((current) => !current)}
-          >{isSidebarCollapsed ? '▸' : '◂'}</button>
-          <nav className="workspace-tabs" aria-label="打开的内容" role="tablist"
+          >
+            {isSidebarCollapsed ? '▸' : '◂'}
+          </button>
+          <nav
+            className="workspace-tabs"
+            aria-label="打开的内容"
+            role="tablist"
             onKeyDown={(event) => {
-              if (!(event.target instanceof HTMLElement) || event.target.getAttribute('role') !== 'tab') return
-              if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+              if (
+                !(event.target instanceof HTMLElement) ||
+                event.target.getAttribute('role') !== 'tab'
+              )
+                return
+              if (
+                !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)
+              )
+                return
               event.preventDefault()
-              const tabs = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+              const tabs = [
+                ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                  '[role="tab"]',
+                ),
+              ]
               const index = tabs.indexOf(event.target as HTMLButtonElement)
-              const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
-                : (index + (event.key === 'ArrowLeft' ? -1 : 1) + tabs.length) % tabs.length
+              const next =
+                event.key === 'Home'
+                  ? 0
+                  : event.key === 'End'
+                    ? tabs.length - 1
+                    : (index +
+                        (event.key === 'ArrowLeft' ? -1 : 1) +
+                        tabs.length) %
+                      tabs.length
               tabs[next].focus()
               tabs[next].click()
             }}
@@ -2693,7 +3593,8 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             </button>
             {openDocuments.map((document) => {
               const isDirty = document.content !== document.savedContent
-              const isActive = !isHistoryActive && document.path === activeDocument?.path
+              const isActive =
+                !isHistoryActive && document.path === activeDocument?.path
               const status = document.conflict
                 ? '保存冲突'
                 : document.isSaving
@@ -2735,13 +3636,19 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     type="button"
                     aria-label={`关闭 ${document.name}`}
                     onClick={() => closeDocument(document.path)}
-                  >×</button>
+                  >
+                    ×
+                  </button>
                 </div>
               )
             })}
             {openPresentations.map((presentation) => {
-              const isDirty = presentation.serializedDocument !== presentation.savedSerializedDocument
-              const isActive = !isHistoryActive && presentation.path === activePresentation?.path
+              const isDirty =
+                presentation.serializedDocument !==
+                presentation.savedSerializedDocument
+              const isActive =
+                !isHistoryActive &&
+                presentation.path === activePresentation?.path
               const status = presentation.conflict
                 ? '保存冲突'
                 : presentation.isSaving
@@ -2783,12 +3690,15 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     type="button"
                     aria-label={`关闭 ${presentation.name}`}
                     onClick={() => closePresentation(presentation.path)}
-                  >×</button>
+                  >
+                    ×
+                  </button>
                 </div>
               )
             })}
             {openImages.map((image) => {
-              const isActive = !isHistoryActive && image.path === activeImage?.path
+              const isActive =
+                !isHistoryActive && image.path === activeImage?.path
               return (
                 <div
                   className={`workspace-document-tab${isActive ? ' workspace-tab-active' : ''}`}
@@ -2817,7 +3727,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     type="button"
                     aria-label={`关闭 ${image.name}`}
                     onClick={() => closeImage(image.path)}
-                  >×</button>
+                  >
+                    ×
+                  </button>
                 </div>
               )
             })}
@@ -2845,11 +3757,12 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     setIsHistoryOpen(false)
                     setIsHistoryActive(false)
                   }}
-                >×</button>
+                >
+                  ×
+                </button>
               </div>
             ) : null}
           </nav>
-
         </header>
 
         {isHistoryActive ? (
@@ -2868,19 +3781,31 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
             projectHandle={project.handle}
           />
         ) : activePresentation ? (
-          <Suspense fallback={<p className="sidebar-loading">正在加载演示编辑器…</p>}>
+          <Suspense
+            fallback={<p className="sidebar-loading">正在加载演示编辑器…</p>}
+          >
             <PresentationEditor
               key={`${activePresentation.path}:${activePresentation.reloadKey}`}
               document={activePresentation}
-              onChange={(document) => updatePresentation(activePresentation.path, document)}
+              onChange={(document) =>
+                updatePresentation(activePresentation.path, document)
+              }
               onReload={() => void reloadPresentation(activePresentation.path)}
-              onSave={(document) => void savePresentation(activePresentation.path, document)}
+              onSave={(document) =>
+                void savePresentation(activePresentation.path, document)
+              }
             />
           </Suspense>
         ) : activeImage ? (
-          <ImagePreview key={`${activeImage.path}:${activeImage.revision}`} document={activeImage} />
+          <ImagePreview
+            key={`${activeImage.path}:${activeImage.revision}`}
+            document={activeImage}
+          />
         ) : (
-          <section className="chat-panel" aria-labelledby="active-conversation-title">
+          <section
+            className="chat-panel"
+            aria-labelledby="active-conversation-title"
+          >
             <h1 id="active-conversation-title" className="sr-only">
               {selectedConversation.title}
             </h1>
@@ -2889,16 +3814,25 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               className="message-stream"
               aria-live="polite"
               onScroll={(event) => {
-                followMessagesRef.current = isNearMessageBottom(event.currentTarget)
+                followMessagesRef.current = isNearMessageBottom(
+                  event.currentTarget,
+                )
               }}
             >
               {loadingConversationIds.has(selectedConversation.id) ? (
                 <p className="sidebar-loading">正在加载 Pi 会话…</p>
               ) : selectedConversation.messages.length === 0 ? (
                 <div className="chat-empty">
-                  <span className="chat-empty-mark" aria-hidden="true"><i /><i /><i /></span>
+                  <span className="chat-empty-mark" aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
                   <h2>从项目材料开始思考</h2>
-                  <p>描述你的演示目标、受众或手头的问题，SlideMind 会和你一起梳理叙事。</p>
+                  <p>
+                    描述你的演示目标、受众或手头的问题，SlideMind
+                    会和你一起梳理叙事。
+                  </p>
                 </div>
               ) : (
                 <div className="message-list">
@@ -2914,14 +3848,24 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                             activities={message.activities ?? []}
                             isStreaming={Boolean(message.isStreaming)}
                           />
-                          {message.isStreaming && !message.text && !message.activities?.length ? (
-                            <p className="chat-message-placeholder"><i /><i /><i /></p>
+                          {message.isStreaming &&
+                          !message.text &&
+                          !message.activities?.length ? (
+                            <p className="chat-message-placeholder">
+                              <i />
+                              <i />
+                              <i />
+                            </p>
                           ) : message.text ? (
                             <AgentMarkdown source={message.text} />
                           ) : null}
                         </div>
                       ) : message.isStreaming && !message.text ? (
-                        <p><i /><i /><i /></p>
+                        <p>
+                          <i />
+                          <i />
+                          <i />
+                        </p>
                       ) : (
                         <p>{message.text}</p>
                       )}
@@ -2932,12 +3876,25 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               <div ref={messageEndRef} />
             </div>
 
-            <form className="chat-composer" onSubmit={(event) => void sendMessage(event)}>
+            <form
+              className="chat-composer"
+              onSubmit={(event) => void sendMessage(event)}
+            >
               <TodoProgress todos={selectedTodos} />
-              {conversationError ? <p className="composer-error" role="alert">{conversationError}</p> : null}
-              {chatError ? <p className="composer-error" role="alert">{chatError}</p> : null}
+              {conversationError ? (
+                <p className="composer-error" role="alert">
+                  {conversationError}
+                </p>
+              ) : null}
+              {chatError ? (
+                <p className="composer-error" role="alert">
+                  {chatError}
+                </p>
+              ) : null}
               {referenceOptionsError ? (
-                <p className="composer-error" role="alert">{referenceOptionsError}</p>
+                <p className="composer-error" role="alert">
+                  {referenceOptionsError}
+                </p>
               ) : null}
               <ConversationUsageBar
                 isLoading={loadingUsageIds.has(selectedConversation.id)}
@@ -2946,11 +3903,21 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
               />
               <div className="composer-input-shell">
                 {referenceTrigger ? (
-                  <div className="composer-reference-menu" role="listbox" id="composer-reference-options">
+                  <div
+                    className="composer-reference-menu"
+                    role="listbox"
+                    id="composer-reference-options"
+                  >
                     <header>
-                      <span>{referenceTrigger.type === 'file' ? '项目文件' : '可用 Skills'}</span>
+                      <span>
+                        {referenceTrigger.type === 'file'
+                          ? '项目文件'
+                          : '可用 Skills'}
+                      </span>
                       <small>
-                        {referenceTrigger.type === 'file' ? '@ 引用材料' : '/ 注入工作流'}
+                        {referenceTrigger.type === 'file'
+                          ? '@ 引用材料'
+                          : '/ 注入工作流'}
                       </small>
                     </header>
                     {isReferenceOptionsLoading ? (
@@ -2967,7 +3934,9 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                       <div className="composer-reference-list">
                         {filteredReferenceOptions.map((option, index) => (
                           <button
-                            className={index === activeReferenceIndex ? 'is-active' : ''}
+                            className={
+                              index === activeReferenceIndex ? 'is-active' : ''
+                            }
                             id={`composer-reference-option-${index}`}
                             key={option.key}
                             type="button"
@@ -2977,14 +3946,18 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                             onMouseEnter={() => setActiveReferenceIndex(index)}
                             onClick={() => selectComposerReference(option)}
                           >
-                            <span className={`composer-reference-badge composer-reference-${option.reference.type}`}>
+                            <span
+                              className={`composer-reference-badge composer-reference-${option.reference.type}`}
+                            >
                               {option.badge}
                             </span>
                             <span>
                               <strong>{option.title}</strong>
                               <small>{option.description}</small>
                             </span>
-                            <kbd>{index === activeReferenceIndex ? '↵' : ''}</kbd>
+                            <kbd>
+                              {index === activeReferenceIndex ? '↵' : ''}
+                            </kbd>
                           </button>
                         ))}
                       </div>
@@ -2997,19 +3970,31 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     value={draft}
                     onChange={(event) => {
                       setDraft(event.target.value)
-                      updateReferenceTrigger(event.target.value, event.target.selectionStart)
+                      updateReferenceTrigger(
+                        event.target.value,
+                        event.target.selectionStart,
+                      )
                     }}
-                    onSelect={(event) => updateReferenceTrigger(
-                      event.currentTarget.value,
-                      event.currentTarget.selectionStart
-                    )}
+                    onSelect={(event) =>
+                      updateReferenceTrigger(
+                        event.currentTarget.value,
+                        event.currentTarget.selectionStart,
+                      )
+                    }
                     onKeyDown={handleComposerKeyDown}
                     placeholder="输入消息，@ 引用文件，/ 使用 skill…"
                     rows={2}
-                    disabled={isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
+                    disabled={
+                      isConversationLoading ||
+                      loadingConversationIds.has(selectedConversation.id)
+                    }
                     aria-label="对话消息"
                     aria-autocomplete="list"
-                    aria-controls={referenceTrigger ? 'composer-reference-options' : undefined}
+                    aria-controls={
+                      referenceTrigger
+                        ? 'composer-reference-options'
+                        : undefined
+                    }
                     aria-expanded={Boolean(referenceTrigger)}
                     aria-activedescendant={
                       referenceTrigger && filteredReferenceOptions.length > 0
@@ -3027,25 +4012,55 @@ export function ProjectWorkspace({ project, onDirtyChange }: ProjectWorkspacePro
                     </span>
                     <div className="composer-actions">
                       <AgentModelSelect
-                        disabled={isSending || isConversationLoading || loadingConversationIds.has(selectedConversation.id)}
+                        disabled={
+                          isSending ||
+                          isConversationLoading ||
+                          loadingConversationIds.has(selectedConversation.id)
+                        }
                         thinkingLevel={thinkingLevel}
                         onThinkingLevelChange={setThinkingLevel}
                       />
                       <button
                         className={`composer-send${isSending ? ' is-running' : ''}${isStopping ? ' is-stopping' : ''}`}
                         type={isSending ? 'button' : 'submit'}
-                        disabled={isSending
-                          ? isStopping
-                          : (!draft.trim() && promptReferences.length === 0) ||
-                            isConversationLoading ||
-                            loadingConversationIds.has(selectedConversation.id)}
-                        aria-label={isStopping ? '正在终止回复' : isSending ? '终止当前回复' : '发送消息'}
-                        title={isStopping ? '正在终止回复' : isSending ? '终止当前回复' : '发送消息'}
-                        onClick={isSending ? () => void stopMessage() : undefined}
+                        disabled={
+                          isSending
+                            ? isStopping
+                            : (!draft.trim() &&
+                                promptReferences.length === 0) ||
+                              isConversationLoading ||
+                              loadingConversationIds.has(
+                                selectedConversation.id,
+                              )
+                        }
+                        aria-label={
+                          isStopping
+                            ? '正在终止回复'
+                            : isSending
+                              ? '终止当前回复'
+                              : '发送消息'
+                        }
+                        title={
+                          isStopping
+                            ? '正在终止回复'
+                            : isSending
+                              ? '终止当前回复'
+                              : '发送消息'
+                        }
+                        onClick={
+                          isSending ? () => void stopMessage() : undefined
+                        }
                       >
                         {isSending ? (
-                          <span className="composer-send-progress" aria-hidden="true"><i /></span>
-                        ) : <span aria-hidden="true">↑</span>}
+                          <span
+                            className="composer-send-progress"
+                            aria-hidden="true"
+                          >
+                            <i />
+                          </span>
+                        ) : (
+                          <span aria-hidden="true">↑</span>
+                        )}
                       </button>
                     </div>
                   </div>

@@ -2,7 +2,10 @@ import { createApp, nextTick, watch } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { parse } from 'pptxtojson'
 import Editor from './pptist-editor.vue'
-import { serializePptistPresentation, type PresentationState } from './pptist-snapshot'
+import {
+  serializePptistPresentation,
+  type PresentationState,
+} from './pptist-snapshot'
 import Directive from '@/directive'
 import { useMainStore, useSlidesStore, useSnapshotStore } from '@/store'
 import useImport from '@/hooks/useImport'
@@ -46,12 +49,14 @@ function post(message: Record<string, unknown>): void {
 function isPresentationState(value: unknown): value is PresentationState {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false
   const candidate = value as Partial<PresentationState>
-  return typeof candidate.title === 'string' &&
+  return (
+    typeof candidate.title === 'string' &&
     Array.isArray(candidate.slides) &&
     !!candidate.theme &&
     typeof candidate.theme === 'object' &&
     typeof candidate.viewportSize === 'number' &&
     typeof candidate.viewportRatio === 'number'
+  )
 }
 
 const pinia = createPinia()
@@ -75,7 +80,7 @@ function serializeCurrentPresentation(): string {
     theme: slidesStore.theme,
     slides: slidesStore.slides,
     viewportSize: slidesStore.viewportSize,
-    viewportRatio: slidesStore.viewportRatio
+    viewportRatio: slidesStore.viewportRatio,
   })
 }
 
@@ -83,11 +88,14 @@ function currentPresentation(): PresentationState {
   return JSON.parse(serializeCurrentPresentation()) as PresentationState
 }
 
-async function loadPresentation(presentation: PresentationState): Promise<void> {
+async function loadPresentation(
+  presentation: PresentationState,
+): Promise<void> {
   if (
     mounted &&
     serializeCurrentPresentation() === JSON.stringify(presentation)
-  ) return
+  )
+    return
 
   initialized = false
   slidesStore.$patch({
@@ -96,7 +104,7 @@ async function loadPresentation(presentation: PresentationState): Promise<void> 
     slides: structuredClone(presentation.slides),
     slideIndex: 0,
     viewportSize: presentation.viewportSize,
-    viewportRatio: presentation.viewportRatio
+    viewportRatio: presentation.viewportRatio,
   })
   if (!mounted) {
     app.mount('#app')
@@ -108,7 +116,7 @@ async function loadPresentation(presentation: PresentationState): Promise<void> 
   } catch (error) {
     post({
       type: 'slidemind:pptist:error',
-      message: error instanceof Error ? error.message : String(error)
+      message: error instanceof Error ? error.message : String(error),
     })
   }
   initialized = true
@@ -122,7 +130,7 @@ function failImport(requestId: string, error: unknown): void {
   post({
     type: 'slidemind:pptist:import-error',
     requestId,
-    message: error instanceof Error ? error.message : String(error)
+    message: error instanceof Error ? error.message : String(error),
   })
 }
 
@@ -141,7 +149,7 @@ async function importPresentation(message: ImportHostMessage): Promise<void> {
       typeof message.requestId === 'string' && message.requestId.length > 0
         ? message.requestId
         : 'unknown',
-      new Error('PPTX 导入请求无效')
+      new Error('PPTX 导入请求无效'),
     )
     return
   }
@@ -155,16 +163,16 @@ async function importPresentation(message: ImportHostMessage): Promise<void> {
     await parse(message.bytes.slice(0), {
       imageMode: 'none',
       videoMode: 'none',
-      audioMode: 'none'
+      audioMode: 'none',
     })
     pendingImport = {
       requestId: message.requestId,
       timeout: window.setTimeout(() => {
         failImport(message.requestId, new Error('PPTX 导入超时'))
-      }, IMPORT_TIMEOUT_MS)
+      }, IMPORT_TIMEOUT_MS),
     }
     const file = new File([message.bytes], message.fileName, {
-      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     })
     importPPTXFile([file], { cover: true, fixedViewport: true })
     if (!importing.value) throw new Error('PPTX 导入未能启动')
@@ -178,34 +186,43 @@ function nextFrame(): Promise<void> {
 }
 
 async function waitForSlideImages(strict: boolean): Promise<void> {
-  const images = [...document.querySelectorAll<HTMLImageElement>('.viewport img')]
-  await Promise.all(images.map((image) => {
-    if (image.complete) {
-      if (strict && image.naturalWidth === 0) return Promise.reject(new Error('幻灯片图片加载失败'))
-      return Promise.resolve()
-    }
-    return new Promise<void>((resolve, reject) => {
-      const finish = (error?: Error): void => {
-        window.clearTimeout(timeout)
-        image.removeEventListener('load', onLoad)
-        image.removeEventListener('error', onError)
-        if (error && strict) reject(error)
-        else resolve()
+  const images = [
+    ...document.querySelectorAll<HTMLImageElement>('.viewport img'),
+  ]
+  await Promise.all(
+    images.map((image) => {
+      if (image.complete) {
+        if (strict && image.naturalWidth === 0)
+          return Promise.reject(new Error('幻灯片图片加载失败'))
+        return Promise.resolve()
       }
-      const onLoad = (): void => finish()
-      const onError = (): void => finish(new Error('幻灯片图片加载失败'))
-      const timeout = window.setTimeout(() => finish(new Error('幻灯片图片加载超时')), 3_000)
-      image.addEventListener('load', onLoad, { once: true })
-      image.addEventListener('error', onError, { once: true })
-    })
-  }))
+      return new Promise<void>((resolve, reject) => {
+        const finish = (error?: Error): void => {
+          window.clearTimeout(timeout)
+          image.removeEventListener('load', onLoad)
+          image.removeEventListener('error', onError)
+          if (error && strict) reject(error)
+          else resolve()
+        }
+        const onLoad = (): void => finish()
+        const onError = (): void => finish(new Error('幻灯片图片加载失败'))
+        const timeout = window.setTimeout(
+          () => finish(new Error('幻灯片图片加载超时')),
+          3_000,
+        )
+        image.addEventListener('load', onLoad, { once: true })
+        image.addEventListener('error', onError, { once: true })
+      })
+    }),
+  )
 }
 
 async function renderPresentation(message: RenderHostMessage): Promise<void> {
   const presentation = message.presentation
-  const presentationValid = presentation === undefined || isPresentationState(presentation)
+  const presentationValid =
+    presentation === undefined || isPresentationState(presentation)
   const slideCount = presentationValid
-    ? presentation?.slides.length ?? slidesStore.slides.length
+    ? (presentation?.slides.length ?? slidesStore.slides.length)
     : 0
   if (
     typeof message.requestId !== 'string' ||
@@ -218,8 +235,9 @@ async function renderPresentation(message: RenderHostMessage): Promise<void> {
   ) {
     post({
       type: 'slidemind:pptist:render-error',
-      requestId: typeof message.requestId === 'string' ? message.requestId : 'unknown',
-      message: '幻灯片渲染请求无效'
+      requestId:
+        typeof message.requestId === 'string' ? message.requestId : 'unknown',
+      message: '幻灯片渲染请求无效',
     })
     return
   }
@@ -244,14 +262,14 @@ async function renderPresentation(message: RenderHostMessage): Promise<void> {
         height: rect.height,
         left: rect.left,
         top: rect.top,
-        width: rect.width
-      }
+        width: rect.width,
+      },
     })
   } catch (error) {
     post({
       type: 'slidemind:pptist:render-error',
       requestId: message.requestId,
-      message: error instanceof Error ? error.message : String(error)
+      message: error instanceof Error ? error.message : String(error),
     })
   }
 }
@@ -274,24 +292,34 @@ window.addEventListener('message', (event: MessageEvent<HostMessage>) => {
   void loadPresentation(event.data.presentation)
 })
 
-window.addEventListener('keydown', (event) => {
-  if ((event.metaKey || event.ctrlKey) && event.key.toLocaleLowerCase() === 's') {
-    event.preventDefault()
-    if (changeTimer !== undefined) window.clearTimeout(changeTimer)
-    changeTimer = undefined
-    post({
-      type: 'slidemind:pptist:save',
-      presentation: currentPresentation()
-    })
-  }
-}, true)
+window.addEventListener(
+  'keydown',
+  (event) => {
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      event.key.toLocaleLowerCase() === 's'
+    ) {
+      event.preventDefault()
+      if (changeTimer !== undefined) window.clearTimeout(changeTimer)
+      changeTimer = undefined
+      post({
+        type: 'slidemind:pptist:save',
+        presentation: currentPresentation(),
+      })
+    }
+  },
+  true,
+)
 
 window.addEventListener('error', (event) => {
   if (pendingImport) {
     failImport(pendingImport.requestId, event.error ?? event.message)
     return
   }
-  post({ type: 'slidemind:pptist:error', message: event.message || 'PPTist 编辑器运行失败' })
+  post({
+    type: 'slidemind:pptist:error',
+    message: event.message || 'PPTist 编辑器运行失败',
+  })
 })
 
 window.addEventListener('unhandledrejection', (event) => {
@@ -302,7 +330,7 @@ window.addEventListener('unhandledrejection', (event) => {
   }
   post({
     type: 'slidemind:pptist:error',
-    message: reason instanceof Error ? reason.message : String(reason)
+    message: reason instanceof Error ? reason.message : String(reason),
   })
 })
 
@@ -315,7 +343,7 @@ watch(importing, async (isImporting, wasImporting) => {
   post({
     type: 'slidemind:pptist:imported',
     requestId: completed.requestId,
-    presentation: currentPresentation()
+    presentation: currentPresentation(),
   })
 })
 
@@ -325,7 +353,7 @@ watch(
     slidesStore.theme,
     slidesStore.slides,
     slidesStore.viewportSize,
-    slidesStore.viewportRatio
+    slidesStore.viewportRatio,
   ],
   () => {
     if (!initialized) return
@@ -333,11 +361,11 @@ watch(
     changeTimer = window.setTimeout(() => {
       post({
         type: 'slidemind:pptist:change',
-        presentation: currentPresentation()
+        presentation: currentPresentation(),
       })
     }, 120)
   },
-  { deep: true }
+  { deep: true },
 )
 
 post({ type: 'slidemind:pptist:ready' })

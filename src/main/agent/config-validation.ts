@@ -6,15 +6,17 @@ interface NormalizedConfigInput {
 export function normalizeConfigInput(
   input: unknown,
   allowedModelIds: readonly string[],
-  hasExistingApiKey: boolean
+  hasExistingApiKey: boolean,
 ): NormalizedConfigInput {
   if (!input || typeof input !== 'object') {
     throw new Error('模型配置格式无效')
   }
 
   const candidate = input as Record<string, unknown>
-  const modelId = typeof candidate.modelId === 'string' ? candidate.modelId.trim() : ''
-  const apiKey = typeof candidate.apiKey === 'string' ? candidate.apiKey.trim() : ''
+  const modelId =
+    typeof candidate.modelId === 'string' ? candidate.modelId.trim() : ''
+  const apiKey =
+    typeof candidate.apiKey === 'string' ? candidate.apiKey.trim() : ''
 
   if (!allowedModelIds.includes(modelId)) {
     throw new Error('请选择受支持的 DeepSeek 模型')
@@ -30,4 +32,3 @@ export function normalizeConfigInput(
 
   return { modelId, apiKey: apiKey || undefined }
 }
-

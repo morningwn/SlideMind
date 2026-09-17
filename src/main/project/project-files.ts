@@ -7,10 +7,21 @@ import {
   rm,
   stat,
   unlink,
-  writeFile
+  writeFile,
 } from 'node:fs/promises'
-import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path'
-import type { ProjectFileEntry, RenameProjectFileInput } from '../../shared/project'
+import {
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  sep,
+} from 'node:path'
+import type {
+  ProjectFileEntry,
+  RenameProjectFileInput,
+} from '../../shared/project'
 
 const MAX_DIRECTORY_ENTRIES = 250
 const MAX_REFERENCE_FILES = 5_000
@@ -22,10 +33,14 @@ const VERSION_EXCLUDED_DIRECTORIES = new Set([
   'coverage',
   'node_modules',
   'out',
-  'release-dist'
+  'release-dist',
 ])
 
-function validatePathInput(value: unknown, label: string, allowEmpty = false): string {
+function validatePathInput(
+  value: unknown,
+  label: string,
+  allowEmpty = false,
+): string {
   if (
     typeof value !== 'string' ||
     (!allowEmpty && !value.trim()) ||
@@ -39,13 +54,18 @@ function validatePathInput(value: unknown, label: string, allowEmpty = false): s
 }
 
 function isInsideProject(projectPath: string, candidatePath: string): boolean {
-  return candidatePath === projectPath || candidatePath.startsWith(`${projectPath}${sep}`)
+  return (
+    candidatePath === projectPath ||
+    candidatePath.startsWith(`${projectPath}${sep}`)
+  )
 }
 
 function hasInternalSegment(path: string): boolean {
   return path
     .split(sep)
-    .some((segment) => INTERNAL_PROJECT_DIRECTORIES.has(segment.toLocaleLowerCase()))
+    .some((segment) =>
+      INTERNAL_PROJECT_DIRECTORIES.has(segment.toLocaleLowerCase()),
+    )
 }
 
 function normalizeRenameInput(value: unknown): RenameProjectFileInput {
@@ -74,69 +94,85 @@ export function projectFileRenamePaths(inputValue: unknown): {
   const input = normalizeRenameInput(inputValue)
   return {
     input,
-    paths: [input.path, join(dirname(input.path), input.name)]
+    paths: [input.path, join(dirname(input.path), input.name)],
   }
 }
 
 export async function resolveRegularProjectFile(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<{ relativePath: string; targetPath: string }> {
-  const projectPath = await realpath(validatePathInput(projectPathInput, '项目路径'))
+  const projectPath = await realpath(
+    validatePathInput(projectPathInput, '项目路径'),
+  )
   const relativePath = validatePathInput(relativePathInput, '文件路径')
   if (isAbsolute(relativePath)) throw new Error('文件路径无效')
 
   const lexicalTarget = resolve(projectPath, relativePath)
-  if (!isInsideProject(projectPath, lexicalTarget)) throw new Error('文件路径超出项目范围')
+  if (!isInsideProject(projectPath, lexicalTarget))
+    throw new Error('文件路径超出项目范围')
   const normalizedRelativePath = relative(projectPath, lexicalTarget)
-  if (hasInternalSegment(normalizedRelativePath)) throw new Error('不能操作项目内部文件')
+  if (hasInternalSegment(normalizedRelativePath))
+    throw new Error('不能操作项目内部文件')
 
   let currentPath = projectPath
   for (const segment of normalizedRelativePath.split(sep)) {
     currentPath = resolve(currentPath, segment)
-    if ((await lstat(currentPath)).isSymbolicLink()) throw new Error('不能操作符号链接文件')
+    if ((await lstat(currentPath)).isSymbolicLink())
+      throw new Error('不能操作符号链接文件')
   }
 
   const targetPath = await realpath(lexicalTarget)
-  if (!isInsideProject(projectPath, targetPath)) throw new Error('文件路径超出项目范围')
+  if (!isInsideProject(projectPath, targetPath))
+    throw new Error('文件路径超出项目范围')
   if (!(await lstat(targetPath)).isFile()) throw new Error('目标不是普通文件')
   return { relativePath: normalizedRelativePath, targetPath }
 }
 
 async function resolveRegularProjectDirectory(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<{ relativePath: string; targetPath: string }> {
-  const projectPath = await realpath(validatePathInput(projectPathInput, '项目路径'))
+  const projectPath = await realpath(
+    validatePathInput(projectPathInput, '项目路径'),
+  )
   const relativePath = validatePathInput(relativePathInput, '目录路径')
   if (isAbsolute(relativePath)) throw new Error('目录路径无效')
 
   const lexicalTarget = resolve(projectPath, relativePath)
-  if (!isInsideProject(projectPath, lexicalTarget) || lexicalTarget === projectPath) {
+  if (
+    !isInsideProject(projectPath, lexicalTarget) ||
+    lexicalTarget === projectPath
+  ) {
     throw new Error('目录路径超出项目范围')
   }
   const normalizedRelativePath = relative(projectPath, lexicalTarget)
-  if (hasInternalSegment(normalizedRelativePath)) throw new Error('不能操作项目内部目录')
+  if (hasInternalSegment(normalizedRelativePath))
+    throw new Error('不能操作项目内部目录')
 
   let currentPath = projectPath
   for (const segment of normalizedRelativePath.split(sep)) {
     currentPath = resolve(currentPath, segment)
-    if ((await lstat(currentPath)).isSymbolicLink()) throw new Error('不能操作符号链接目录')
+    if ((await lstat(currentPath)).isSymbolicLink())
+      throw new Error('不能操作符号链接目录')
   }
 
   const targetPath = await realpath(lexicalTarget)
   if (!isInsideProject(projectPath, targetPath) || targetPath === projectPath) {
     throw new Error('目录路径超出项目范围')
   }
-  if (!(await lstat(targetPath)).isDirectory()) throw new Error('目标不是文件夹')
+  if (!(await lstat(targetPath)).isDirectory())
+    throw new Error('目标不是文件夹')
   return { relativePath: normalizedRelativePath, targetPath }
 }
 
 async function resolveNewProjectEntry(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<{ relativePath: string; targetPath: string }> {
-  const projectPath = await realpath(validatePathInput(projectPathInput, '项目路径'))
+  const projectPath = await realpath(
+    validatePathInput(projectPathInput, '项目路径'),
+  )
   const relativePath = validatePathInput(relativePathInput, '新建路径')
   if (isAbsolute(relativePath)) throw new Error('新建路径无效')
 
@@ -145,11 +181,14 @@ async function resolveNewProjectEntry(
     throw new Error('新建路径超出项目范围')
   }
   const normalizedRelativePath = relative(projectPath, targetPath)
-  if (hasInternalSegment(normalizedRelativePath)) throw new Error('不能在项目内部目录中创建')
+  if (hasInternalSegment(normalizedRelativePath))
+    throw new Error('不能在项目内部目录中创建')
 
   const parentRelativePath = relative(projectPath, dirname(targetPath))
   let currentPath = projectPath
-  for (const segment of parentRelativePath ? parentRelativePath.split(sep) : []) {
+  for (const segment of parentRelativePath
+    ? parentRelativePath.split(sep)
+    : []) {
     currentPath = resolve(currentPath, segment)
     const stats = await lstat(currentPath)
     if (stats.isSymbolicLink()) throw new Error('不能通过符号链接目录创建')
@@ -167,23 +206,32 @@ async function resolveNewProjectEntry(
 
 async function collectVersionedDirectoryFiles(
   targetPath: string,
-  relativePath: string
+  relativePath: string,
 ): Promise<string[]> {
-  if (relativePath
-    .split(sep)
-    .some((segment) => VERSION_EXCLUDED_DIRECTORIES.has(segment.toLocaleLowerCase()))) {
+  if (
+    relativePath
+      .split(sep)
+      .some((segment) =>
+        VERSION_EXCLUDED_DIRECTORIES.has(segment.toLocaleLowerCase()),
+      )
+  ) {
     return []
   }
   const paths: string[] = []
-  const visit = async (directoryPath: string, directoryRelativePath: string): Promise<void> => {
-    const entries = (await readdir(directoryPath, { withFileTypes: true }))
-      .sort((left, right) => left.name.localeCompare(right.name))
+  const visit = async (
+    directoryPath: string,
+    directoryRelativePath: string,
+  ): Promise<void> => {
+    const entries = (
+      await readdir(directoryPath, { withFileTypes: true })
+    ).sort((left, right) => left.name.localeCompare(right.name))
     for (const entry of entries) {
       if (entry.isSymbolicLink()) continue
       const entryPath = resolve(directoryPath, entry.name)
       const entryRelativePath = join(directoryRelativePath, entry.name)
       if (entry.isDirectory()) {
-        if (VERSION_EXCLUDED_DIRECTORIES.has(entry.name.toLocaleLowerCase())) continue
+        if (VERSION_EXCLUDED_DIRECTORIES.has(entry.name.toLocaleLowerCase()))
+          continue
         await visit(entryPath, entryRelativePath)
       } else if (entry.isFile()) {
         paths.push(entryRelativePath)
@@ -199,25 +247,32 @@ async function collectVersionedDirectoryFiles(
 
 export async function listProjectDirectory(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<ProjectFileEntry[]> {
-  const projectPath = await realpath(validatePathInput(projectPathInput, '项目路径'))
+  const projectPath = await realpath(
+    validatePathInput(projectPathInput, '项目路径'),
+  )
   const relativePath = validatePathInput(relativePathInput, '目录路径', true)
 
   if (isAbsolute(relativePath)) throw new Error('目录路径无效')
 
   const lexicalTarget = resolve(projectPath, relativePath)
   const normalizedRelativePath = relative(projectPath, lexicalTarget)
-  if (hasInternalSegment(normalizedRelativePath)) throw new Error('不能读取项目内部目录')
+  if (hasInternalSegment(normalizedRelativePath))
+    throw new Error('不能读取项目内部目录')
   const targetPath = await realpath(lexicalTarget)
-  if (!isInsideProject(projectPath, targetPath)) throw new Error('目录路径超出项目范围')
+  if (!isInsideProject(projectPath, targetPath))
+    throw new Error('目录路径超出项目范围')
 
   const targetStats = await stat(targetPath)
   if (!targetStats.isDirectory()) throw new Error('目标不是文件夹')
 
   const entries = await readdir(targetPath, { withFileTypes: true })
   return entries
-    .filter((entry) => normalizedRelativePath !== '' || !hasInternalSegment(entry.name))
+    .filter(
+      (entry) =>
+        normalizedRelativePath !== '' || !hasInternalSegment(entry.name),
+    )
     .sort((left, right) => {
       const kindOrder = Number(right.isDirectory()) - Number(left.isDirectory())
       return kindOrder || left.name.localeCompare(right.name, 'zh-CN')
@@ -226,21 +281,28 @@ export async function listProjectDirectory(
     .map((entry) => ({
       kind: entry.isDirectory() ? 'directory' : 'file',
       name: entry.name,
-      path: relative(projectPath, resolve(targetPath, entry.name))
+      path: relative(projectPath, resolve(targetPath, entry.name)),
     }))
 }
 
-export async function listProjectFiles(projectPathInput: unknown): Promise<ProjectFileEntry[]> {
-  const projectPath = await realpath(validatePathInput(projectPathInput, '项目路径'))
+export async function listProjectFiles(
+  projectPathInput: unknown,
+): Promise<ProjectFileEntry[]> {
+  const projectPath = await realpath(
+    validatePathInput(projectPathInput, '项目路径'),
+  )
   const files: ProjectFileEntry[] = []
 
   const visit = async (directoryPath: string): Promise<void> => {
-    const entries = (await readdir(directoryPath, { withFileTypes: true }))
-      .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'))
+    const entries = (
+      await readdir(directoryPath, { withFileTypes: true })
+    ).sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'))
     for (const entry of entries) {
-      if (files.length >= MAX_REFERENCE_FILES || entry.isSymbolicLink()) continue
+      if (files.length >= MAX_REFERENCE_FILES || entry.isSymbolicLink())
+        continue
       if (entry.isDirectory()) {
-        if (VERSION_EXCLUDED_DIRECTORIES.has(entry.name.toLocaleLowerCase())) continue
+        if (VERSION_EXCLUDED_DIRECTORIES.has(entry.name.toLocaleLowerCase()))
+          continue
         await visit(resolve(directoryPath, entry.name))
       } else if (entry.isFile()) {
         const path = relative(projectPath, resolve(directoryPath, entry.name))
@@ -256,9 +318,12 @@ export async function listProjectFiles(projectPathInput: unknown): Promise<Proje
 
 export async function createProjectDirectory(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<ProjectFileEntry> {
-  const target = await resolveNewProjectEntry(projectPathInput, relativePathInput)
+  const target = await resolveNewProjectEntry(
+    projectPathInput,
+    relativePathInput,
+  )
   try {
     await mkdir(target.targetPath)
   } catch (error) {
@@ -270,16 +335,23 @@ export async function createProjectDirectory(
   return {
     kind: 'directory',
     name: target.relativePath.split(sep).at(-1)!,
-    path: target.relativePath
+    path: target.relativePath,
   }
 }
 
 export async function createProjectMarkdownFile(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<ProjectFileEntry> {
-  const target = await resolveNewProjectEntry(projectPathInput, relativePathInput)
-  if (!['.md', '.markdown'].includes(extname(target.relativePath).toLocaleLowerCase())) {
+  const target = await resolveNewProjectEntry(
+    projectPathInput,
+    relativePathInput,
+  )
+  if (
+    !['.md', '.markdown'].includes(
+      extname(target.relativePath).toLocaleLowerCase(),
+    )
+  ) {
     throw new Error('Markdown 文件必须使用 .md 或 .markdown 扩展名')
   }
   try {
@@ -293,13 +365,13 @@ export async function createProjectMarkdownFile(
   return {
     kind: 'file',
     name: target.relativePath.split(sep).at(-1)!,
-    path: target.relativePath
+    path: target.relativePath,
   }
 }
 
 export async function renameProjectFile(
   projectPathInput: unknown,
-  inputValue: unknown
+  inputValue: unknown,
 ): Promise<ProjectFileEntry> {
   const input = normalizeRenameInput(inputValue)
   const source = await resolveRegularProjectFile(projectPathInput, input.path)
@@ -325,41 +397,49 @@ export async function renameProjectFile(
 
 export async function deleteProjectFile(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<void> {
-  const source = await resolveRegularProjectFile(projectPathInput, relativePathInput)
+  const source = await resolveRegularProjectFile(
+    projectPathInput,
+    relativePathInput,
+  )
   await unlink(source.targetPath)
 }
 
 export async function projectDirectoryRenamePaths(
   projectPathInput: unknown,
-  inputValue: unknown
+  inputValue: unknown,
 ): Promise<{ input: RenameProjectFileInput; paths: string[] }> {
   const input = normalizeRenameInput(inputValue)
-  const source = await resolveRegularProjectDirectory(projectPathInput, input.path)
+  const source = await resolveRegularProjectDirectory(
+    projectPathInput,
+    input.path,
+  )
   const destinationRelativePath = join(dirname(source.relativePath), input.name)
   const sourcePaths = await collectVersionedDirectoryFiles(
     source.targetPath,
-    source.relativePath
+    source.relativePath,
   )
   return {
     input,
     paths: [
       ...sourcePaths,
-      ...sourcePaths.map((path) => join(
-        destinationRelativePath,
-        relative(source.relativePath, path)
-      ))
-    ]
+      ...sourcePaths.map((path) =>
+        join(destinationRelativePath, relative(source.relativePath, path)),
+      ),
+    ],
   }
 }
 
 export async function renameProjectDirectory(
   projectPathInput: unknown,
-  inputValue: unknown
+  inputValue: unknown,
 ): Promise<ProjectFileEntry> {
   const input = normalizeRenameInput(inputValue)
-  const source = await resolveRegularProjectDirectory(projectPathInput, input.path)
+  const source = await resolveRegularProjectDirectory(
+    projectPathInput,
+    input.path,
+  )
   if (input.name === source.relativePath.split(sep).at(-1)) {
     return { kind: 'directory', name: input.name, path: source.relativePath }
   }
@@ -382,19 +462,28 @@ export async function renameProjectDirectory(
 
 export async function projectDirectoryDeletePaths(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<{ path: string; paths: string[] }> {
-  const source = await resolveRegularProjectDirectory(projectPathInput, relativePathInput)
+  const source = await resolveRegularProjectDirectory(
+    projectPathInput,
+    relativePathInput,
+  )
   return {
     path: source.relativePath,
-    paths: await collectVersionedDirectoryFiles(source.targetPath, source.relativePath)
+    paths: await collectVersionedDirectoryFiles(
+      source.targetPath,
+      source.relativePath,
+    ),
   }
 }
 
 export async function deleteProjectDirectory(
   projectPathInput: unknown,
-  relativePathInput: unknown
+  relativePathInput: unknown,
 ): Promise<void> {
-  const source = await resolveRegularProjectDirectory(projectPathInput, relativePathInput)
+  const source = await resolveRegularProjectDirectory(
+    projectPathInput,
+    relativePathInput,
+  )
   await rm(source.targetPath, { recursive: true })
 }

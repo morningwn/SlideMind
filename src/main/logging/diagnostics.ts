@@ -1,10 +1,7 @@
 import { chmod, lstat, readFile, readdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { gzip } from 'node:zlib'
-import {
-  isApplicationLogFileName,
-  sanitizeDiagnosticLog
-} from './logger'
+import { isApplicationLogFileName, sanitizeDiagnosticLog } from './logger'
 
 const MAX_BUNDLE_LOG_FILES = 5
 const MAX_BUNDLE_LOG_BYTES = 30 * 1024 * 1024
@@ -56,7 +53,9 @@ async function gzipBuffer(input: Buffer): Promise<Buffer> {
   })
 }
 
-async function readDiagnosticLogs(logsDirectory: string): Promise<DiagnosticLogFile[]> {
+async function readDiagnosticLogs(
+  logsDirectory: string,
+): Promise<DiagnosticLogFile[]> {
   const names = (await readdir(logsDirectory))
     .filter(isApplicationLogFileName)
     .sort((left, right) => archiveIndex(left) - archiveIndex(right))
@@ -67,7 +66,8 @@ async function readDiagnosticLogs(logsDirectory: string): Promise<DiagnosticLogF
   for (const name of names) {
     const path = join(logsDirectory, name)
     const stats = await lstat(path)
-    if (!stats.isFile() || totalBytes + stats.size > MAX_BUNDLE_LOG_BYTES) continue
+    if (!stats.isFile() || totalBytes + stats.size > MAX_BUNDLE_LOG_BYTES)
+      continue
     const content = await readFile(path, 'utf8')
     totalBytes += Buffer.byteLength(content)
     logs.push({ name, content: sanitizeDiagnosticLog(content) })
@@ -76,14 +76,17 @@ async function readDiagnosticLogs(logsDirectory: string): Promise<DiagnosticLogF
 }
 
 export function diagnosticBundleFileName(now = new Date()): string {
-  const timestamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+  const timestamp = now
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\.\d{3}Z$/, 'Z')
   return `SlideMind-diagnostics-${timestamp}.json.gz`
 }
 
 export async function createDiagnosticBundle(
   logsDirectory: string,
   environment: DiagnosticEnvironment,
-  now = new Date()
+  now = new Date(),
 ): Promise<Buffer> {
   const files = await readDiagnosticLogs(logsDirectory)
   const bundle: DiagnosticBundle = {
@@ -94,8 +97,8 @@ export async function createDiagnosticBundle(
     logging: {
       format: 'jsonl',
       fileCount: files.length,
-      files
-    }
+      files,
+    },
   }
   return gzipBuffer(Buffer.from(`${JSON.stringify(bundle, null, 2)}\n`, 'utf8'))
 }
@@ -103,7 +106,7 @@ export async function createDiagnosticBundle(
 export async function writeDiagnosticBundle(
   outputPath: string,
   logsDirectory: string,
-  environment: DiagnosticEnvironment
+  environment: DiagnosticEnvironment,
 ): Promise<void> {
   try {
     const existing = await lstat(outputPath)

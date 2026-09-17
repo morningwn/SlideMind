@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { createBlankPresentationDocument } from './presentation-store'
 import {
   exportPresentationToPptx,
-  pptistHtmlToPlainText
+  pptistHtmlToPlainText,
 } from './presentation-exporter'
 
 describe('exportPresentationToPptx', () => {
@@ -24,7 +24,7 @@ describe('exportPresentationToPptx', () => {
         rotate: 0,
         content: '<p><strong>SlideMind</strong><br>导出测试</p>',
         defaultFontName: 'Arial',
-        defaultColor: '#24488E'
+        defaultColor: '#24488E',
       },
       {
         id: 'accent',
@@ -42,8 +42,8 @@ describe('exportPresentationToPptx', () => {
           content: '<p>可编辑形状</p>',
           defaultFontName: '',
           defaultColor: '#333333',
-          align: 'middle'
-        }
+          align: 'middle',
+        },
       },
       {
         id: 'connector',
@@ -57,8 +57,8 @@ describe('exportPresentationToPptx', () => {
         broken2Direction: 'horizontal',
         points: ['dot', 'arrow'],
         color: '#24488E',
-        style: 'dashed'
-      }
+        style: 'dashed',
+      },
     ]
 
     await exportPresentationToPptx(document.presentation, outputPath)

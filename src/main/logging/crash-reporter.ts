@@ -29,7 +29,7 @@ interface CrashReporterAdapter {
 async function scanDirectory(
   directory: string,
   depth: number,
-  summary: MutableCrashReportSummary
+  summary: MutableCrashReportSummary,
 ): Promise<void> {
   if (depth > MAX_SCAN_DEPTH || summary.truncated) return
 
@@ -54,7 +54,8 @@ async function scanDirectory(
       await scanDirectory(path, depth + 1, summary)
       continue
     }
-    if (!entry.isFile() || extname(entry.name).toLocaleLowerCase() !== '.dmp') continue
+    if (!entry.isFile() || extname(entry.name).toLocaleLowerCase() !== '.dmp')
+      continue
 
     try {
       const stats = await lstat(path)
@@ -70,12 +71,12 @@ async function scanDirectory(
 }
 
 export async function inspectLocalCrashReports(
-  crashesDirectory: string
+  crashesDirectory: string,
 ): Promise<LocalCrashReportSummary> {
   const summary: MutableCrashReportSummary = {
     count: 0,
     scannedEntries: 0,
-    truncated: false
+    truncated: false,
   }
   await scanDirectory(crashesDirectory, 0, summary)
   return {
@@ -83,29 +84,31 @@ export async function inspectLocalCrashReports(
     truncated: summary.truncated,
     ...(summary.latestModifiedAt
       ? { latestModifiedAt: summary.latestModifiedAt.toISOString() }
-      : {})
+      : {}),
   }
 }
 
 export function initializeLocalCrashReporting(
   productName: string,
-  reporter: CrashReporterAdapter = crashReporter
+  reporter: CrashReporterAdapter = crashReporter,
 ): void {
   try {
     reporter.start({
       productName,
-      uploadToServer: false
+      uploadToServer: false,
     })
     if (reporter.getUploadToServer()) reporter.setUploadToServer(false)
     logger.info('crash_reporting.started', {
-      context: { uploadToServer: reporter.getUploadToServer() }
+      context: { uploadToServer: reporter.getUploadToServer() },
     })
   } catch (error) {
     logger.error('crash_reporting.start_failed', { error })
   }
 }
 
-export async function reportExistingCrashReports(crashesDirectory: string): Promise<void> {
+export async function reportExistingCrashReports(
+  crashesDirectory: string,
+): Promise<void> {
   try {
     const summary = await inspectLocalCrashReports(crashesDirectory)
     if (summary.count === 0) return
@@ -113,8 +116,8 @@ export async function reportExistingCrashReports(crashesDirectory: string): Prom
       context: {
         count: summary.count,
         latestModifiedAt: summary.latestModifiedAt ?? null,
-        truncated: summary.truncated
-      }
+        truncated: summary.truncated,
+      },
     })
   } catch (error) {
     logger.warn('crash_reports.scan_failed', { error })

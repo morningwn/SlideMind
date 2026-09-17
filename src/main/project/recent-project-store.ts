@@ -1,4 +1,11 @@
-import { mkdir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
+import {
+  mkdir,
+  readFile,
+  realpath,
+  rename,
+  stat,
+  writeFile,
+} from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
 import type { ProjectInfo } from '../../shared/project'
 import { getLogger } from '../logging/logger'
@@ -35,7 +42,12 @@ function isStoredRecentProjects(value: unknown): value is StoredRecentProjects {
 }
 
 export async function resolveProject(path: unknown): Promise<ProjectInfo> {
-  if (typeof path !== 'string' || !path.trim() || path.length > 4096 || path.includes('\0')) {
+  if (
+    typeof path !== 'string' ||
+    !path.trim() ||
+    path.length > 4096 ||
+    path.includes('\0')
+  ) {
     throw new Error('项目路径无效')
   }
 
@@ -50,10 +62,11 @@ export async function resolveProject(path: unknown): Promise<ProjectInfo> {
     return {
       name: basename(canonicalPath),
       path: canonicalPath,
-      lastOpenedAt: new Date().toISOString()
+      lastOpenedAt: new Date().toISOString(),
     }
   } catch (error) {
-    if (error instanceof Error && error.message === '请选择项目文件夹') throw error
+    if (error instanceof Error && error.message === '请选择项目文件夹')
+      throw error
     throw new Error('项目文件夹不存在或无法访问')
   }
 }
@@ -70,10 +83,14 @@ export class RecentProjectStore {
       if (!isStoredRecentProjects(stored)) return []
 
       return [...stored.projects]
-        .sort((left, right) => Date.parse(right.lastOpenedAt) - Date.parse(left.lastOpenedAt))
+        .sort(
+          (left, right) =>
+            Date.parse(right.lastOpenedAt) - Date.parse(left.lastOpenedAt),
+        )
         .slice(0, MAX_RECENT_PROJECTS)
     } catch (error) {
-      const code = error instanceof Error && 'code' in error ? error.code : undefined
+      const code =
+        error instanceof Error && 'code' in error ? error.code : undefined
       if (code !== 'ENOENT') {
         logger.warn('project.recent_read_failed', { error })
       }
@@ -86,7 +103,7 @@ export class RecentProjectStore {
       const projects = await this.list()
       const nextProjects = [
         project,
-        ...projects.filter((candidate) => candidate.path !== project.path)
+        ...projects.filter((candidate) => candidate.path !== project.path),
       ].slice(0, MAX_RECENT_PROJECTS)
       await this.write(nextProjects)
       return nextProjects
@@ -106,7 +123,7 @@ export class RecentProjectStore {
     const result = this.writeQueue.then(operation, operation)
     this.writeQueue = result.then(
       () => undefined,
-      () => undefined
+      () => undefined,
     )
     return result
   }
@@ -118,7 +135,7 @@ export class RecentProjectStore {
     await mkdir(dirname(this.storePath), { recursive: true })
     await writeFile(temporaryPath, `${JSON.stringify(stored, null, 2)}\n`, {
       encoding: 'utf8',
-      mode: 0o600
+      mode: 0o600,
     })
     await rename(temporaryPath, this.storePath)
   }

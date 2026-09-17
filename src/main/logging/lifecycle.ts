@@ -7,7 +7,7 @@ export function installProcessErrorLogging(): void {
   process.on('uncaughtExceptionMonitor', (error, origin) => {
     logger.error('process.uncaught_exception', {
       error,
-      context: { origin }
+      context: { origin },
     })
   })
   process.on('unhandledRejection', (reason) => {
@@ -22,8 +22,8 @@ export function installApplicationLifecycleLogging(app: App): void {
         exitCode: details.exitCode,
         processType: details.type,
         reason: details.reason,
-        serviceName: details.serviceName ?? null
-      }
+        serviceName: details.serviceName ?? null,
+      },
     })
   })
 }
@@ -33,9 +33,9 @@ export function installWindowLifecycleLogging(window: BrowserWindow): void {
     logger.error('renderer.process_gone', {
       context: {
         exitCode: details.exitCode,
-        reason: details.reason
+        reason: details.reason,
       },
-      process: 'renderer'
+      process: 'renderer',
     })
   })
   window.webContents.on('unresponsive', () => {
@@ -50,8 +50,8 @@ export function installWindowLifecycleLogging(window: BrowserWindow): void {
       logger.error('renderer.load_failed', {
         context: { errorCode, isMainFrame },
         error: errorDescription,
-        process: 'renderer'
+        process: 'renderer',
       })
-    }
+    },
   )
 }

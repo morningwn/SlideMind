@@ -18,7 +18,10 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = resolve(scriptDirectory, '../..')
 const packageRuntimeRoot = join(repositoryRoot, 'out/.pandoc-package-runtime')
 const runtimeManifest = JSON.parse(
-  await readFile(join(repositoryRoot, 'scripts/pandoc-p0/runtime-manifest.json'), 'utf8'),
+  await readFile(
+    join(repositoryRoot, 'scripts/pandoc-p0/runtime-manifest.json'),
+    'utf8',
+  ),
 )
 const hostPlatform = `${process.platform}-${process.arch}`
 const requested = readOption('--platforms') ?? hostPlatform
@@ -49,7 +52,10 @@ for (const platform of platforms) {
   if (platform !== hostPlatform) args.push('--skip-execution')
   await run(process.execPath, args)
   const platformRoot = join(packageRuntimeRoot, platform)
-  await copyFile(sourcePath, join(platformRoot, 'runtime', sourceArtifact.archive))
+  await copyFile(
+    sourcePath,
+    join(platformRoot, 'runtime', sourceArtifact.archive),
+  )
   const manifestPath = join(platformRoot, 'prepared-runtime.json')
   const prepared = JSON.parse(await readFile(manifestPath, 'utf8'))
   prepared.correspondingSource = {

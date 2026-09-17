@@ -6,7 +6,7 @@ import type {
   ProjectVersionComparisonTarget,
   ProjectVersionFileComparison,
   ProjectVersionFileContent,
-  ProjectVersionSummary
+  ProjectVersionSummary,
 } from '../../../shared/project-version'
 
 interface ProjectHistoryPanelProps {
@@ -29,13 +29,13 @@ const sourceLabels: Record<ProjectMutationSource, string> = {
   import: '导入',
   'presentation-editor': '演示编辑器',
   restore: '版本恢复',
-  'text-editor': '文本编辑器'
+  'text-editor': '文本编辑器',
 }
 
 const changeLabels: Record<ProjectVersionChange['kind'], string> = {
   added: '新增',
   modified: '修改',
-  removed: '删除'
+  removed: '删除',
 }
 
 function HistoryIcon(): React.JSX.Element {
@@ -48,8 +48,16 @@ function HistoryIcon(): React.JSX.Element {
   )
 }
 
-function FileChangeIcon({ kind }: { kind: ProjectVersionChange['kind'] }): React.JSX.Element {
-  return <span aria-hidden="true">{kind === 'added' ? '+' : kind === 'removed' ? '−' : '•'}</span>
+function FileChangeIcon({
+  kind,
+}: {
+  kind: ProjectVersionChange['kind']
+}): React.JSX.Element {
+  return (
+    <span aria-hidden="true">
+      {kind === 'added' ? '+' : kind === 'removed' ? '−' : '•'}
+    </span>
+  )
 }
 
 function sourceText(sources: ProjectMutationSource[]): string {
@@ -60,15 +68,23 @@ function sourceText(sources: ProjectMutationSource[]): string {
 function versionDay(value: string): string {
   const date = new Date(value)
   const today = new Date()
-  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
-  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const startOfToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  ).getTime()
+  const startOfDate = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  ).getTime()
   const dayDifference = Math.round((startOfToday - startOfDate) / 86_400_000)
   if (dayDifference === 0) return '今天'
   if (dayDifference === 1) return '昨天'
   return new Intl.DateTimeFormat('zh-CN', {
     month: 'long',
     day: 'numeric',
-    weekday: 'short'
+    weekday: 'short',
   }).format(date)
 }
 
@@ -76,7 +92,7 @@ function versionTime(value: string): string {
   return new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false
+    hour12: false,
   }).format(new Date(value))
 }
 
@@ -88,7 +104,7 @@ function versionDateTime(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: false
+    hour12: false,
   }).format(new Date(value))
 }
 
@@ -102,12 +118,17 @@ function previewMessage(content: ProjectVersionFileContent): string | null {
   return null
 }
 
-function buildDiff(comparison: ProjectVersionFileComparison | null): DiffLine[] | null {
+function buildDiff(
+  comparison: ProjectVersionFileComparison | null,
+): DiffLine[] | null {
   if (!comparison) return null
-  const unsupported = previewMessage(comparison.before) ?? previewMessage(comparison.after)
+  const unsupported =
+    previewMessage(comparison.before) ?? previewMessage(comparison.after)
   if (unsupported) return null
-  const before = comparison.before.status === 'text' ? comparison.before.content : ''
-  const after = comparison.after.status === 'text' ? comparison.after.content : ''
+  const before =
+    comparison.before.status === 'text' ? comparison.before.content : ''
+  const after =
+    comparison.after.status === 'text' ? comparison.after.content : ''
   let oldLine = 1
   let newLine = 1
   const rows: DiffLine[] = []
@@ -120,7 +141,13 @@ function buildDiff(comparison: ProjectVersionFileComparison | null): DiffLine[] 
         rows.push({ kind: 'added', marker: '+', oldLine: null, newLine, text })
         newLine += 1
       } else if (change.removed) {
-        rows.push({ kind: 'removed', marker: '−', oldLine, newLine: null, text })
+        rows.push({
+          kind: 'removed',
+          marker: '−',
+          oldLine,
+          newLine: null,
+          text,
+        })
         oldLine += 1
       } else {
         rows.push({ kind: 'context', marker: ' ', oldLine, newLine, text })
@@ -135,15 +162,19 @@ function buildDiff(comparison: ProjectVersionFileComparison | null): DiffLine[] 
 export function ProjectHistoryPanel({
   projectHandle,
   onConfirmRestore,
-  onRestoreSettled
+  onRestoreSettled,
 }: ProjectHistoryPanelProps): React.JSX.Element {
   const [versions, setVersions] = useState<ProjectVersionSummary[]>([])
   const [nextCursor, setNextCursor] = useState<string | null>(null)
-  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null)
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(
+    null,
+  )
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const [checkedPaths, setCheckedPaths] = useState<Set<string>>(new Set())
-  const [comparisonTarget, setComparisonTarget] = useState<ProjectVersionComparisonTarget>('previous')
-  const [comparison, setComparison] = useState<ProjectVersionFileComparison | null>(null)
+  const [comparisonTarget, setComparisonTarget] =
+    useState<ProjectVersionComparisonTarget>('previous')
+  const [comparison, setComparison] =
+    useState<ProjectVersionFileComparison | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [isComparing, setIsComparing] = useState(false)
@@ -157,7 +188,8 @@ export function ProjectHistoryPanel({
   selectedPathRef.current = selectedPath
   checkedPathsRef.current = checkedPaths
 
-  const selectedVersion = versions.find((version) => version.id === selectedVersionId) ?? null
+  const selectedVersion =
+    versions.find((version) => version.id === selectedVersionId) ?? null
   const diff = useMemo(() => buildDiff(comparison), [comparison])
 
   async function loadVersions(cursor?: string): Promise<void> {
@@ -166,23 +198,26 @@ export function ProjectHistoryPanel({
     setError('')
     try {
       const page = await window.projectVersions.list(projectHandle, cursor)
-      setVersions((current) => cursor ? [...current, ...page.versions] : page.versions)
+      setVersions((current) =>
+        cursor ? [...current, ...page.versions] : page.versions,
+      )
       setNextCursor(page.nextCursor)
       if (!cursor) {
-        const nextVersion = page.versions.find(
-          (version) => version.id === selectedVersionIdRef.current
-        )
-          ?? page.versions[0]
-          ?? null
+        const nextVersion =
+          page.versions.find(
+            (version) => version.id === selectedVersionIdRef.current,
+          ) ??
+          page.versions[0] ??
+          null
         const nextPath = nextVersion?.changes.some(
-          (change) => change.path === selectedPathRef.current
+          (change) => change.path === selectedPathRef.current,
         )
           ? selectedPathRef.current
-          : nextVersion?.changes[0]?.path ?? null
+          : (nextVersion?.changes[0]?.path ?? null)
         const retainedCheckedPaths = new Set(
           nextVersion?.changes
             .map((change) => change.path)
-            .filter((path) => checkedPathsRef.current.has(path))
+            .filter((path) => checkedPathsRef.current.has(path)),
         )
         setSelectedVersionId(nextVersion?.id ?? null)
         setSelectedPath(nextPath)
@@ -191,11 +226,13 @@ export function ProjectHistoryPanel({
             ? retainedCheckedPaths
             : nextPath
               ? new Set([nextPath])
-              : new Set()
+              : new Set(),
         )
       }
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '无法读取版本历史')
+      setError(
+        loadError instanceof Error ? loadError.message : '无法读取版本历史',
+      )
     } finally {
       setIsLoading(false)
       setIsLoadingMore(false)
@@ -206,9 +243,13 @@ export function ProjectHistoryPanel({
     void loadVersions()
   }, [projectHandle])
 
-  useEffect(() => window.projectVersions.onCreated((event) => {
-    if (event.projectHandle === projectHandle) void loadVersions()
-  }), [projectHandle])
+  useEffect(
+    () =>
+      window.projectVersions.onCreated((event) => {
+        if (event.projectHandle === projectHandle) void loadVersions()
+      }),
+    [projectHandle],
+  )
 
   useEffect(() => {
     if (!selectedVersionId || !selectedPath) {
@@ -218,20 +259,28 @@ export function ProjectHistoryPanel({
     let active = true
     setIsComparing(true)
     setError('')
-    void window.projectVersions.compareFile(projectHandle, {
-      versionId: selectedVersionId,
-      path: selectedPath,
-      target: comparisonTarget
-    }).then((result) => {
-      if (active) setComparison(result)
-    }).catch((comparisonError: unknown) => {
-      if (active) {
-        setComparison(null)
-        setError(comparisonError instanceof Error ? comparisonError.message : '无法比较文件版本')
-      }
-    }).finally(() => {
-      if (active) setIsComparing(false)
-    })
+    void window.projectVersions
+      .compareFile(projectHandle, {
+        versionId: selectedVersionId,
+        path: selectedPath,
+        target: comparisonTarget,
+      })
+      .then((result) => {
+        if (active) setComparison(result)
+      })
+      .catch((comparisonError: unknown) => {
+        if (active) {
+          setComparison(null)
+          setError(
+            comparisonError instanceof Error
+              ? comparisonError.message
+              : '无法比较文件版本',
+          )
+        }
+      })
+      .finally(() => {
+        if (active) setIsComparing(false)
+      })
     return () => {
       active = false
     }
@@ -240,7 +289,9 @@ export function ProjectHistoryPanel({
   function selectVersion(version: ProjectVersionSummary): void {
     setSelectedVersionId(version.id)
     setSelectedPath(version.changes[0]?.path ?? null)
-    setCheckedPaths(version.changes[0] ? new Set([version.changes[0].path]) : new Set())
+    setCheckedPaths(
+      version.changes[0] ? new Set([version.changes[0].path]) : new Set(),
+    )
     setComparisonTarget('previous')
     setNotice('')
   }
@@ -265,30 +316,38 @@ export function ProjectHistoryPanel({
     setError('')
     setNotice('')
     try {
-      const comparisons = await Promise.all(paths.map((path) =>
-        window.projectVersions.compareFile(projectHandle, {
-          versionId: selectedVersion.id,
-          path,
-          target: 'current'
-        })
-      ))
+      const comparisons = await Promise.all(
+        paths.map((path) =>
+          window.projectVersions.compareFile(projectHandle, {
+            versionId: selectedVersion.id,
+            path,
+            target: 'current',
+          }),
+        ),
+      )
       const result = await window.projectVersions.restore(projectHandle, {
         versionId: selectedVersion.id,
         files: comparisons.map((item) => ({
           path: item.path,
-          currentRevision: item.currentRevision
-        }))
+          currentRevision: item.currentRevision,
+        })),
       })
       if (!result.ok) {
         setError(`文件已再次变化，未恢复：${result.paths.join('、')}`)
         return
       }
-      setNotice(result.restoredPaths.length > 0
-        ? `已恢复 ${result.restoredPaths.length} 个文件，版本历史已同步。`
-        : '所选文件已经是该版本状态。')
+      setNotice(
+        result.restoredPaths.length > 0
+          ? `已恢复 ${result.restoredPaths.length} 个文件，版本历史已同步。`
+          : '所选文件已经是该版本状态。',
+      )
       await loadVersions()
     } catch (restoreError) {
-      setError(restoreError instanceof Error ? restoreError.message : '无法恢复所选版本')
+      setError(
+        restoreError instanceof Error
+          ? restoreError.message
+          : '无法恢复所选版本',
+      )
     } finally {
       onRestoreSettled(paths)
       setIsRestoring(false)
@@ -298,7 +357,10 @@ export function ProjectHistoryPanel({
   let lastDay = ''
 
   return (
-    <section className="project-history" aria-labelledby="project-history-title">
+    <section
+      className="project-history"
+      aria-labelledby="project-history-title"
+    >
       <aside className="history-timeline">
         <header className="history-timeline-heading">
           <div>
@@ -311,14 +373,18 @@ export function ProjectHistoryPanel({
             title="刷新版本历史"
             onClick={() => void loadVersions()}
             disabled={isLoading}
-          >↻</button>
+          >
+            ↻
+          </button>
         </header>
 
         <div className="history-timeline-scroll">
           {isLoading ? (
             <p className="history-state">正在读取版本…</p>
           ) : error && versions.length === 0 ? (
-            <p className="history-state history-state-error" role="alert">{error}</p>
+            <p className="history-state history-state-error" role="alert">
+              {error}
+            </p>
           ) : versions.length === 0 ? (
             <div className="history-empty">
               <HistoryIcon />
@@ -335,13 +401,18 @@ export function ProjectHistoryPanel({
                   <div className="history-version-group" key={version.id}>
                     {showDay ? <h3>{day}</h3> : null}
                     <button
-                      className={version.id === selectedVersionId
-                        ? 'history-version history-version-active'
-                        : 'history-version'}
+                      className={
+                        version.id === selectedVersionId
+                          ? 'history-version history-version-active'
+                          : 'history-version'
+                      }
                       type="button"
                       onClick={() => selectVersion(version)}
                     >
-                      <span className="history-version-node" aria-hidden="true" />
+                      <span
+                        className="history-version-node"
+                        aria-hidden="true"
+                      />
                       <span className="history-version-copy">
                         <strong>{versionTime(version.createdAt)}</strong>
                         <span>{sourceText(version.sources)}</span>
@@ -357,12 +428,16 @@ export function ProjectHistoryPanel({
                   type="button"
                   disabled={isLoadingMore}
                   onClick={() => void loadVersions(nextCursor)}
-                >{isLoadingMore ? '正在加载…' : '加载更早版本'}</button>
+                >
+                  {isLoadingMore ? '正在加载…' : '加载更早版本'}
+                </button>
               ) : null}
             </div>
           )}
         </div>
-        <p className="history-scope-note">外部应用的修改会及时刷新，但不会自动记入这里。</p>
+        <p className="history-scope-note">
+          外部应用的修改会及时刷新，但不会自动记入这里。
+        </p>
       </aside>
 
       <section className="history-detail">
@@ -379,18 +454,35 @@ export function ProjectHistoryPanel({
                 type="button"
                 disabled={checkedPaths.size === 0 || isRestoring}
                 onClick={() => void restoreSelectedFiles()}
-              >{isRestoring ? '正在恢复…' : `恢复所选文件${checkedPaths.size ? ` (${checkedPaths.size})` : ''}`}</button>
+              >
+                {isRestoring
+                  ? '正在恢复…'
+                  : `恢复所选文件${checkedPaths.size ? ` (${checkedPaths.size})` : ''}`}
+              </button>
             </header>
 
-            {error ? <p className="history-feedback history-feedback-error" role="alert">{error}</p> : null}
-            {notice ? <p className="history-feedback" role="status">{notice}</p> : null}
+            {error ? (
+              <p
+                className="history-feedback history-feedback-error"
+                role="alert"
+              >
+                {error}
+              </p>
+            ) : null}
+            {notice ? (
+              <p className="history-feedback" role="status">
+                {notice}
+              </p>
+            ) : null}
 
             <div className="history-file-strip" aria-label="此版本修改的文件">
               {selectedVersion.changes.map((change) => (
                 <div
-                  className={change.path === selectedPath
-                    ? 'history-file history-file-active'
-                    : 'history-file'}
+                  className={
+                    change.path === selectedPath
+                      ? 'history-file history-file-active'
+                      : 'history-file'
+                  }
                   key={change.path}
                 >
                   <label title={`选择恢复 ${change.path}`}>
@@ -399,32 +491,55 @@ export function ProjectHistoryPanel({
                       checked={checkedPaths.has(change.path)}
                       onChange={() => toggleCheckedPath(change.path)}
                     />
-                    <span className={`history-file-kind history-file-kind-${change.kind}`}>
+                    <span
+                      className={`history-file-kind history-file-kind-${change.kind}`}
+                    >
                       <FileChangeIcon kind={change.kind} />
                     </span>
                   </label>
-                  <button type="button" title={change.path} onClick={() => setSelectedPath(change.path)}>
+                  <button
+                    type="button"
+                    title={change.path}
+                    onClick={() => setSelectedPath(change.path)}
+                  >
                     <strong>{fileName(change.path)}</strong>
-                    <small>{changeLabels[change.kind]} · {change.path}</small>
+                    <small>
+                      {changeLabels[change.kind]} · {change.path}
+                    </small>
                   </button>
                 </div>
               ))}
             </div>
 
             <div className="history-comparison-bar">
-              <div className="history-comparison-switch" aria-label="版本比较方式">
+              <div
+                className="history-comparison-switch"
+                aria-label="版本比较方式"
+              >
                 <button
-                  className={comparisonTarget === 'previous' ? 'history-comparison-active' : ''}
+                  className={
+                    comparisonTarget === 'previous'
+                      ? 'history-comparison-active'
+                      : ''
+                  }
                   type="button"
                   aria-pressed={comparisonTarget === 'previous'}
                   onClick={() => setComparisonTarget('previous')}
-                >本次改动</button>
+                >
+                  本次改动
+                </button>
                 <button
-                  className={comparisonTarget === 'current' ? 'history-comparison-active' : ''}
+                  className={
+                    comparisonTarget === 'current'
+                      ? 'history-comparison-active'
+                      : ''
+                  }
                   type="button"
                   aria-pressed={comparisonTarget === 'current'}
                   onClick={() => setComparisonTarget('current')}
-                >与当前比较</button>
+                >
+                  与当前比较
+                </button>
               </div>
               <span>{selectedPath ?? '请选择文件'}</span>
             </div>
@@ -434,17 +549,29 @@ export function ProjectHistoryPanel({
                 <p className="history-state">正在生成差异…</p>
               ) : !comparison ? (
                 <p className="history-state">请选择要查看的文件。</p>
-              ) : previewMessage(comparison.before) ?? previewMessage(comparison.after) ? (
+              ) : (previewMessage(comparison.before) ??
+                previewMessage(comparison.after)) ? (
                 <div className="history-diff-unavailable">
                   <FileChangeIcon kind="modified" />
                   <h3>无法显示文本差异</h3>
-                  <p>{previewMessage(comparison.before) ?? previewMessage(comparison.after)}</p>
+                  <p>
+                    {previewMessage(comparison.before) ??
+                      previewMessage(comparison.after)}
+                  </p>
                   <p>仍可将文件恢复为所选版本状态。</p>
                 </div>
               ) : diff?.length ? (
-                <div className="history-diff-lines" role="table" aria-label="文件差异">
+                <div
+                  className="history-diff-lines"
+                  role="table"
+                  aria-label="文件差异"
+                >
                   {diff.map((line, index) => (
-                    <div className={`history-diff-line history-diff-line-${line.kind}`} role="row" key={`${index}-${line.kind}`}>
+                    <div
+                      className={`history-diff-line history-diff-line-${line.kind}`}
+                      role="row"
+                      key={`${index}-${line.kind}`}
+                    >
                       <span role="cell">{line.oldLine ?? ''}</span>
                       <span role="cell">{line.newLine ?? ''}</span>
                       <span role="cell">{line.marker}</span>

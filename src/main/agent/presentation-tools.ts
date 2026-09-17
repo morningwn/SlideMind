@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { ExtensionFactory } from '@earendil-works/pi-coding-agent'
 import {
   type PptistElement,
-  type PresentationDocument
+  type PresentationDocument,
 } from '../../shared/presentation'
 import type { PresentationService } from '../presentation/presentation-service'
 import type { renderPresentationSlides } from '../presentation/presentation-renderer'
@@ -15,57 +15,57 @@ type SlideInput = {
   background?: string
   elements: Array<
     | {
-      type: 'text'
-      x: number
-      y: number
-      width: number
-      height: number
-      rotation?: number
-      text: string
-      fontSize?: number
-      fontFamily?: string
-      color?: string
-      bold?: boolean
-      italic?: boolean
-    }
+        type: 'text'
+        x: number
+        y: number
+        width: number
+        height: number
+        rotation?: number
+        text: string
+        fontSize?: number
+        fontFamily?: string
+        color?: string
+        bold?: boolean
+        italic?: boolean
+      }
     | {
-      type: 'shape'
-      x: number
-      y: number
-      width: number
-      height: number
-      rotation?: number
-      shape?: string
-      text?: string
-      fill?: string
-      lineColor?: string
-      lineWidth?: number
-      fontSize?: number
-      color?: string
-    }
+        type: 'shape'
+        x: number
+        y: number
+        width: number
+        height: number
+        rotation?: number
+        shape?: string
+        text?: string
+        fill?: string
+        lineColor?: string
+        lineWidth?: number
+        fontSize?: number
+        color?: string
+      }
     | {
-      type: 'line'
-      x1: number
-      y1: number
-      x2: number
-      y2: number
-      color?: string
-      lineWidth?: number
-      style?: 'solid' | 'dashed' | 'dotted'
-      routing?: 'straight' | 'orthogonal'
-      startMarker?: 'none' | 'arrow' | 'dot'
-      endMarker?: 'none' | 'arrow' | 'dot'
-    }
+        type: 'line'
+        x1: number
+        y1: number
+        x2: number
+        y2: number
+        color?: string
+        lineWidth?: number
+        style?: 'solid' | 'dashed' | 'dotted'
+        routing?: 'straight' | 'orthogonal'
+        startMarker?: 'none' | 'arrow' | 'dot'
+        endMarker?: 'none' | 'arrow' | 'dot'
+      }
     | {
-      type: 'image'
-      x: number
-      y: number
-      width: number
-      height: number
-      rotation?: number
-      source: string
-      alt?: string
-    }
+        type: 'image'
+        x: number
+        y: number
+        width: number
+        height: number
+        rotation?: number
+        source: string
+        alt?: string
+      }
   >
 }
 
@@ -81,20 +81,25 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
-function textHtml(value: string, options?: {
-  bold?: boolean
-  color?: string
-  fontFamily?: string
-  fontSize?: number
-  italic?: boolean
-}): string {
+function textHtml(
+  value: string,
+  options?: {
+    bold?: boolean
+    color?: string
+    fontFamily?: string
+    fontSize?: number
+    italic?: boolean
+  },
+): string {
   const styles = [
     options?.fontSize ? `font-size: ${options.fontSize}px` : '',
     options?.fontFamily ? `font-family: ${escapeHtml(options.fontFamily)}` : '',
     options?.color ? `color: ${escapeHtml(options.color)}` : '',
     options?.bold ? 'font-weight: bold' : '',
-    options?.italic ? 'font-style: italic' : ''
-  ].filter(Boolean).join('; ')
+    options?.italic ? 'font-style: italic' : '',
+  ]
+    .filter(Boolean)
+    .join('; ')
   const content = escapeHtml(value).replace(/\r?\n/g, '<br>')
   return `<p${styles ? ` style="${styles}"` : ''}>${content}</p>`
 }
@@ -128,9 +133,9 @@ function createElement(element: SlideInput['elements'][number]): PptistElement {
       ...(routing === 'orthogonal' && deltaX > 0 && deltaY > 0
         ? {
             broken2: [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2],
-            broken2Direction: deltaX >= deltaY ? 'horizontal' : 'vertical'
+            broken2Direction: deltaX >= deltaY ? 'horizontal' : 'vertical',
           }
-        : {})
+        : {}),
     }
   }
 
@@ -140,7 +145,7 @@ function createElement(element: SlideInput['elements'][number]): PptistElement {
     top: element.y,
     width: element.width,
     height: element.height,
-    rotate: element.rotation ?? 0
+    rotate: element.rotation ?? 0,
   }
   if (element.type === 'text') {
     return {
@@ -148,7 +153,7 @@ function createElement(element: SlideInput['elements'][number]): PptistElement {
       type: 'text',
       content: textHtml(element.text, element),
       defaultFontName: element.fontFamily ?? '',
-      defaultColor: element.color ?? '#333333'
+      defaultColor: element.color ?? '#333333',
     }
   }
   if (element.type === 'shape') {
@@ -163,19 +168,19 @@ function createElement(element: SlideInput['elements'][number]): PptistElement {
       outline: {
         color: element.lineColor ?? '#8EA4CC',
         width: element.lineWidth ?? 1,
-        style: 'solid'
+        style: 'solid',
       },
       text: element.text
         ? {
             content: textHtml(element.text, {
               color: element.color,
-              fontSize: element.fontSize
+              fontSize: element.fontSize,
             }),
             defaultFontName: '',
             defaultColor: element.color ?? '#333333',
-            align: 'middle'
+            align: 'middle',
           }
-        : undefined
+        : undefined,
     }
   }
   if (!element.source.startsWith('data:image/')) {
@@ -186,14 +191,14 @@ function createElement(element: SlideInput['elements'][number]): PptistElement {
     type: 'image',
     src: element.source,
     fixedRatio: false,
-    name: element.alt ?? ''
+    name: element.alt ?? '',
   }
 }
 
 function slidesToDocument(
   current: PresentationDocument,
   title: string,
-  slides: SlideInput[]
+  slides: SlideInput[],
 ): PresentationDocument {
   return {
     ...current,
@@ -206,56 +211,72 @@ function slidesToDocument(
         ...(slide.background
           ? { background: { type: 'solid', color: slide.background } }
           : {}),
-        name: slide.title
-      }))
-    }
+        name: slide.title,
+      })),
+    },
   }
 }
 
-async function embedProjectImages(projectPath: string, slides: SlideInput[]): Promise<SlideInput[]> {
-  return Promise.all(slides.map(async (slide) => ({
-    ...slide,
-    elements: await Promise.all(slide.elements.map(async (element) => {
-      if (element.type !== 'image' || element.source.startsWith('data:image/')) return element
+async function embedProjectImages(
+  projectPath: string,
+  slides: SlideInput[],
+): Promise<SlideInput[]> {
+  return Promise.all(
+    slides.map(async (slide) => ({
+      ...slide,
+      elements: await Promise.all(
+        slide.elements.map(async (element) => {
+          if (
+            element.type !== 'image' ||
+            element.source.startsWith('data:image/')
+          )
+            return element
 
-      const image = await readProjectImageFile(projectPath, element.source)
-      return { ...element, source: image.dataUrl }
-    }))
-  })))
+          const image = await readProjectImageFile(projectPath, element.source)
+          return { ...element, source: image.dataUrl }
+        }),
+      ),
+    })),
+  )
 }
 
 function plainText(value: unknown): string {
   return typeof value === 'string'
-    ? value.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '').trim()
+    ? value
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<[^>]*>/g, '')
+        .trim()
     : ''
 }
 
 function tableRows(value: unknown): string[][] | undefined {
   if (!Array.isArray(value)) return undefined
-  return value.map((row) => Array.isArray(row)
-    ? row.map((cell) => {
-        if (typeof cell === 'string') return plainText(cell)
-        if (!cell || typeof cell !== 'object') return ''
-        return plainText((cell as Record<string, unknown>).text)
-      })
-    : []
+  return value.map((row) =>
+    Array.isArray(row)
+      ? row.map((cell) => {
+          if (typeof cell === 'string') return plainText(cell)
+          if (!cell || typeof cell !== 'object') return ''
+          return plainText((cell as Record<string, unknown>).text)
+        })
+      : [],
   )
 }
 
 function chartData(value: unknown): Record<string, unknown> | undefined {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return undefined
   const data = value as Record<string, unknown>
   return {
     labels: Array.isArray(data.labels) ? data.labels : [],
     legends: Array.isArray(data.legends) ? data.legends : [],
-    series: Array.isArray(data.series) ? data.series : []
+    series: Array.isArray(data.series) ? data.series : [],
   }
 }
 
 function presentationSummary(
   document: PresentationDocument,
   startSlideInput = 1,
-  endSlideInput?: number
+  endSlideInput?: number,
 ): Record<string, unknown> {
   const presentation = document.presentation
   const totalSlideCount = presentation.slides.length
@@ -265,7 +286,7 @@ function presentationSummary(
   const startSlide = Math.max(1, startSlideInput)
   const endSlide = Math.min(
     totalSlideCount,
-    endSlideInput ?? startSlide + MAX_SLIDES_PER_READ - 1
+    endSlideInput ?? startSlide + MAX_SLIDES_PER_READ - 1,
   )
   if (endSlide < startSlide) throw new Error('结束页不能早于起始页')
   if (endSlide - startSlide + 1 > MAX_SLIDES_PER_READ) {
@@ -279,67 +300,81 @@ function presentationSummary(
     startSlide,
     endSlide,
     truncated: startSlide > 1 || endSlide < totalSlideCount,
-    slides: presentation.slides.slice(startSlide - 1, endSlide).map((slide, index) => ({
-      number: startSlide + index,
-      id: slide.id,
-      title: typeof slide.name === 'string' ? slide.name : `第 ${startSlide + index} 页`,
-      notes: plainText(slide.remark),
-      background: typeof slide.background === 'object' ? slide.background : undefined,
-      elements: slide.elements.map((element) => {
-        if (element.type === 'line') {
-          const start = Array.isArray(element.start) ? element.start : [0, 0]
-          const end = Array.isArray(element.end) ? element.end : [0, 0]
+    slides: presentation.slides
+      .slice(startSlide - 1, endSlide)
+      .map((slide, index) => ({
+        number: startSlide + index,
+        id: slide.id,
+        title:
+          typeof slide.name === 'string'
+            ? slide.name
+            : `第 ${startSlide + index} 页`,
+        notes: plainText(slide.remark),
+        background:
+          typeof slide.background === 'object' ? slide.background : undefined,
+        elements: slide.elements.map((element) => {
+          if (element.type === 'line') {
+            const start = Array.isArray(element.start) ? element.start : [0, 0]
+            const end = Array.isArray(element.end) ? element.end : [0, 0]
+            return {
+              id: element.id,
+              type: element.type,
+              x1: element.left + Number(start[0]),
+              y1: element.top + Number(start[1]),
+              x2: element.left + Number(end[0]),
+              y2: element.top + Number(end[1]),
+              color: element.color,
+              lineWidth: element.width,
+              style: element.style,
+              markers: element.points,
+              routing: element.broken2
+                ? 'orthogonal'
+                : element.broken || element.curve || element.cubic
+                  ? 'unsupported'
+                  : 'straight',
+            }
+          }
           return {
             id: element.id,
             type: element.type,
-            x1: element.left + Number(start[0]),
-            y1: element.top + Number(start[1]),
-            x2: element.left + Number(end[0]),
-            y2: element.top + Number(end[1]),
-            color: element.color,
-            lineWidth: element.width,
-            style: element.style,
-            markers: element.points,
-            routing: element.broken2
-              ? 'orthogonal'
-              : element.broken || element.curve || element.cubic ? 'unsupported' : 'straight'
+            x: element.left,
+            y: element.top,
+            width: element.width,
+            height: element.height,
+            rotation: element.rotate ?? 0,
+            text:
+              plainText(element.content) ||
+              (typeof element.text === 'object' && element.text !== null
+                ? plainText((element.text as Record<string, unknown>).content)
+                : ''),
+            table:
+              element.type === 'table' ? tableRows(element.data) : undefined,
+            chart:
+              element.type === 'chart'
+                ? {
+                    chartType: element.chartType,
+                    data: chartData(element.data),
+                  }
+                : undefined,
+            formula: element.type === 'latex' ? element.latex : undefined,
+            fill: element.fill,
+            image:
+              element.type === 'image'
+                ? {
+                    embedded: true,
+                    alt: typeof element.name === 'string' ? element.name : '',
+                  }
+                : undefined,
           }
-        }
-        return {
-          id: element.id,
-          type: element.type,
-          x: element.left,
-          y: element.top,
-          width: element.width,
-          height: element.height,
-          rotation: element.rotate ?? 0,
-          text: plainText(element.content) || (
-            typeof element.text === 'object' && element.text !== null
-              ? plainText((element.text as Record<string, unknown>).content)
-              : ''
-          ),
-          table: element.type === 'table' ? tableRows(element.data) : undefined,
-          chart: element.type === 'chart'
-            ? {
-                chartType: element.chartType,
-                data: chartData(element.data)
-              }
-            : undefined,
-          formula: element.type === 'latex' ? element.latex : undefined,
-          fill: element.fill,
-          image: element.type === 'image'
-            ? { embedded: true, alt: typeof element.name === 'string' ? element.name : '' }
-            : undefined
-        }
-      })
-    }))
+        }),
+      })),
   }
 }
 
 function toolText(value: unknown) {
   return {
     content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }],
-    details: value
+    details: value,
   }
 }
 
@@ -358,164 +393,213 @@ export function createPresentationToolsExtension(options: {
       y: Type.Number({ minimum: 0, maximum: 100_000 }),
       width: Type.Number({ exclusiveMinimum: 0, maximum: 100_000 }),
       height: Type.Number({ exclusiveMinimum: 0, maximum: 100_000 }),
-      rotation: Type.Optional(Type.Number({ minimum: -360, maximum: 360 }))
+      rotation: Type.Optional(Type.Number({ minimum: -360, maximum: 360 })),
     }
-    const textElementSchema = Type.Object({
-      type: Type.Literal('text'),
-      ...elementBase,
-      text: Type.String({ maxLength: 50_000 }),
-      fontSize: Type.Optional(Type.Number({ minimum: 1, maximum: 400 })),
-      fontFamily: Type.Optional(Type.String({ maxLength: 200 })),
-      color: Type.Optional(Type.String({ maxLength: 100 })),
-      bold: Type.Optional(Type.Boolean()),
-      italic: Type.Optional(Type.Boolean())
-    }, { additionalProperties: false })
-    const shapeElementSchema = Type.Object({
-      type: Type.Literal('shape'),
-      ...elementBase,
-      shape: Type.Optional(Type.String({ maxLength: 100 })),
-      text: Type.Optional(Type.String({ maxLength: 50_000 })),
-      fill: Type.Optional(Type.String({ maxLength: 100 })),
-      lineColor: Type.Optional(Type.String({ maxLength: 100 })),
-      lineWidth: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
-      fontSize: Type.Optional(Type.Number({ minimum: 1, maximum: 400 })),
-      color: Type.Optional(Type.String({ maxLength: 100 }))
-    }, { additionalProperties: false })
+    const textElementSchema = Type.Object(
+      {
+        type: Type.Literal('text'),
+        ...elementBase,
+        text: Type.String({ maxLength: 50_000 }),
+        fontSize: Type.Optional(Type.Number({ minimum: 1, maximum: 400 })),
+        fontFamily: Type.Optional(Type.String({ maxLength: 200 })),
+        color: Type.Optional(Type.String({ maxLength: 100 })),
+        bold: Type.Optional(Type.Boolean()),
+        italic: Type.Optional(Type.Boolean()),
+      },
+      { additionalProperties: false },
+    )
+    const shapeElementSchema = Type.Object(
+      {
+        type: Type.Literal('shape'),
+        ...elementBase,
+        shape: Type.Optional(Type.String({ maxLength: 100 })),
+        text: Type.Optional(Type.String({ maxLength: 50_000 })),
+        fill: Type.Optional(Type.String({ maxLength: 100 })),
+        lineColor: Type.Optional(Type.String({ maxLength: 100 })),
+        lineWidth: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
+        fontSize: Type.Optional(Type.Number({ minimum: 1, maximum: 400 })),
+        color: Type.Optional(Type.String({ maxLength: 100 })),
+      },
+      { additionalProperties: false },
+    )
     const lineMarkerSchema = Type.Union([
       Type.Literal('none'),
       Type.Literal('arrow'),
-      Type.Literal('dot')
+      Type.Literal('dot'),
     ])
-    const lineElementSchema = Type.Object({
-      type: Type.Literal('line'),
-      x1: Type.Number({ minimum: 0, maximum: 100_000 }),
-      y1: Type.Number({ minimum: 0, maximum: 100_000 }),
-      x2: Type.Number({ minimum: 0, maximum: 100_000 }),
-      y2: Type.Number({ minimum: 0, maximum: 100_000 }),
-      color: Type.Optional(Type.String({ maxLength: 100 })),
-      lineWidth: Type.Optional(Type.Number({ minimum: 0.5, maximum: 100 })),
-      style: Type.Optional(Type.Union([
-        Type.Literal('solid'),
-        Type.Literal('dashed'),
-        Type.Literal('dotted')
-      ])),
-      routing: Type.Optional(Type.Union([
-        Type.Literal('straight'),
-        Type.Literal('orthogonal')
-      ])),
-      startMarker: Type.Optional(lineMarkerSchema),
-      endMarker: Type.Optional(lineMarkerSchema)
-    }, { additionalProperties: false })
-    const imageElementSchema = Type.Object({
-      type: Type.Literal('image'),
-      ...elementBase,
-      source: Type.String({
-        maxLength: 40_000_000,
-        description: '项目内图片的相对路径，或 data:image/... URL'
-      }),
-      alt: Type.Optional(Type.String({ maxLength: 2_000 }))
-    }, { additionalProperties: false })
-    const slideSchema = Type.Object({
-      title: Type.String({ minLength: 1, maxLength: 10_000 }),
-      background: Type.Optional(Type.String({ maxLength: 100 })),
-      elements: Type.Array(
-        Type.Union([
-          textElementSchema,
-          shapeElementSchema,
-          lineElementSchema,
-          imageElementSchema
-        ]),
-        { maxItems: 5_000 }
-      )
-    }, { additionalProperties: false })
+    const lineElementSchema = Type.Object(
+      {
+        type: Type.Literal('line'),
+        x1: Type.Number({ minimum: 0, maximum: 100_000 }),
+        y1: Type.Number({ minimum: 0, maximum: 100_000 }),
+        x2: Type.Number({ minimum: 0, maximum: 100_000 }),
+        y2: Type.Number({ minimum: 0, maximum: 100_000 }),
+        color: Type.Optional(Type.String({ maxLength: 100 })),
+        lineWidth: Type.Optional(Type.Number({ minimum: 0.5, maximum: 100 })),
+        style: Type.Optional(
+          Type.Union([
+            Type.Literal('solid'),
+            Type.Literal('dashed'),
+            Type.Literal('dotted'),
+          ]),
+        ),
+        routing: Type.Optional(
+          Type.Union([Type.Literal('straight'), Type.Literal('orthogonal')]),
+        ),
+        startMarker: Type.Optional(lineMarkerSchema),
+        endMarker: Type.Optional(lineMarkerSchema),
+      },
+      { additionalProperties: false },
+    )
+    const imageElementSchema = Type.Object(
+      {
+        type: Type.Literal('image'),
+        ...elementBase,
+        source: Type.String({
+          maxLength: 40_000_000,
+          description: '项目内图片的相对路径，或 data:image/... URL',
+        }),
+        alt: Type.Optional(Type.String({ maxLength: 2_000 })),
+      },
+      { additionalProperties: false },
+    )
+    const slideSchema = Type.Object(
+      {
+        title: Type.String({ minLength: 1, maxLength: 10_000 }),
+        background: Type.Optional(Type.String({ maxLength: 100 })),
+        elements: Type.Array(
+          Type.Union([
+            textElementSchema,
+            shapeElementSchema,
+            lineElementSchema,
+            imageElementSchema,
+          ]),
+          { maxItems: 5_000 },
+        ),
+      },
+      { additionalProperties: false },
+    )
 
     pi.registerTool({
       name: 'slides_create',
       label: '新建演示文稿',
-      description: '在当前项目中新建一个 SlideMind/PPTist 演示文稿。文件名必须以 .slides.json 结尾。',
+      description:
+        '在当前项目中新建一个 SlideMind/PPTist 演示文稿。文件名必须以 .slides.json 结尾。',
       promptSnippet: 'Create an editable PPTist presentation.',
-      parameters: Type.Object({
-        file: Type.String({ minLength: 1, maxLength: 4096 }),
-        title: Type.Optional(Type.String({ minLength: 1, maxLength: 200 }))
-      }, { additionalProperties: false }),
+      parameters: Type.Object(
+        {
+          file: Type.String({ minLength: 1, maxLength: 4096 }),
+          title: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })),
+        },
+        { additionalProperties: false },
+      ),
       async execute(_toolCallId, params) {
         const created = await options.presentationService.create(
           options.projectPath,
           options.projectHandle,
           { path: params.file, title: params.title },
-          'agent'
+          'agent',
         )
         return toolText({
           file: created.path,
           revision: created.revision,
-          ...presentationSummary(created.document)
+          ...presentationSummary(created.document),
         })
-      }
+      },
     })
 
     pi.registerTool({
       name: 'slides_read',
       label: '读取演示文稿',
-      description: '读取 PPTist 演示文稿结构和当前修订号。写入前必须先读取并使用返回的 revision。',
+      description:
+        '读取 PPTist 演示文稿结构和当前修订号。写入前必须先读取并使用返回的 revision。',
       promptSnippet: 'Inspect an editable PPTist presentation.',
-      parameters: Type.Object({
-        file: Type.String({ minLength: 1, maxLength: 4096 }),
-        startSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
-        endSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 }))
-      }, { additionalProperties: false }),
+      parameters: Type.Object(
+        {
+          file: Type.String({ minLength: 1, maxLength: 4096 }),
+          startSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+          endSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+        },
+        { additionalProperties: false },
+      ),
       async execute(_toolCallId, params) {
-        const file = await options.presentationService.read(options.projectPath, params.file)
+        const file = await options.presentationService.read(
+          options.projectPath,
+          params.file,
+        )
         return toolText({
           file: file.path,
           revision: file.revision,
-          ...presentationSummary(file.document, params.startSlide, params.endSlide)
+          ...presentationSummary(
+            file.document,
+            params.startSlide,
+            params.endSlide,
+          ),
         })
-      }
+      },
     })
 
     pi.registerTool({
       name: 'slides_review',
       label: '审查演示文稿',
-      description: '对当前 PPTist 演示文稿执行只读自动预检，检查占位内容、越界、潜在文字溢出、内容重叠、图层遮挡、字号和图片体积。结果不替代真实渲染与人工语义审查。',
-      promptSnippet: 'Run deterministic preflight checks on an editable PPTist presentation.',
+      description:
+        '对当前 PPTist 演示文稿执行只读自动预检，检查占位内容、越界、潜在文字溢出、内容重叠、图层遮挡、字号和图片体积。结果不替代真实渲染与人工语义审查。',
+      promptSnippet:
+        'Run deterministic preflight checks on an editable PPTist presentation.',
       promptGuidelines: [
         'Run after generating or editing slides, before claiming the deck is ready.',
         'Treat pass as automated-structure pass only; report the returned manualChecks separately.',
-        'Use slides_read for narrative, factual, and wording review because slides_review only reports deterministic heuristics.'
+        'Use slides_read for narrative, factual, and wording review because slides_review only reports deterministic heuristics.',
       ],
-      parameters: Type.Object({
-        file: Type.String({ minLength: 1, maxLength: 4096 })
-      }, { additionalProperties: false }),
+      parameters: Type.Object(
+        {
+          file: Type.String({ minLength: 1, maxLength: 4096 }),
+        },
+        { additionalProperties: false },
+      ),
       async execute(_toolCallId, params) {
-        const file = await options.presentationService.read(options.projectPath, params.file)
+        const file = await options.presentationService.read(
+          options.projectPath,
+          params.file,
+        )
         return toolText({
           file: file.path,
           revision: file.revision,
-          ...reviewPresentationDocument(file.document)
+          ...reviewPresentationDocument(file.document),
         })
-      }
+      },
     })
 
     pi.registerTool({
       name: 'slides_render',
       label: '渲染幻灯片',
-      description: '使用真实 PPTist 渲染器把最多 4 页可编辑演示渲染为 PNG，并把图片返回给当前视觉模型。用于视觉层次、对比、留白、分组、阅读顺序和跨页一致性审查；非视觉模型不可用。',
-      promptSnippet: 'Render editable PPTist slides as images for visual inspection.',
+      description:
+        '使用真实 PPTist 渲染器把最多 4 页可编辑演示渲染为 PNG，并把图片返回给当前视觉模型。用于视觉层次、对比、留白、分组、阅读顺序和跨页一致性审查；非视觉模型不可用。',
+      promptSnippet:
+        'Render editable PPTist slides as images for visual inspection.',
       promptGuidelines: [
         'Use only when visual inspection is required and the current model supports image input.',
         'Inspect every returned image; cite the slide number and visible evidence for each visual finding.',
-        'Use slides_review separately for deterministic geometry and text checks.'
+        'Use slides_review separately for deterministic geometry and text checks.',
       ],
-      parameters: Type.Object({
-        file: Type.String({ minLength: 1, maxLength: 4096 }),
-        startSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
-        endSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 }))
-      }, { additionalProperties: false }),
+      parameters: Type.Object(
+        {
+          file: Type.String({ minLength: 1, maxLength: 4096 }),
+          startSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+          endSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+        },
+        { additionalProperties: false },
+      ),
       async execute(_toolCallId, params, signal) {
         if (!options.supportsVision) {
-          throw new Error('当前模型不支持图片理解，请切换到支持 image 输入的视觉模型后重试')
+          throw new Error(
+            '当前模型不支持图片理解，请切换到支持 image 输入的视觉模型后重试',
+          )
         }
-        const file = await options.presentationService.read(options.projectPath, params.file)
+        const file = await options.presentationService.read(
+          options.projectPath,
+          params.file,
+        )
         const totalSlideCount = file.document.presentation.slides.length
         const startSlide = params.startSlide ?? 1
         if (startSlide > totalSlideCount) {
@@ -523,20 +607,21 @@ export function createPresentationToolsExtension(options: {
         }
         const endSlide = Math.min(
           totalSlideCount,
-          params.endSlide ?? startSlide + MAX_SLIDES_PER_RENDER - 1
+          params.endSlide ?? startSlide + MAX_SLIDES_PER_RENDER - 1,
         )
         if (endSlide < startSlide) throw new Error('结束页不能早于起始页')
         if (endSlide - startSlide + 1 > MAX_SLIDES_PER_RENDER) {
           throw new Error(`单次最多渲染 ${MAX_SLIDES_PER_RENDER} 页幻灯片`)
         }
-        const renderSlides = options.renderSlides ?? (
-          await import('../presentation/presentation-renderer')
-        ).renderPresentationSlides
+        const renderSlides =
+          options.renderSlides ??
+          (await import('../presentation/presentation-renderer'))
+            .renderPresentationSlides
         const rendered = await renderSlides(
           file.document.presentation,
           startSlide,
           endSlide,
-          signal
+          signal,
         )
         const details = {
           file: file.path,
@@ -548,111 +633,138 @@ export function createPresentationToolsExtension(options: {
           renderedSlides: rendered.map((slide) => ({
             number: slide.number,
             width: slide.width,
-            height: slide.height
-          }))
+            height: slide.height,
+          })),
         }
         return {
           content: [
             {
               type: 'text' as const,
-              text: JSON.stringify(details, null, 2)
+              text: JSON.stringify(details, null, 2),
             },
             ...rendered.flatMap((slide) => [
               {
                 type: 'text' as const,
-                text: `第 ${slide.number} 页渲染图（${slide.width}×${slide.height}）`
+                text: `第 ${slide.number} 页渲染图（${slide.width}×${slide.height}）`,
               },
               {
                 type: 'image' as const,
                 data: slide.png.toString('base64'),
-                mimeType: 'image/png'
-              }
-            ])
+                mimeType: 'image/png',
+              },
+            ]),
           ],
-          details
+          details,
         }
-      }
+      },
     })
 
     pi.registerTool({
       name: 'pptx_read',
       label: '读取 PowerPoint',
-      description: '直接读取项目内原始 .pptx 文件的文字、备注、表格、图表、公式和媒体数量。不会修改或导入文件。',
+      description:
+        '直接读取项目内原始 .pptx 文件的文字、备注、表格、图表、公式和媒体数量。不会修改或导入文件。',
       promptSnippet: 'Read content from a project-local PowerPoint file.',
-      parameters: Type.Object({
-        file: Type.String({ minLength: 1, maxLength: 4096 }),
-        startSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
-        endSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 }))
-      }, { additionalProperties: false }),
+      parameters: Type.Object(
+        {
+          file: Type.String({ minLength: 1, maxLength: 4096 }),
+          startSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+          endSlide: Type.Optional(Type.Integer({ minimum: 1, maximum: 500 })),
+        },
+        { additionalProperties: false },
+      ),
       async execute(_toolCallId, params, signal) {
         const readPptx = options.readPptx ?? readProjectPptx
-        return toolText(await readPptx(
-          options.projectPath,
-          params.file,
-          params.startSlide,
-          params.endSlide,
-          signal
-        ))
-      }
+        return toolText(
+          await readPptx(
+            options.projectPath,
+            params.file,
+            params.startSlide,
+            params.endSlide,
+            signal,
+          ),
+        )
+      },
     })
 
     pi.registerTool({
       name: 'slides_write',
       label: '写入演示文稿',
-      description: '使用结构化页面替换 PPTist 演示文稿内容。revision 必须来自最近一次 slides_read。',
-      promptSnippet: 'Write structured PPTist slides with text, shapes, lines, and embedded images.',
+      description:
+        '使用结构化页面替换 PPTist 演示文稿内容。revision 必须来自最近一次 slides_read。',
+      promptSnippet:
+        'Write structured PPTist slides with text, shapes, lines, and embedded images.',
       promptGuidelines: [
         'Use a 1000×562.5 coordinate system unless slides_read reports another canvas size.',
         'Call slides_read immediately before slides_write and pass its revision.',
-        'For a local image in the project, set image source to its project-relative path; do not encode it yourself.'
+        'For a local image in the project, set image source to its project-relative path; do not encode it yourself.',
       ],
-      parameters: Type.Object({
-        file: Type.String({ minLength: 1, maxLength: 4096 }),
-        revision: Type.String({ pattern: '^[a-f0-9]{64}$' }),
-        title: Type.String({ minLength: 1, maxLength: 200 }),
-        slides: Type.Array(slideSchema, { minItems: 1, maxItems: 500 })
-      }, { additionalProperties: false }),
+      parameters: Type.Object(
+        {
+          file: Type.String({ minLength: 1, maxLength: 4096 }),
+          revision: Type.String({ pattern: '^[a-f0-9]{64}$' }),
+          title: Type.String({ minLength: 1, maxLength: 200 }),
+          slides: Type.Array(slideSchema, { minItems: 1, maxItems: 500 }),
+        },
+        { additionalProperties: false },
+      ),
       async execute(_toolCallId, params) {
-        const current = await options.presentationService.read(options.projectPath, params.file)
-        const slides = await embedProjectImages(options.projectPath, params.slides as SlideInput[])
-        const document = slidesToDocument(current.document, params.title, slides)
+        const current = await options.presentationService.read(
+          options.projectPath,
+          params.file,
+        )
+        const slides = await embedProjectImages(
+          options.projectPath,
+          params.slides as SlideInput[],
+        )
+        const document = slidesToDocument(
+          current.document,
+          params.title,
+          slides,
+        )
         const result = await options.presentationService.save(
           options.projectPath,
           options.projectHandle,
           { path: params.file, revision: params.revision, document },
-          'agent'
+          'agent',
         )
         if (!result.ok) {
-          throw new Error(`演示文稿已被修改，请重新调用 slides_read；当前修订号：${result.currentRevision}`)
+          throw new Error(
+            `演示文稿已被修改，请重新调用 slides_read；当前修订号：${result.currentRevision}`,
+          )
         }
         return toolText({
           file: params.file,
           revision: result.revision,
           slideCount: params.slides.length,
-          title: params.title
+          title: params.title,
         })
-      }
+      },
     })
 
     pi.registerTool({
       name: 'slides_export',
       label: '导出 PowerPoint',
-      description: '把当前项目中的 PPTist .slides.json 演示文稿导出为可编辑的 .pptx 文件。',
+      description:
+        '把当前项目中的 PPTist .slides.json 演示文稿导出为可编辑的 .pptx 文件。',
       promptSnippet: 'Export a PPTist presentation to PowerPoint.',
-      parameters: Type.Object({
-        file: Type.String({ minLength: 1, maxLength: 4096 }),
-        output: Type.Optional(Type.String({ minLength: 1, maxLength: 4096 }))
-      }, { additionalProperties: false }),
+      parameters: Type.Object(
+        {
+          file: Type.String({ minLength: 1, maxLength: 4096 }),
+          output: Type.Optional(Type.String({ minLength: 1, maxLength: 4096 })),
+        },
+        { additionalProperties: false },
+      ),
       async execute(_toolCallId, params, signal) {
         const result = await options.presentationService.export(
           options.projectPath,
           options.projectHandle,
           { path: params.file, outputPath: params.output },
           signal,
-          'agent'
+          'agent',
         )
         return toolText({ file: params.file, output: result.outputPath })
-      }
+      },
     })
   }
 }

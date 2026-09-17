@@ -3,7 +3,7 @@ import chokidar, { type FSWatcher } from 'chokidar'
 import type {
   ProjectExternalWatchScope,
   ProjectFileChangedEvent,
-  ProjectFileChangeKind
+  ProjectFileChangeKind,
 } from '../../shared/project'
 import { isVersionedProjectPath } from '../version-control/project-version-service'
 import type { ProjectMutationService } from '../version-control/project-mutation-service'
@@ -19,10 +19,17 @@ interface ProjectWatcher {
 }
 
 function isInsideProject(projectPath: string, candidatePath: string): boolean {
-  return candidatePath === projectPath || candidatePath.startsWith(`${projectPath}${sep}`)
+  return (
+    candidatePath === projectPath ||
+    candidatePath.startsWith(`${projectPath}${sep}`)
+  )
 }
 
-function normalizeScopePath(projectPath: string, value: unknown, allowEmpty: boolean): string {
+function normalizeScopePath(
+  projectPath: string,
+  value: unknown,
+  allowEmpty: boolean,
+): string {
   if (
     typeof value !== 'string' ||
     (!allowEmpty && !value.trim()) ||
@@ -33,14 +40,22 @@ function normalizeScopePath(projectPath: string, value: unknown, allowEmpty: boo
     throw new Error('外部变化监听路径无效')
   }
   const targetPath = resolve(projectPath, value)
-  if (!isInsideProject(projectPath, targetPath)) throw new Error('外部变化监听路径超出项目范围')
+  if (!isInsideProject(projectPath, targetPath))
+    throw new Error('外部变化监听路径超出项目范围')
   return relative(projectPath, targetPath)
 }
 
-function normalizeScope(projectPath: string, value: unknown): ProjectExternalWatchScope {
-  if (!value || typeof value !== 'object') throw new Error('外部变化监听范围无效')
+function normalizeScope(
+  projectPath: string,
+  value: unknown,
+): ProjectExternalWatchScope {
+  if (!value || typeof value !== 'object')
+    throw new Error('外部变化监听范围无效')
   const candidate = value as Partial<ProjectExternalWatchScope>
-  if (!Array.isArray(candidate.files) || !Array.isArray(candidate.directories)) {
+  if (
+    !Array.isArray(candidate.files) ||
+    !Array.isArray(candidate.directories)
+  ) {
     throw new Error('外部变化监听范围无效')
   }
   if (
@@ -50,10 +65,20 @@ function normalizeScope(projectPath: string, value: unknown): ProjectExternalWat
     throw new Error('外部变化监听范围过大')
   }
   return {
-    files: [...new Set(candidate.files.map((path) => normalizeScopePath(projectPath, path, false)))],
-    directories: [...new Set(candidate.directories.map(
-      (path) => normalizeScopePath(projectPath, path, true)
-    ))]
+    files: [
+      ...new Set(
+        candidate.files.map((path) =>
+          normalizeScopePath(projectPath, path, false),
+        ),
+      ),
+    ],
+    directories: [
+      ...new Set(
+        candidate.directories.map((path) =>
+          normalizeScopePath(projectPath, path, true),
+        ),
+      ),
+    ],
   }
 }
 
@@ -67,13 +92,15 @@ function changeKind(event: string): ProjectFileChangeKind | null {
 }
 
 export class ExternalChangeMonitor {
-  private readonly listeners = new Set<(event: ProjectFileChangedEvent) => void>()
+  private readonly listeners = new Set<
+    (event: ProjectFileChangedEvent) => void
+  >()
   private readonly scopeQueues = new Map<string, Promise<void>>()
   private readonly watchers = new Map<string, ProjectWatcher>()
 
   constructor(
     private readonly mutations: ProjectMutationService,
-    private readonly options: { usePolling?: boolean } = {}
+    private readonly options: { usePolling?: boolean } = {},
   ) {}
 
   onChanged(listener: (event: ProjectFileChangedEvent) => void): () => void {
@@ -84,17 +111,21 @@ export class ExternalChangeMonitor {
   setScope(
     projectPath: string,
     projectHandle: string,
-    scopeInput: unknown
+    scopeInput: unknown,
   ): Promise<void> {
     const previous = this.scopeQueues.get(projectHandle) ?? Promise.resolve()
     const result = previous.then(
       () => this.replaceScope(projectPath, projectHandle, scopeInput),
-      () => this.replaceScope(projectPath, projectHandle, scopeInput)
+      () => this.replaceScope(projectPath, projectHandle, scopeInput),
     )
-    const queue = result.then(() => undefined, () => undefined)
+    const queue = result.then(
+      () => undefined,
+      () => undefined,
+    )
     this.scopeQueues.set(projectHandle, queue)
     void queue.finally(() => {
-      if (this.scopeQueues.get(projectHandle) === queue) this.scopeQueues.delete(projectHandle)
+      if (this.scopeQueues.get(projectHandle) === queue)
+        this.scopeQueues.delete(projectHandle)
     })
     return result
   }
@@ -109,11 +140,14 @@ export class ExternalChangeMonitor {
   private async replaceScope(
     projectPath: string,
     projectHandle: string,
-    scopeInput: unknown
+    scopeInput: unknown,
   ): Promise<void> {
     const scope = normalizeScope(projectPath, scopeInput)
     const current = this.watchers.get(projectHandle)
-    if (current?.projectPath === projectPath && (scope.files.length || scope.directories.length)) {
+    if (
+      current?.projectPath === projectPath &&
+      (scope.files.length || scope.directories.length)
+    ) {
       return
     }
     if (current) {
@@ -133,8 +167,8 @@ export class ExternalChangeMonitor {
       atomic: true,
       awaitWriteFinish: {
         stabilityThreshold: 500,
-        pollInterval: 100
-      }
+        pollInterval: 100,
+      },
     })
     const registered: ProjectWatcher = { projectPath, watcher }
     this.watchers.set(projectHandle, registered)
@@ -150,7 +184,8 @@ export class ExternalChangeMonitor {
         watcher.once('error', rejectReady)
       })
     } catch (error) {
-      if (this.watchers.get(projectHandle) === registered) this.watchers.delete(projectHandle)
+      if (this.watchers.get(projectHandle) === registered)
+        this.watchers.delete(projectHandle)
       await watcher.close()
       throw error
     }
@@ -160,19 +195,20 @@ export class ExternalChangeMonitor {
     projectHandle: string,
     registered: ProjectWatcher,
     eventName: string,
-    absolutePath: string
+    absolutePath: string,
   ): Promise<void> {
     const kind = changeKind(eventName)
     if (!kind) return
     const path = relative(registered.projectPath, absolutePath)
     if (!path || !isVersionedProjectPath(path)) return
-    if (await this.mutations.isInternalEcho(registered.projectPath, path)) return
+    if (await this.mutations.isInternalEcho(registered.projectPath, path))
+      return
 
     const changedEvent: ProjectFileChangedEvent = {
       projectHandle,
       path,
       kind,
-      source: 'external'
+      source: 'external',
     }
     for (const listener of this.listeners) listener(changedEvent)
   }

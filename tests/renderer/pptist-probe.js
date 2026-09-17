@@ -11,14 +11,24 @@ window.addEventListener('message', async (event) => {
     store.slides[0].elements[0].content = `<p>${event.data.text}</p>`
     await nextTick()
     const watcherMs = performance.now() - start
-    requestAnimationFrame(() => window.parent.postMessage({
-      type: 'slidemind:test:edited', watcherMs, frameMs: performance.now() - start
-    }, '*'))
+    requestAnimationFrame(() =>
+      window.parent.postMessage(
+        {
+          type: 'slidemind:test:edited',
+          watcherMs,
+          frameMs: performance.now() - start,
+        },
+        '*',
+      ),
+    )
   }
   if (event.data?.type === 'slidemind:test:measure') {
     const presentation = {
-      title: store.title, theme: store.theme, slides: store.slides,
-      viewportSize: store.viewportSize, viewportRatio: store.viewportRatio
+      title: store.title,
+      theme: store.theme,
+      slides: store.slides,
+      viewportSize: store.viewportSize,
+      viewportRatio: store.viewportRatio,
     }
     const measure = (serialize) => {
       const start = performance.now()
@@ -28,14 +38,22 @@ window.addEventListener('message', async (event) => {
     const baseline = () => measure(JSON.stringify)
     const optimized = () => measure(serializePptistPresentation)
     const [before, after] = event.data.reverse
-      ? (() => { const after = optimized(); return [baseline(), after] })()
+      ? (() => {
+          const after = optimized()
+          return [baseline(), after]
+        })()
       : [baseline(), optimized()]
-    window.parent.postMessage({
-      type: 'slidemind:test:measured',
-      baselineSerializationMs: before.ms, serializationMs: after.ms,
-      bytes: new TextEncoder().encode(JSON.stringify(after.snapshot)).length,
-      equal: JSON.stringify(before.snapshot) === JSON.stringify(after.snapshot)
-    }, '*')
+    window.parent.postMessage(
+      {
+        type: 'slidemind:test:measured',
+        baselineSerializationMs: before.ms,
+        serializationMs: after.ms,
+        bytes: new TextEncoder().encode(JSON.stringify(after.snapshot)).length,
+        equal:
+          JSON.stringify(before.snapshot) === JSON.stringify(after.snapshot),
+      },
+      '*',
+    )
   }
 })
 window.parent.postMessage({ type: 'slidemind:test:probe-ready' }, '*')

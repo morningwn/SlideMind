@@ -27,7 +27,7 @@ export function AppTitleBar({
   onChooseProject,
   onOpenProject,
   platform,
-  recentProjects
+  recentProjects,
 }: AppTitleBarProps): React.JSX.Element {
   function changeProject(event: ChangeEvent<HTMLSelectElement>): void {
     const value = event.currentTarget.value
@@ -43,7 +43,12 @@ export function AppTitleBar({
   return (
     <header className={`app-title-bar app-title-bar-${platform}`}>
       <div className="title-bar-identity">
-        <img className="title-bar-icon" src={appIcon} alt="SlideMind" draggable={false} />
+        <img
+          className="title-bar-icon"
+          src={appIcon}
+          alt="SlideMind"
+          draggable={false}
+        />
         {activeProject ? (
           <label className="title-bar-project" title={activeProject.path}>
             <span className="sr-only">切换项目</span>
@@ -54,7 +59,9 @@ export function AppTitleBar({
               onChange={changeProject}
             >
               {recentProjects.map((project) => (
-                <option value={project.path} key={project.path}>{project.name}</option>
+                <option value={project.path} key={project.path}>
+                  {project.name}
+                </option>
               ))}
               <option value={CHOOSE_PROJECT_VALUE}>选择其他项目…</option>
             </select>

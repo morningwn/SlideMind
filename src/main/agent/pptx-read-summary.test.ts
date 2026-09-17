@@ -15,7 +15,10 @@ describe('summarizePptxBytes', () => {
     slide.addNotes('演讲者备注')
     await pptx.writeFile({ fileName: path, compression: true })
     const data = await readFile(path)
-    const bytes = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength)
+    const bytes = data.buffer.slice(
+      data.byteOffset,
+      data.byteOffset + data.byteLength,
+    )
 
     const summary = await summarizePptxBytes(bytes)
 
@@ -23,11 +26,13 @@ describe('summarizePptxBytes', () => {
       totalSlideCount: 1,
       startSlide: 1,
       endSlide: 1,
-      slides: [{
-        number: 1,
-        notes: '演讲者备注',
-        texts: ['产品路线图']
-      }]
+      slides: [
+        {
+          number: 1,
+          notes: '演讲者备注',
+          texts: ['产品路线图'],
+        },
+      ],
     })
   })
 })

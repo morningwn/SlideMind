@@ -7,7 +7,7 @@ import {
   createDiagnosticBundle,
   diagnosticBundleFileName,
   writeDiagnosticBundle,
-  type DiagnosticEnvironment
+  type DiagnosticEnvironment,
 } from './diagnostics'
 
 const temporaryDirectories: string[] = []
@@ -18,8 +18,8 @@ const environment: DiagnosticEnvironment = {
     chrome: '1',
     electron: '1',
     node: '1',
-    platform: 'darwin'
-  }
+    platform: 'darwin',
+  },
 }
 
 function gunzipBuffer(input: Buffer): Promise<Buffer> {
@@ -32,15 +32,17 @@ function gunzipBuffer(input: Buffer): Promise<Buffer> {
 }
 
 afterEach(async () => {
-  await Promise.all(temporaryDirectories.splice(0).map((path) =>
-    rm(path, { force: true, recursive: true })
-  ))
+  await Promise.all(
+    temporaryDirectories
+      .splice(0)
+      .map((path) => rm(path, { force: true, recursive: true })),
+  )
 })
 
 describe('diagnostic bundle', () => {
   it('uses a filesystem-safe timestamped name', () => {
     expect(diagnosticBundleFileName(new Date('2026-08-31T15:20:30.000Z'))).toBe(
-      'SlideMind-diagnostics-20260831T152030Z.json.gz'
+      'SlideMind-diagnostics-20260831T152030Z.json.gz',
     )
   })
 
@@ -49,7 +51,7 @@ describe('diagnostic bundle', () => {
     temporaryDirectories.push(directory)
     await writeFile(
       join(directory, 'slidemind.log'),
-      `{"event":"app.started","apiKey":"plain","path":"${homedir()}/project"}\n`
+      `{"event":"app.started","apiKey":"plain","path":"${homedir()}/project"}\n`,
     )
     await writeFile(join(directory, 'slidemind.1.log'), '{"event":"old"}\n')
     await writeFile(join(directory, 'unrelated.txt'), 'do not export')
@@ -57,12 +59,17 @@ describe('diagnostic bundle', () => {
     const compressed = await createDiagnosticBundle(
       directory,
       environment,
-      new Date('2026-08-31T15:20:30.000Z')
+      new Date('2026-08-31T15:20:30.000Z'),
     )
-    const bundle = JSON.parse((await gunzipBuffer(compressed)).toString('utf8')) as {
+    const bundle = JSON.parse(
+      (await gunzipBuffer(compressed)).toString('utf8'),
+    ) as {
       application: unknown
       generatedAt: string
-      logging: { fileCount: number; files: Array<{ name: string; content: string }> }
+      logging: {
+        fileCount: number
+        files: Array<{ name: string; content: string }>
+      }
       runtime: unknown
       schemaVersion: number
     }
@@ -72,11 +79,11 @@ describe('diagnostic bundle', () => {
       generatedAt: '2026-08-31T15:20:30.000Z',
       application: environment.application,
       runtime: environment.runtime,
-      logging: { fileCount: 2 }
+      logging: { fileCount: 2 },
     })
     expect(bundle.logging.files.map((file) => file.name)).toEqual([
       'slidemind.log',
-      'slidemind.1.log'
+      'slidemind.1.log',
     ])
     expect(JSON.stringify(bundle)).not.toContain('do not export')
     expect(JSON.stringify(bundle)).not.toContain('plain')
@@ -91,9 +98,9 @@ describe('diagnostic bundle', () => {
     await writeFile(targetPath, 'keep')
     await symlink(targetPath, outputPath)
 
-    await expect(writeDiagnosticBundle(outputPath, directory, environment)).rejects.toThrow(
-      '诊断包目标必须是普通文件'
-    )
+    await expect(
+      writeDiagnosticBundle(outputPath, directory, environment),
+    ).rejects.toThrow('诊断包目标必须是普通文件')
     await expect(readFile(targetPath, 'utf8')).resolves.toBe('keep')
   })
 })

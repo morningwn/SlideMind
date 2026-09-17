@@ -27,15 +27,16 @@ async function fixture() {
     join(root, 'prepared-runtime.json'),
     JSON.stringify({
       schemaVersion: 1,
-    platform: 'darwin-arm64',
-    pandocVersion: '3.11',
-    binary: 'runtime/pandoc',
-    correspondingSource: {
-      path: 'runtime/pandoc-3.11.tar.gz',
-      url: 'https://github.com/jgm/pandoc/archive/refs/tags/3.11.tar.gz',
-      bytes: 9018272,
-      sha256: '61d05e7fc57e995a61367bee1bb73a8bb278cda3c787b7e4e27b30037e17aeed',
-    },
+      platform: 'darwin-arm64',
+      pandocVersion: '3.11',
+      binary: 'runtime/pandoc',
+      correspondingSource: {
+        path: 'runtime/pandoc-3.11.tar.gz',
+        url: 'https://github.com/jgm/pandoc/archive/refs/tags/3.11.tar.gz',
+        bytes: 9018272,
+        sha256:
+          '61d05e7fc57e995a61367bee1bb73a8bb278cda3c787b7e4e27b30037e17aeed',
+      },
       fileDescription: 'Mach-O 64-bit executable arm64',
     }),
   )
@@ -70,15 +71,16 @@ describe('Pandoc packaging validation', () => {
       join(root, 'prepared-runtime.json'),
       JSON.stringify({
         schemaVersion: 1,
-      platform: 'darwin-arm64',
-      pandocVersion: '3.11',
-      binary: '../pandoc',
-      correspondingSource: {
-        path: 'runtime/pandoc-3.11.tar.gz',
-        url: 'https://github.com/jgm/pandoc/archive/refs/tags/3.11.tar.gz',
-        bytes: 9018272,
-        sha256: '61d05e7fc57e995a61367bee1bb73a8bb278cda3c787b7e4e27b30037e17aeed',
-      },
+        platform: 'darwin-arm64',
+        pandocVersion: '3.11',
+        binary: '../pandoc',
+        correspondingSource: {
+          path: 'runtime/pandoc-3.11.tar.gz',
+          url: 'https://github.com/jgm/pandoc/archive/refs/tags/3.11.tar.gz',
+          bytes: 9018272,
+          sha256:
+            '61d05e7fc57e995a61367bee1bb73a8bb278cda3c787b7e4e27b30037e17aeed',
+        },
         fileDescription: 'Mach-O 64-bit executable arm64',
       }),
     )

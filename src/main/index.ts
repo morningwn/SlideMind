@@ -19,19 +19,22 @@ import type { DesktopCloseResponse } from '../shared/desktop'
 import { registerLoggingIpc } from './logging/ipc'
 import {
   initializeLocalCrashReporting,
-  reportExistingCrashReports
+  reportExistingCrashReports,
 } from './logging/crash-reporter'
 import {
   installApplicationLifecycleLogging,
   installProcessErrorLogging,
-  installWindowLifecycleLogging
+  installWindowLifecycleLogging,
 } from './logging/lifecycle'
 import { getLogger, initializeApplicationLogging } from './logging/logger'
 import { createTikaDocumentReadService } from './document/document-reader'
 import { resolveTikaRuntimeOptions } from './document/tika-runtime'
 import { registerDocumentExportIpc } from './document-export/ipc'
 import { MarkdownWordExportService } from './document-export/markdown-word-export-service'
-import { PandocRuntime, resolvePandocRuntimeOptions } from './document-export/pandoc-runtime'
+import {
+  PandocRuntime,
+  resolvePandocRuntimeOptions,
+} from './document-export/pandoc-runtime'
 import { PdfExportService } from './pdf-export/pdf-export-service'
 import { registerPdfExportIpc } from './pdf-export/ipc'
 
@@ -45,7 +48,7 @@ let closeDocumentReadService: (() => Promise<void>) | undefined
 
 initializeApplicationLogging({
   isPackaged: app.isPackaged,
-  logsDirectory: app.getPath('logs')
+  logsDirectory: app.getPath('logs'),
 })
 initializeLocalCrashReporting(app.getName())
 installProcessErrorLogging()
@@ -73,9 +76,9 @@ function installApplicationMenu(): void {
               { role: 'hideOthers' as const },
               { role: 'unhide' as const },
               { type: 'separator' as const },
-              { role: 'quit' as const }
-            ]
-          }
+              { role: 'quit' as const },
+            ],
+          },
         ]
       : []),
     {
@@ -87,8 +90,8 @@ function installApplicationMenu(): void {
         { role: 'cut' },
         { role: 'copy' },
         { role: 'paste' },
-        { role: 'selectAll' }
-      ]
+        { role: 'selectAll' },
+      ],
     },
     {
       label: 'View',
@@ -100,13 +103,13 @@ function installApplicationMenu(): void {
         { role: 'zoomIn' },
         { role: 'zoomOut' },
         { type: 'separator' },
-        { role: 'togglefullscreen' }
-      ]
+        { role: 'togglefullscreen' },
+      ],
     },
     {
       label: 'Window',
-      submenu: [{ role: 'minimize' }, { role: 'close' }]
-    }
+      submenu: [{ role: 'minimize' }, { role: 'close' }],
+    },
   ]
 
   Menu.setApplicationMenu(Menu.buildFromTemplate(template))
@@ -121,7 +124,8 @@ function registerDesktopIpc(): void {
       }
 
       const mainWindow = BrowserWindow.fromWebContents(event.sender)
-      if (!mainWindow || !pendingWindowCloseRequests.has(mainWindow.id)) return false
+      if (!mainWindow || !pendingWindowCloseRequests.has(mainWindow.id))
+        return false
 
       if ((response satisfies DesktopCloseResponse) === 'keep-window-open') {
         pendingWindowCloseRequests.delete(mainWindow.id)
@@ -134,7 +138,7 @@ function registerDesktopIpc(): void {
         defaultId: 1,
         cancelId: 1,
         title: '退出 SlideMind？',
-        message: '确定退出 SlideMind 吗？'
+        message: '确定退出 SlideMind 吗？',
       })
       if (choice.response !== 0) {
         pendingWindowCloseRequests.delete(mainWindow.id)
@@ -145,7 +149,7 @@ function registerDesktopIpc(): void {
       isApplicationQuitting = true
       app.quit()
       return true
-    }
+    },
   )
 }
 
@@ -164,8 +168,8 @@ function createWindow(): BrowserWindow {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
-    }
+      sandbox: true,
+    },
   })
   installWindowLifecycleLogging(mainWindow)
 
@@ -210,7 +214,7 @@ function createWindow(): BrowserWindow {
       defaultId: 1,
       cancelId: 1,
       title: '存在未保存的文件',
-      message: '部分文件尚未保存。确定放弃修改并退出吗？'
+      message: '部分文件尚未保存。确定放弃修改并退出吗？',
     })
     if (choice === 0) {
       event.preventDefault()
@@ -235,11 +239,13 @@ app.whenReady().then(() => {
       appVersion: app.getVersion(),
       arch: process.arch,
       electronVersion: process.versions.electron,
-      platform: process.platform
-    }
+      platform: process.platform,
+    },
   })
   void reportExistingCrashReports(app.getPath('crashDumps'))
-  const configStore = new AgentConfigStore(join(app.getPath('userData'), 'agent-config.json'))
+  const configStore = new AgentConfigStore(
+    join(app.getPath('userData'), 'agent-config.json'),
+  )
   const projectRoots = new ProjectRootRegistry()
   const versionService = new ProjectVersionService()
   const mutationService = new ProjectMutationService(versionService)
@@ -249,22 +255,26 @@ app.whenReady().then(() => {
     resolveTikaRuntimeOptions({
       appPath: app.getAppPath(),
       isPackaged: app.isPackaged,
-      resourcesPath: process.resourcesPath
-    })
+      resourcesPath: process.resourcesPath,
+    }),
   )
   const documentExportService = new MarkdownWordExportService(
     new PandocRuntime(
       resolvePandocRuntimeOptions({
         appPath: app.getAppPath(),
         isPackaged: app.isPackaged,
-        resourcesPath: process.resourcesPath
-      })
+        resourcesPath: process.resourcesPath,
+      }),
     ),
-    mutationService
+    mutationService,
   )
   const pdfExportService = new PdfExportService(mutationService)
   closeDocumentReadService = async () => {
-    await Promise.all([documentReadService.close(), documentExportService.close(), pdfExportService.close()])
+    await Promise.all([
+      documentReadService.close(),
+      documentExportService.close(),
+      pdfExportService.close(),
+    ])
   }
   const agentService = new BaseAgentService(
     configStore,
@@ -273,14 +283,14 @@ app.whenReady().then(() => {
     resolveBundledSkillsDirectory({
       appPath: app.getAppPath(),
       isPackaged: app.isPackaged,
-      resourcesPath: process.resourcesPath
+      resourcesPath: process.resourcesPath,
     }),
     presentationService,
     mutationService,
-    documentReadService
+    documentReadService,
   )
   const recentProjectStore = new RecentProjectStore(
-    join(app.getPath('userData'), 'recent-projects.json')
+    join(app.getPath('userData'), 'recent-projects.json'),
   )
   const conversationStore = new ProjectConversationStore()
 
@@ -294,23 +304,23 @@ app.whenReady().then(() => {
       application: {
         isPackaged: app.isPackaged,
         name: app.getName(),
-        version: app.getVersion()
+        version: app.getVersion(),
       },
       runtime: {
         arch: process.arch,
         chrome: process.versions.chrome,
         electron: process.versions.electron,
         node: process.versions.node,
-        platform: process.platform
-      }
-    }
+        platform: process.platform,
+      },
+    },
   })
   registerProjectIpc(
     recentProjectStore,
     conversationStore,
     projectRoots,
     mutationService,
-    externalChangeMonitor
+    externalChangeMonitor,
   )
   registerPresentationIpc(presentationService, projectRoots)
   registerDocumentExportIpc(documentExportService, projectRoots)

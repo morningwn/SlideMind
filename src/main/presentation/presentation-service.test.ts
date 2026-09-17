@@ -11,9 +11,11 @@ describe('resolvePresentationOutputPath', () => {
     const outputPath = join(exportDirectory, 'deck.pptx')
     const resolvedExportDirectory = await realpath(exportDirectory)
 
-    await expect(resolvePresentationOutputPath(projectPath, outputPath, true)).resolves.toEqual({
+    await expect(
+      resolvePresentationOutputPath(projectPath, outputPath, true),
+    ).resolves.toEqual({
       outputPath: join(resolvedExportDirectory, 'deck.pptx'),
-      resultPath: outputPath
+      resultPath: outputPath,
     })
   })
 
@@ -22,7 +24,10 @@ describe('resolvePresentationOutputPath', () => {
     const exportDirectory = await mkdtemp(join(tmpdir(), 'slidemind-export-'))
 
     await expect(
-      resolvePresentationOutputPath(projectPath, join(exportDirectory, 'deck.pptx'))
+      resolvePresentationOutputPath(
+        projectPath,
+        join(exportDirectory, 'deck.pptx'),
+      ),
     ).rejects.toThrow('必须位于项目目录内')
   })
 
@@ -30,10 +35,12 @@ describe('resolvePresentationOutputPath', () => {
     const projectPath = await mkdtemp(join(tmpdir(), 'slidemind-project-'))
     const resolvedProjectPath = await realpath(projectPath)
 
-    await expect(resolvePresentationOutputPath(projectPath, 'deck.pptx')).resolves.toEqual({
+    await expect(
+      resolvePresentationOutputPath(projectPath, 'deck.pptx'),
+    ).resolves.toEqual({
       outputPath: join(resolvedProjectPath, 'deck.pptx'),
       projectRelativePath: 'deck.pptx',
-      resultPath: 'deck.pptx'
+      resultPath: 'deck.pptx',
     })
   })
 
@@ -42,8 +49,8 @@ describe('resolvePresentationOutputPath', () => {
     const exportDirectory = await mkdtemp(join(tmpdir(), 'slidemind-export-'))
     await symlink(exportDirectory, join(projectPath, 'linked'))
 
-    await expect(resolvePresentationOutputPath(projectPath, 'linked/deck.pptx')).rejects.toThrow(
-      '超出项目范围'
-    )
+    await expect(
+      resolvePresentationOutputPath(projectPath, 'linked/deck.pptx'),
+    ).rejects.toThrow('超出项目范围')
   })
 })
