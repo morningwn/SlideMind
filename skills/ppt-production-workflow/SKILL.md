@@ -1,6 +1,6 @@
 ---
 name: ppt-production-workflow
-description: 编排 SlideMind 中从材料梳理、事实核验、叙事规划、逐页文案、模板或视觉设计、结构化写入、质量复核到 PPTX 导出的完整制作流程。适用于用户要求新建、重写或交付整份 PPT；单页润色、只做大纲、只选模板或只做审查时应使用对应专项 Skill。
+description: 编排 SlideMind 中从材料梳理、事实核验、叙事规划、逐页文案、模板或视觉设计、结构化写入、质量复核到 PPTX 导出的完整制作流程。适用于用户要求新建、重写或交付整份 PPT；单页润色、只做 PPT 大纲、只选模板或只做演示审查时应使用对应专项 Skill；普通文章、报告、摘要和非演示大纲不使用此流程。
 ---
 
 # PPT 制作总控流程
@@ -26,9 +26,11 @@ description: 编排 SlideMind 中从材料梳理、事实核验、叙事规划�
 
 ## 任务路由
 
-先判断用户实际要求的交付层级：
+先确认用户要求的是演示相关工作；普通文案任务退出本流程，按用户所需文体完成，复杂任务使用已注册的 `task-workflow` Skill。材料来自 PPT 并不表示交付物也必须是 PPT。
 
-- 仅梳理目标、结构或大纲：加载已注册的 `deck-strategy` Skill，生成 Markdown 策略文档后停止，不创建演示文件。
+再判断用户实际要求的交付层级：
+
+- 仅梳理演示目标、结构或 PPT 大纲：加载已注册的 `deck-strategy` Skill，生成 Markdown 策略文档后停止，不创建演示文件。
 - 仅改写页面文字：加载已注册的 `slide-copywriting` Skill。
 - 仅处理数据页：加载已注册的 `data-storytelling` Skill。
 - 仅制作流程图：加载已注册的 `slide-flowchart` Skill；按其要求再读取几何 reference。

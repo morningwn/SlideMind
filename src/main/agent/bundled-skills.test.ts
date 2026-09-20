@@ -16,6 +16,7 @@ const EXPECTED_SKILLS = [
   'slide-copywriting',
   'slide-flowchart',
   'slide-visual-design',
+  'task-workflow',
 ]
 
 const EXPECTED_TEMPLATE_SLIDE_COUNTS = [38, 36, 36, 36, 27, 28, 26, 30]
@@ -55,7 +56,7 @@ describe('resolveBundledSkillsDirectory', () => {
   })
 })
 
-describe('bundled presentation skills', () => {
+describe('bundled authoring skills', () => {
   it('loads the application catalog from validated bundled files only', async () => {
     const root = resolve('skills')
     const policy = await FilePolicy.create(process.cwd(), [root])
