@@ -30,10 +30,17 @@ export interface TikaClientOptions {
 
 function contentDisposition(file: string): string {
   const name =
-    basename(file)
-      .replace(/[\r\n"\\]/g, '_')
-      .slice(0, 255) || 'document'
-  return `attachment; filename="${name}"; filename*=UTF-8''${encodeURIComponent(name)}`
+    Array.from(basename(file).replace(/[\u0000-\u001f\u007f"\\]/g, '_'))
+      .slice(0, 255)
+      .join('') || 'document'
+  // Header values are ByteStrings: raw Unicode fails before any HTTP request.
+  // Keep an ASCII fallback and encode the Unicode name using RFC 8187.
+  const fallback = name.replace(/[^\u0020-\u007e]/g, '_')
+  const encoded = encodeURIComponent(name).replace(
+    /['()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  )
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`
 }
 
 function allowedMimeTypes(file: string): ReadonlySet<string> | undefined {
@@ -181,18 +188,21 @@ export class TikaClient {
     const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout
     const requestBody = new ArrayBuffer(bytes.byteLength)
     new Uint8Array(requestBody).set(bytes)
+    // Validate construction outside the transport catch: programming errors in
+    // headers or URLs must not be reported as an unavailable Tika process.
+    const request = new Request(url, {
+      body: requestBody,
+      headers: {
+        'Content-Disposition': contentDisposition(file),
+        'Content-Type': 'application/octet-stream',
+      },
+      method: 'PUT',
+      redirect: 'error',
+      signal: requestSignal,
+    })
     let response: Response
     try {
-      response = await fetch(url, {
-        body: requestBody,
-        headers: {
-          'Content-Disposition': contentDisposition(file),
-          'Content-Type': 'application/octet-stream',
-        },
-        method: 'PUT',
-        redirect: 'error',
-        signal: requestSignal,
-      })
+      response = await fetch(request)
     } catch (error) {
       if (signal?.aborted)
         throw new DocumentReadError('cancelled', '文档读取已取消')

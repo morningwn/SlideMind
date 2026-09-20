@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { extname, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { TikaClient } from './tika-client'
 import { TikaRuntime } from './tika-runtime'
@@ -83,15 +83,22 @@ describe.skipIf(!integrationEnabled)('fixed Tika runtime integration', () => {
         const bytes = await readFile(
           resolve(repositoryRoot, 'scripts/tika-p0/fixtures', file),
         )
-        const result = await runtime.run((baseUrl) =>
-          client.parse(baseUrl, bytes, file),
-        )
-        expect(result.mimeType).toBe(fixture.mimeType)
-        expect(result.entries[0]['tk:content']).toContain(fixture.marker)
-        for (const marker of expectations.samples.find(
-          (sample) => sample.file === file,
-        )!.requiredText) {
-          expect(result.entries[0]['tk:content'], file).toContain(marker)
+        for (const requestFile of [
+          file,
+          `中文教材·课堂 (1)'📖${extname(file)}`,
+        ]) {
+          const result = await runtime.run((baseUrl) =>
+            client.parse(baseUrl, bytes, requestFile),
+          )
+          expect(result.mimeType).toBe(fixture.mimeType)
+          expect(result.entries[0]['tk:content']).toContain(fixture.marker)
+          for (const marker of expectations.samples.find(
+            (sample) => sample.file === file,
+          )!.requiredText) {
+            expect(result.entries[0]['tk:content'], requestFile).toContain(
+              marker,
+            )
+          }
         }
       }
     } finally {
