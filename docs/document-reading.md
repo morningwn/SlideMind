@@ -1,6 +1,6 @@
-# 本地办公文档读取
+# 文档读取与导出
 
-本文描述本地办公文档读取的当前契约、运行时与限制。
+本地读取使用 Tika，Markdown 导出使用 Pandoc 或 Electron 打印，演示 PDF 使用 PPTist 渲染。运行时准备和验证命令见[开发指南](development.md)。
 
 ## 能力与调用链
 
@@ -14,7 +14,7 @@ Agent document_read
   → 正文规范化、元数据白名单、分段返回
 ```
 
-复用现有 Agent 通道，渲染进程不能直连 Tika。源文档只读，不把正文持久化到项目或用户目录。
+复用现有 Agent 通道，渲染进程不能直连 Tika。读取服务不修改源文件，正文缓存保存在内存；返回给 Agent 的工具结果仍会随会话记录保存。
 
 ## 工具契约
 
@@ -59,57 +59,13 @@ Agent document_read
 - Java 子进程只继承最小环境，应用密钥和代理配置不传入。退出时清理所属进程与临时目录，不按进程名终止其他 Java 实例。
 - 日志仅保留脱敏标识、错误、耗时、大小和版本等诊断信息，不直接记录正文、元数据或原始 Tika stderr；目标机日志与诊断包仍需复核。
 
-## 开发与打包
+## 内置运行时
 
-运行时固定为 Apache Tika Server Standard 4.0.0 和 Eclipse Temurin JRE 21.0.12.1+1，下载地址、摘要与签名信息以[版本清单](../scripts/tika-p0/runtime-manifest.json)为准。资源准备需要联网；解析本身不需要联网、系统 Java 或 Docker。
+版本与下载校验以 [Tika / Java 清单](../scripts/tika-p0/runtime-manifest.json)和 [Pandoc 清单](../scripts/pandoc-p0/runtime-manifest.json)为准。安装包支持 macOS arm64、macOS x64、Windows x64，不在运行时自动下载或升级。
 
-```bash
-pnpm tika:prepare
-pnpm tika:probe
-SLIDEMIND_TIKA_INTEGRATION=1 pnpm exec vitest run src/main/document/tika-integration.test.ts
-```
+Java 默认由固定版本 JDK 的 jlink 压缩并裁剪模块，保留字体、字符集、地区数据、动态加密提供程序及许可证。支持 `minimal`（默认）、`compressed`（保留原模块，仅压缩）和 `full`（原版 JRE）三种模式；命令参数 `--java-mode` 优先于环境变量 `SLIDEMIND_JAVA_MODE`。修改模式后需重新准备和打包，不影响已安装应用。
 
-最后一条为 POSIX shell 写法；PowerShell 先设置 `$env:SLIDEMIND_TIKA_INTEGRATION='1'` 再运行 Vitest。真实集成测试仅在未设置开关时跳过，必须确认输出未跳过。样本说明见 [测试样本](#测试样本)。
-
-打包使用 `pnpm package`、`pnpm package:mac` 或 `pnpm package:win`，链路为：
-
-1. `scripts/tika-package/prepare.mjs` 复用固定下载、摘要与 Apache 发布签名校验，按目标架构准备资源。默认使用同版本 Temurin JDK 的 `jlink` 生成压缩且裁剪模块的 Java 运行时；保留字体、全部字符集和地区数据、所需加密提供程序及上游许可证。构建 JDK 与下载归档不进入安装包。
-2. `after-pack.mjs` 通过 electron-builder `afterPack` 将对应架构运行时放到 ASAR 外的 `resources/tika-runtime/<platform>/`，保留 launcher 相邻依赖及许可证，校验链接运行时的模块清单与模块许可证。
-3. `verify.mjs` 检查清单、路径和许可证，在本机架构执行 DOC、简单及复杂 DOCX、XLS、XLSX、PDF 六样本文本检查；交叉架构只检查结构，不视为运行验收。
-
-`prepared-runtime.json` 的 `javaOptimization` 记录模式、原始/实际模块、裁剪前后 Java 字节数及构建选项。可通过 `--java-mode full|compressed|minimal` 选择完整原版、仅压缩或压缩并裁剪；默认 `minimal`。设置 `SLIDEMIND_JAVA_MODE=full` 后运行打包命令可回退至完整原版。模块与构建约束见下文。
-
-真实集成测试支持 `SLIDEMIND_TIKA_RUNTIME_ROOT` 指定对照运行时根目录；显式启用测试但未准备运行时会报错，不再静默跳过。
-
-支持的打包目标为 macOS arm64、macOS x64、Windows x64。运行时不自动在线下载或升级。升级时需同步版本清单、代码版本校验、协议测试及[第三方声明](THIRD_PARTY_NOTICES.md)，重新执行真实解析和目标平台安装测试。
-
-## Java 构建约束
-
-Tika 和 Java 版本保持为 4.0.0 / Temurin 21.0.12.1+1。默认 `minimal` 使用固定版本 JDK 的 jlink，执行资源压缩 `--compress=zip-6`、移除调试信息 `--strip-debug`、不生成头文件和手册。Java 模块依赖由 jlink 自动补齐，不生成 CDS 类缓存。
-
-下载清单和 SHA-256 固定在 [runtime-manifest.json](../scripts/tika-p0/runtime-manifest.json)。准备过程仍校验原始 JRE，用其实际 `lib/modules` 镜像确定对照模块、统计原始体积，并保留完整上游 `NOTICE` 和 `legal/`。上游 JRE 的 `release` 字段可能包含不在实际镜像中的 JDK 模块，不能直接用它生成对照版。
-
-构建工具使用宿主平台的固定 JDK，模块和原生库来自目标平台同版本 JDK 的 `jmods/`，不依赖系统 Java。`build-tools/`、`downloads/` 均在运行时目录外，不进入应用。跨架构生成只验证结构，必须在目标系统继续完成运行与安装验收。
-
-| 模式         | 行为                                        | 用途             |
-| ------------ | ------------------------------------------- | ---------------- |
-| `full`       | 完整上游 JRE，包含 CDS 缓存，不下载构建 JDK | 兼容性对照和回退 |
-| `compressed` | 保留原 JRE 的全部模块，压缩并移除调试信息   | 单独验证压缩影响 |
-| `minimal`    | 压缩并仅保留固定依赖、提供程序及传递依赖    | 默认打包         |
-
-模式优先级为命令参数 `--java-mode`、环境变量 `SLIDEMIND_JAVA_MODE`、默认 `minimal`。未知模式直接报错。准备失败后不会留下有效的旧 `prepared-runtime.json` 指向不完整资源。
-
-```bash
-node scripts/tika-p0/prepare-runtime.mjs --java-mode minimal
-node scripts/tika-package/prepare.mjs --platforms darwin-x64,darwin-arm64 --java-mode compressed
-
-# 回退完整 JRE 后执行正常打包链路（POSIX shell）
-SLIDEMIND_JAVA_MODE=full pnpm package
-```
-
-PowerShell 先执行 `$env:SLIDEMIND_JAVA_MODE='full'`，再执行打包命令；删除该环境变量恢复默认。每种模式都需重新准备和打包，不会修改已安装的应用。
-
-模块清单由 [java-runtime.mjs](../scripts/tika-p0/java-runtime.mjs) 维护，保留字体、字符集、地区数据和动态加密提供程序。`analyze-java-modules.mjs` 使用 jdeps 静态分析，不能发现全部反射或动态依赖；升级后需人工复核并执行真实解析测试。精简运行时不含被裁剪的调试、JFR 和远程管理能力，不能承诺启动或内存性能改善。
+模块清单在 [java-runtime.mjs](../scripts/tika-p0/java-runtime.mjs)。跨架构准备只验证结构；jdeps 静态分析无法发现所有反射和动态依赖。升级运行时需同步校验代码、协议测试及[第三方声明](THIRD_PARTY_NOTICES.md)，并在目标系统验证真实解析。
 
 ## 测试样本
 
@@ -146,8 +102,43 @@ soffice --headless --convert-to pdf \
   scripts/tika-p0/fixtures/simple-content.docx
 ```
 
-## 当前验证边界
+## 导出与文件保存
 
-macOS arm64 固定样本解析与包内运行时探针已有覆盖；各平台真实安装、离线运行、签名及安全软件行为尚未全面验收。macOS x64、Windows x64 的结构检查不能代替目标机运行。
+Markdown 可将点击时的未保存内容快照导出为 Word 或 PDF，导出不改变源文件保存状态，转换期间可继续编辑。演示文稿导出 PPTX 或 PDF 前先保存 `.slides.json`；保存冲突、失败或取消会阻止导出。
 
-慢解析取消和超时的进程回收、峰值资源、外部访问诱捕、异常压缩包，以及复杂 Word/Excel/PDF 内容仍需验证。客户端取消成功不等于服务端解析已停止；文本提取成功不等于视觉或语义完整。
+界面导出由主进程校验调用方、项目句柄、源文件和目标，通过系统保存对话框选择路径。同目录临时文件完成后才提交；目标在转换期间变化时停止覆盖。项目内输出参与自动版本，项目外输出不进入项目历史。关闭窗口和退出应用会取消所属任务并清理资源。
+
+## Markdown → Word
+
+使用内置 Pandoc 3.11，执行 GFM → JSON AST → DOCX 两阶段转换。应用检查 AST，并将授权图片字节转换为内部 data URI；两阶段启用 Pandoc sandbox，使用任务私有目录、固定参数和白名单环境。该选项不等同于操作系统沙箱。
+
+支持标题、正文、列表、GFM 表格、代码、HTTP(S)/邮件/文档内链接及项目内 PNG/JPEG。任务列表为静态标记；Mermaid 保留代码并提示未渲染。不支持协议的链接转为显示文本并提示。原始 HTML、远程/绝对/越界/符号链接图片、GIF/WebP、缺失或损坏资源会中止转换。
+
+开发前运行 `pnpm pandoc:prepare`，真实二进制集成测试使用 `pnpm pandoc:test`。打包应用携带目标架构 Pandoc、中文参考样式、许可证及对应源码归档，不依赖系统 Pandoc、Word 或网络。版本及完整性信息见 [运行时清单](../scripts/pandoc-p0/runtime-manifest.json)。
+
+字体由目标系统提供，不捆绑字体。真实 Microsoft Word 中的中文、字体替换、宽表、跨页列表、代码和图片排版尚未完成 macOS/Windows 验收；DOCX 结构检查与 LibreOffice 渲染不能替代 Word 验收。
+
+## Markdown → PDF
+
+复用 Markdown 预览的 HTML 渲染和净化，在受限隐藏打印页等待字体与图片后，通过 Electron `printToPDF` 输出 A4 PDF。正文样式与预览共用，打印规则负责分页与宽内容处理；不使用 Pandoc PDF 引擎。
+
+仅加载已授权的项目图片，支持 PNG/JPEG/GIF/WebP，加载失败则中止。正文最多 2 MiB、图片最多 100 个、图片总量最多 25 MiB。复杂长表格、字体替换及与预览逐页对照仍需视觉验收。
+
+## 演示文稿 → PDF / PPTX
+
+PDF 使用 PPTist 实际渲染的逐页截图，通过 PDFKit 合成，保留页面比例。当前支持 1–30 页，目标截图宽度 2560 像素，单页 PNG 最多 20 MiB、截图最多 1200 万像素；PDF 导出超时为 120 秒。限制以 [PDF 服务](../src/main/pdf-export/pdf-export-service.ts) 为准。
+
+每页为栅格图像，文字不可复制或搜索；动画与视频使用静态画面。高复杂度文稿、图表、背景图、异常元素、视频帧及峰值内存尚未全面验收，不承诺 PDF/A 或 PDF/UA 合规。
+
+PPTX 从 `.slides.json` 派生，支持基础文本、形状、图片和线条；外部 PPTX 仅可只读提取，不支持无损导入或原位编辑。导出成功不能证明 Office 字体、裁切、排版与兼容性通过。
+
+## 已知限制与验证缺口
+
+上述格式和资源限制是当前实现约束。以下属于尚需目标环境验证的项目，不能仅凭自动测试或探针认定通过：
+
+- macOS arm64 / x64 与 Windows x64 的安装后运行、离线解析和导出、签名及安全软件行为。
+- Tika 慢解析取消、超时后的进程回收、峰值资源、外部访问诱捕、异常压缩包及复杂办公文档。客户端取消不等于服务端解析已经停止。
+- Microsoft Word / PowerPoint 中的字体替换、宽表、分页、图片裁切与实际排版；结构回读和 LibreOffice 渲染不能替代 Office 验收。
+- PDF 复杂长表格、图表、背景图、视频静态帧与峰值内存，以及磁盘不足、应用退出等稳定性场景。
+
+自动测试覆盖输入授权、转换、取消、目标冲突与界面快照；包内探针使用测试外壳或替代保存对话框，不能代替真实安装与用户交互验收。

@@ -2,6 +2,19 @@
 
 环境和常用命令见 [README](../README.md#环境要求)，工程约束见 [AGENTS.md](../AGENTS.md)。命令以 [package.json](../package.json) 为准。
 
+## 代码结构
+
+| 目录                          | 职责                                                                      |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| `src/main/`                   | Electron 生命周期、Agent、项目与版本存储、文档读取和导出、诊断及 IPC 校验 |
+| `src/preload/`、`src/shared/` | 最小桥接接口与跨进程类型                                                  |
+| `src/renderer/src/`           | React 工作区、文档编辑与预览                                              |
+| `src/renderer/pptist-*`       | 独立 Vue/PPTist 入口与受限消息桥                                          |
+| `skills/`                     | 随应用打包的只读制作流程与专项 Skill                                      |
+| `scripts/`                    | 运行时准备、打包校验、集成探针与测试样本                                  |
+
+渲染进程保持沙箱、`contextIsolation` 和禁用 Node 集成；主进程校验调用方、项目句柄与不可信输入。新增跨进程能力先定义共享契约，再暴露最小接口。
+
 ## 类型检查与测试
 
 ```bash
@@ -13,7 +26,7 @@ pnpm format:check
 ```
 
 PPTist 检查使用与构建相同的 `@` 别名。Vue 检查工具通过 `typescript-vue` 使用 TypeScript 5.9，其余检查使用项目的 TypeScript 7。
-`pnpm test` 依次运行 Vitest、Agent 独立进程隔离测试、渲染端 TypeScript 检查和 Electron 渲染测试；真实 Tika 集成测试需[单独启用](document-reading.md#开发与打包)。
+`pnpm test` 依次运行 Vitest、Agent 独立进程隔离测试、渲染端 TypeScript 检查和 Electron 渲染测试；真实 Tika 集成测试需单独启用，见下文专项检查。
 
 ## 渲染层集成验证
 
@@ -30,7 +43,7 @@ node scripts/test-renderer.mjs
 
 测试会打开可见 Electron 窗口，需要桌面显示环境；Linux CI 使用 `xvfb-run -a pnpm test`。失败返回非零退出码，进程具有 180 秒外部看门狗。
 
-同步基准覆盖 10、50、200 页与三种图片配置，每组预热一次、采样 20 次，测量编辑帧回调、宿主消息延迟及快照耗时。同步包含 120 ms 防抖，快照探针在消息同步后运行；用于同机比较，不设置跨机器绝对门槛。结果写入 `.local/renderer-tests/`，不作为跨机器性能承诺。
+同步性能结果用于同机比较，不设置跨机器绝对门槛。截图和测量输出到 `.local/renderer-tests/`，不提交历史报告。
 
 ## 构建产物
 
@@ -43,7 +56,7 @@ node scripts/test-renderer.mjs
 | `out/release/`                               | 安装包与 Electron Builder 中间产物                       |
 | `.local/renderer-tests/`                     | `results.json`、`pptist.png`，可捕获时另存 `failure.png` |
 
-以上目录被 Git 忽略。仅检查生产构建可运行 `pnpm exec electron-vite build`；生成安装包使用 README 中的 `pnpm package*` 命令，它们还会执行类型检查、测试和 Tika 资源校验。
+以上目录被 Git 忽略。仅检查生产构建可运行 `pnpm exec electron-vite build`；生成安装包使用 README 中的 `pnpm package*` 命令，它们还会执行类型检查、测试、Tika / Pandoc 资源与 Agent 包内校验。
 
 打包依赖按运行方式划分：前端库与已明确由 Vite 内联的主进程库放在 `devDependencies`，需要在运行时通过 Node 加载的库保留在 `dependencies`。主进程和渲染端构建分别生成 `licenses.md`，随构建产物分发被内联依赖的许可证。新增动态加载依赖时需检查这一边界，不能仅凭开发环境运行成功判断包内可用。
 
@@ -53,12 +66,15 @@ Electron 仅分发英文（美式、英式）和中文（简体、繁体）语�
 
 [PR 工作流](../.github/workflows/check.yml) 在 Linux、macOS 和 Windows 上安装锁定依赖、检查主进程/渲染进程/PPTist 类型并运行测试。[tag 工作流](../.github/workflows/build.yml) 分别在 macOS 和 Windows 构建安装包，再上传到 GitHub Release。
 
-macOS 打包脚本和 CI 通过 `CSC_IDENTITY_AUTO_DISCOVERY=false` 关闭自动签名发现；本地 `pnpm package` 未显式设置该变量。正式分发需要 Apple Developer ID、公证凭据和 Windows 代码签名证书，仓库不保存证书或密钥。Tika 内嵌 Java 的签名、目标机安装与安全软件验收见[文档读取限制](document-reading.md#当前验证边界)。
+macOS 打包脚本和 CI 通过 `CSC_IDENTITY_AUTO_DISCOVERY=false` 关闭自动签名发现；本地 `pnpm package` 未显式设置该变量。正式分发需要 Apple Developer ID、公证凭据和 Windows 代码签名证书，仓库不保存证书或密钥。Tika 内嵌 Java 的签名、目标机安装与安全软件验收见[文档验证缺口](document-reading.md#已知限制与验证缺口)。
 
 ## 专项检查
 
 ```bash
 pnpm test:agent-isolation
+pnpm tika:prepare
+pnpm tika:probe
+SLIDEMIND_TIKA_INTEGRATION=1 pnpm exec vitest run src/main/document/tika-integration.test.ts
 pnpm pandoc:prepare
 pnpm pandoc:test
 pnpm exec electron-vite build
@@ -69,4 +85,4 @@ Agent 隔离测试使用独立进程与模拟响应，不调用付费模型。`n
 
 PDF 探针通过真实 preload/IPC 导出合成样本，输出到 `.local/pdf-p3/build/`；`--asar` 检查包内应用，输出到 `.local/pdf-p3/asar/`。它使用测试 Electron 外壳与替代保存对话框，不代表真实安装与对话框交互通过。重复执行覆盖对应目录的同名测试产物。
 
-Tika 准备与真实集成测试见 [读取指南](document-reading.md#开发与打包)。`scripts/*-p0/` 仍包含运行时准备、清单、样本和探针，被开发或打包流程引用，不是可直接删除的临时目录。Pandoc 运行时位于 `out/.pandoc-package-runtime/`，所有生成资源与探针报告均不提交。
+Tika 集成测试的环境变量命令为 POSIX shell 写法；PowerShell 先设置 `$env:SLIDEMIND_TIKA_INTEGRATION='1'`。未启用时该测试跳过，启用后缺少运行时会失败。可通过 `SLIDEMIND_TIKA_RUNTIME_ROOT` 指定对照运行时；Java 完整模式回退使用 `SLIDEMIND_JAVA_MODE=full`，再重新执行准备与打包。`scripts/*-p0/` 仍包含运行时准备、清单、样本和探针，被开发或打包流程引用，不是可直接删除的临时目录。Pandoc 运行时位于 `out/.pandoc-package-runtime/`，所有生成资源与探针报告均不提交。

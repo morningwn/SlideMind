@@ -1,30 +1,19 @@
 # Agent 与工具
 
-Agent 在主进程按会话运行，由应用显式注入 DeepSeek 模型、内存凭据、工具与只读内置 Skill。模型设置与用户行为见 [README](../README.md#agent-与模型配置)。
+Agent 在主进程按会话运行，由应用显式注入 DeepSeek 模型、内存凭据、工具与只读内置 Skill。模型设置与用户行为见 [README](../README.md#当前功能)。
 
 模型只返回思考或空白内容时，请求明确失败，已有产物与会话保留，用户可继续对话；不会将空回复标记为成功或自动重放已执行的工具。复杂任务的清单指引放在 `todo` 工具描述中，避免自定义系统提示跳过 Pi 的 `promptSnippet`。
 
 ## 配置隔离
 
-| 阶段                 | 入口                                                                                          | 应用控制与验证                                                                           |
-| -------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| 模块导入             | Pi config.js 的 PI_PACKAGE_DIR 和包元数据                                                     | 补丁取消环境路径覆盖，只定位已安装包；独立进程在首次导入前监测文件访问                   |
-| 模型初始化           | ModelRuntime 默认服务商目录、auth.json、models.json、models-store.json                        | 每会话内存凭据与模型存储；modelsPath 为 null；仅传入 DeepSeek provider                   |
-| 模型注册、认证刷新   | 全部内置服务商的环境变量与登录文件发现                                                        | 补丁支持注入 providers/authContext；应用上下文不提供环境变量与外部文件，关闭网络目录刷新 |
-| 请求编码             | Pi AI 的 PI_CACHE_RETENTION 等环境回退                                                        | 补丁仅接受显式 scoped env；默认缓存参数不受进程环境影响                                  |
-| 请求发送             | OpenAI SDK 的 OPENAI_API_KEY、ADMIN_KEY、BASE_URL、ORG_ID、PROJECT_ID、CUSTOM_HEADERS、LOG 等 | 固定版本补丁关闭 SDK 环境读取；DeepSeek Key、URL 继续显式传入；测试检查真实编码后的请求  |
-| 会话创建             | settings.json 与项目设置合并                                                                  | 每次创建使用 SettingsManager.inMemory；压缩启用、分析与安装遥测关闭                      |
-| 资源创建、reload     | 扩展、Skill、AGENTS.md、SYSTEM.md、APPEND_SYSTEM.md、提示词、主题                             | 受控 ResourceLoader，只接收内部工厂与指定内置 Skill；禁止默认扫描与扩展发现              |
-| 工具执行             | 文件读写与搜索、文档、PPT、模板、Todo、Web                                                    | 固定权限在 execute 边界执行；路径与网络负向测试分别位于对应模块                          |
-| 设置保存、下一次执行 | userData/agent-config.json                                                                    | 系统安全存储解密；请求执行时加载快照；变化时使用原会话文件重建，不中断当前请求           |
-| 运行状态             | 项目 .slideMind/convs、userData 下 web-cache                                                  | 属于明确指定的运行数据，不作为配置来源；保留旧会话与分支快照                             |
-| 延迟解析             | Readability/linkedom、Tika、Pandoc、PPTist                                                    | 使用固定服务及显式运行时路径；无浏览器登录资料或服务商凭据自动导入                       |
-
-Pi SDK、Pi AI 和 OpenAI SDK 的补丁均在 `patches/`，由 pnpm 自动应用；不在应用运行时拦截 fs、不改写 HOME、不修改进程环境。测试子进程使用临时 HOME 和虚构凭据，这是隔离夹具，不是生产实现。
+- 每会话使用内存设置、凭据与模型存储，仅注册 DeepSeek；设置保存后在下一次请求加载，不中断运行中的请求。
+- 受控资源加载器只接收内置工具与 Skill，不自动扫描用户或项目的扩展、AGENTS.md、系统提示和权限文件。
+- `patches/` 中固定版本的 Pi、Pi AI 与 OpenAI SDK 补丁关闭环境凭据、请求参数及包路径回退；不改写 HOME 或在运行时拦截文件系统。
+- 会话文件与 Web 缓存是明确指定的运行数据，不作为配置来源；旧会话保留。
 
 ## 权限与文件访问
 
-模型只能调用应用明确注册的 21 个工具；文件操作限制在当前项目允许文件和显式提供的只读内置 Skill。未知工具、Shell、PowerShell、MCP 默认拒绝。权限不接受项目或用户策略文件覆盖，也不提供运行时永久授权。
+模型只能调用应用明确注册的工具；文件操作限制在当前项目允许文件和显式提供的只读内置 Skill。未知工具、Shell、PowerShell、MCP 默认拒绝。权限不接受项目或用户策略文件覆盖，也不提供运行时永久授权。
 
 本实现约束应用接管的模型工具调用，不是操作系统沙箱。主进程和内置代码仍拥有进程权限；逐段路径检查无法保证抵御本机其他进程并发替换目录。若未来运行不可信扩展或要求抵御恶意并发文件树修改，必须另行设计进程或系统隔离。
 
@@ -46,6 +35,12 @@ Pi SDK、Pi AI 和 OpenAI SDK 的补丁均在 `patches/`，由 pnpm 自动应用
 读写与搜索拒绝 `.git`、`.slidemind`、`node_modules`、`out`、`coverage`、`release-dist`、`.ssh`、`.aws`、`.gnupg` 目录；写入额外拒绝 `.pi`。凭据清单包括 `.env`、`.env.*`、auth.json、credentials.json、application_default_credentials.json、常见 SSH 私钥名、.npmrc、.netrc，以及 pem/key/p12/pfx 文件。清单不能识别所有敏感业务资料。
 
 只读 Skill 根对写入的拒绝优先于项目授权，即使 Skill 位于项目内也不可写。项目普通文档仍可按权限显式读取；禁止外部配置自动加载并不等于禁止阅读所有 `.pi` 文件。
+
+## 演示修改与质量检查
+
+Agent 修改 `.slides.json` 按“读取最新 revision → 一次写入完整页面集合 → 再次回读”执行；revision 冲突后重新读取并合并。`slides_review` 是占位符、几何、字号等确定性预检，`slides_render` 提供真实 PPTist 画面用于视觉审查；两者均不能证明 Office 兼容性。
+
+完整演示的阶段和导出门禁由 `skills/ppt-production-workflow/` 管理，专项 Skill 只负责对应阶段。质量审查通过且用户要求 PPTX 时才进入导出；仅要求大纲或审查不会自动扩大为完整制作。
 
 ## 文件搜索
 
@@ -79,10 +74,10 @@ Pi SDK、Pi AI 和 OpenAI SDK 的补丁均在 `patches/`，由 pnpm 自动应用
 - 重定向结果同时保留 `requestedUrl` 与最终 `url`，由模型核对最终文章是否相关；跳转成功不等于事实已核实。批量读取保留逐来源错误，全部失败则工具失败。
 - 不记录查询正文、网页正文或凭据。工具整体失败通过抛出异常交给 Pi 标记 `isError`，而非在成功返回值中嵌入错误标记；网络状态错误只返回有界状态信息，编程错误自然传播。
 
-## 验证边界与依赖维护
+## 已知限制与依赖维护
 
-自动测试使用模拟模型响应，覆盖配置隔离、请求编码、工具、压缩和会话恢复；不能证明真实模型的缓存收益或长任务语义恢复。真实付费模型验收和 Windows 原生验收尚未执行，Intel 实机也未验证；Rosetta 探针不能替代原生平台验收。
+自动测试使用模拟模型响应，覆盖配置隔离、请求编码、工具、压缩和会话恢复，不能证明真实模型的缓存收益或长任务语义恢复。真实模型调用、各目标平台安装后运行、Web PDF 到 Tika 全链路、DNS 重绑定对抗性验证及中文搜索质量仍需专项验收。
 
-Web PDF 到 Tika 全链路、DNS 重绑定对抗性验证及完整中文搜索质量仍未验收。权限检查不提供恶意本机进程隔离。Web 缓存没有跨会话全局容量上限。
+文件权限不提供恶意本机进程隔离；Web 缓存没有跨会话全局容量上限，历史会话目录可能持续占用磁盘。空白或仅思考回复会明确失败，不自动重放已执行工具。
 
-Pi、Pi AI 和 OpenAI SDK 升级时必须同时复核 `patches/`、宿主注入与锁文件，并执行独立进程隔离、请求编码、项目测试和目标平台安装包验证。测试命令见 [开发指南](development.md)。
+Pi、Pi AI 和 OpenAI SDK 升级时需一起复核 `patches/`、宿主注入与锁文件，执行隔离、请求编码和目标平台包内验证。命令见[开发指南](development.md)。
