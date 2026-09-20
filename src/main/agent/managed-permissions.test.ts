@@ -80,6 +80,10 @@ async function setup(extra?: ExtensionFactory) {
         name,
         label: name,
         description: name,
+        promptGuidelines:
+          name === 'document_read' || name === 'pptx_read'
+            ? ['Keep source provenance when reading documents.']
+            : undefined,
         parameters: Type.Object({}),
         execute: calls,
       })
@@ -310,7 +314,8 @@ describe('managed permission execution', () => {
     await loader.reload()
     expect(loader.getAgentsFiles().agentsFiles).toEqual([])
     expect(loader.getAppendSystemPrompt()).toEqual([])
-    expect(loader.getSystemPrompt()).toBe('App controlled prompt')
+    expect(loader.getSystemPrompt()).toMatch(/^App controlled prompt/)
+    expect(loader.getSystemPrompt()).not.toContain('UNTRUSTED_MARKER')
     expect(loader.getSkills().skills.map((skill) => skill.name)).toEqual([
       'internal',
     ])
@@ -375,6 +380,23 @@ describe('managed permission execution', () => {
     })
     try {
       for (let i = 0; i < 2; i++) {
+        const prompt = session.agent.state.systemPrompt
+        const guidelines = new Set(
+          loader
+            .getExtensions()
+            .extensions.flatMap((extension) =>
+              [...extension.tools.values()].flatMap(
+                (tool) => tool.definition.promptGuidelines ?? [],
+              ),
+            ),
+        )
+        expect(guidelines.size).toBeGreaterThan(0)
+        for (const guideline of guidelines) {
+          expect(prompt.split(guideline)).toHaveLength(2)
+          expect(prompt.indexOf(guideline)).toBeLessThan(
+            prompt.indexOf('<available_skills>'),
+          )
+        }
         expect(session.getActiveToolNames().sort()).toEqual(
           [...AGENT_TOOL_NAMES].sort(),
         )

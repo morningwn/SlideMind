@@ -104,4 +104,27 @@ describe('createDocumentToolsExtension', () => {
       }),
     ).rejects.toBe(failure)
   })
+
+  it('explains unread sources on runtime failure without preventing later recovery', async () => {
+    const failure = new DocumentReadError(
+      'runtime_unavailable',
+      '无法连接 Tika 运行时',
+    )
+    const read = vi
+      .fn()
+      .mockRejectedValueOnce(failure)
+      .mockResolvedValue(result)
+    const tool = await register(read)
+
+    await expect(
+      tool.execute('unavailable', { file: 'brief.pdf' }),
+    ).rejects.toMatchObject({
+      cause: failure,
+      message: expect.stringContaining('本次未读取到文档内容'),
+    })
+    expect(read).toHaveBeenCalledTimes(1)
+    const recovered = await tool.execute('recovered', { file: 'brief.pdf' })
+    expect(recovered.details).toEqual(result)
+    expect(read).toHaveBeenCalledTimes(2)
+  })
 })

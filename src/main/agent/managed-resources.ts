@@ -22,6 +22,7 @@ export async function createManagedResources(options: {
   let runtime = createExtensionRuntime()
   let extensions: Extension[] = []
   let skills: Skill[] = []
+  let systemPrompt = options.systemPrompt
   const expectedOwners = new Map<string, string>()
   const resourceLoader: ResourceLoader = {
     getExtensions: () => ({ extensions, errors: [], runtime }),
@@ -29,7 +30,7 @@ export async function createManagedResources(options: {
     getPrompts: () => ({ prompts: [], diagnostics: [] }),
     getThemes: () => ({ themes: [], diagnostics: [] }),
     getAgentsFiles: () => ({ agentsFiles: [] }),
-    getSystemPrompt: () => options.systemPrompt,
+    getSystemPrompt: () => systemPrompt,
     getSystemPromptSource: () => undefined,
     getAppendSystemPrompt: () => [],
     getAppendSystemPromptSources: () => [],
@@ -68,10 +69,26 @@ export async function createManagedResources(options: {
         options.skillsDirectory,
         options.policy,
       )
+      // Pi's custom-prompt branch omits tool promptGuidelines. Compose the
+      // trusted registered guidelines here so they survive creation and reload.
+      const guidelines = new Map<string, Set<string>>()
+      for (const extension of nextExtensions) {
+        for (const { definition } of extension.tools.values()) {
+          for (const line of definition.promptGuidelines ?? []) {
+            const names = guidelines.get(line) ?? new Set<string>()
+            names.add(definition.name)
+            guidelines.set(line, names)
+          }
+        }
+      }
+      const nextSystemPrompt = guidelines.size
+        ? `${options.systemPrompt}\n\n工具使用规则（仅在任务需要相应工具时适用，不扩大用户交付范围）：\n${[...guidelines].map(([line, names]) => `- [${[...names].join(', ')}] ${line}`).join('\n')}`
+        : options.systemPrompt
       for (const [name, path] of owners) expectedOwners.set(name, path)
       extensions = nextExtensions
       runtime = nextRuntime
       skills = loadedSkills
+      systemPrompt = nextSystemPrompt
     },
   }
   return resourceLoader

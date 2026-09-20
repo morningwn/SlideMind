@@ -108,6 +108,9 @@ describe('bundled authoring skills', () => {
     )
 
     expect(descriptions.get('ppt-production-workflow')).toContain('整份 PPT')
+    expect(descriptions.get('task-workflow')).toContain(
+      '简单问答和局部润色无需',
+    )
     expect(descriptions.get('pptist-template-library')).toContain(
       '不独立负责整份 PPT',
     )
@@ -137,6 +140,10 @@ describe('bundled authoring skills', () => {
         'skills/pptist-template-library/references/slidemind-mapping.md',
       ].map((file) => readFile(resolve(file), 'utf8')),
     )
+    const taskWorkflow = await readFile(
+      resolve('skills/task-workflow/SKILL.md'),
+      'utf8',
+    )
 
     expect(workflow).toContain('连续模式')
     expect(workflow).toContain('审阅模式')
@@ -144,6 +151,10 @@ describe('bundled authoring skills', () => {
     expect(contract).toContain('`review`')
     expect(contract).toContain('`document_read`')
     expect(contract).toContain('`nextCursor`')
+    expect(taskWorkflow).toContain('`task-status.md`')
+    expect(taskWorkflow).toContain('`workflow-status.md`')
+    expect(taskWorkflow).toContain('不再为同一演示维护重复的')
+    expect(workflow).toContain('`task-workflow`')
     expect(workflow).not.toMatch(/\.\.\/[^\s`]+\/SKILL\.md/)
     for (const guide of imageGuides) {
       expect(guide).toContain('项目内图片')

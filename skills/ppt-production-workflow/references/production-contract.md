@@ -2,6 +2,8 @@
 
 本 reference 用于完整创建、重写或导出任务。它定义阶段输入、产物、推进模式、确认门禁和失败处理。完整任务必须把状态和阶段产物写入统一产物目录，不能只依赖会话上下文。
 
+进入本契约前必须确认用户要求的是演示交付。普通分析、总结与教学思路默认在对话中回答；历史课件和已有 `workflow-status.md` 不授权新演示，也不能把用户再次提问解释为继续导出。只有明确延续同一演示任务时才恢复其状态。
+
 ## 状态机
 
 `evidence-ready → strategy-ready → content-ready → design-ready → draft-ready → qa-ready → exported`
