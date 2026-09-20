@@ -114,7 +114,7 @@ Markdown 可将点击时的未保存内容快照导出为 Word 或 PDF，导出�
 
 支持标题、正文、列表、GFM 表格、代码、HTTP(S)/邮件/文档内链接及项目内 PNG/JPEG。任务列表为静态标记；Mermaid 保留代码并提示未渲染。不支持协议的链接转为显示文本并提示。原始 HTML、远程/绝对/越界/符号链接图片、GIF/WebP、缺失或损坏资源会中止转换。
 
-开发前运行 `pnpm pandoc:prepare`，真实二进制集成测试使用 `pnpm pandoc:test`。打包应用携带目标架构 Pandoc、中文参考样式、许可证及对应源码归档，不依赖系统 Pandoc、Word 或网络。版本及完整性信息见 [运行时清单](../scripts/pandoc-p0/runtime-manifest.json)。
+开发前运行 `node scripts/pandoc-package/prepare.mjs`，真实二进制集成测试使用 `pnpm test --integration`。打包应用携带目标架构 Pandoc、中文参考样式、许可证及对应源码归档，不依赖系统 Pandoc、Word 或网络。版本及完整性信息见 [运行时清单](../scripts/pandoc-p0/runtime-manifest.json)。
 
 字体由目标系统提供，不捆绑字体。真实 Microsoft Word 中的中文、字体替换、宽表、跨页列表、代码和图片排版尚未完成 macOS/Windows 验收；DOCX 结构检查与 LibreOffice 渲染不能替代 Word 验收。
 

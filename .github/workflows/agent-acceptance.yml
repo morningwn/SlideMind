@@ -27,3 +27,5 @@ jobs:
         run: pnpm package
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Verify packaged runtime and Agent execution
+        run: pnpm test --packaged

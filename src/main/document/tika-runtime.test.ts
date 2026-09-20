@@ -104,7 +104,7 @@ describe('resolveTikaRuntimeOptions', () => {
     const runtime = new TikaRuntime(options)
 
     await expect(runtime.run(async () => undefined)).rejects.toThrow(
-      'Tika 开发运行时未准备，请先运行 pnpm tika:prepare',
+      'Tika 开发运行时未准备，请先运行 node scripts/tika-p0/prepare-runtime.mjs',
     )
     expect(runtime.state).toBe('failed')
   })

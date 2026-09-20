@@ -8,8 +8,8 @@ Node.js 22.19 或更高版本，pnpm 11.15.1。CI 使用 Node.js 24；最低 Nod
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm tika:prepare       # 使用 Word / Excel / PDF 文本读取前准备
-pnpm pandoc:prepare     # 使用 Word 导出前准备
+node scripts/tika-p0/prepare-runtime.mjs       # 使用 Word / Excel / PDF 文本读取前准备
+node scripts/pandoc-package/prepare.mjs     # 使用 Word 导出前准备
 pnpm dev
 ```
 
@@ -58,13 +58,15 @@ pnpm dev
 
 ```bash
 pnpm test          # 单元测试、Agent 隔离与 Electron 渲染测试
+pnpm test --unit   # 仅单元测试，打包使用此模式
+pnpm test --integration # 增加 Tika / Pandoc 与 PDF 导出集成测试
 pnpm format:check
 pnpm package       # 当前平台安装包
 pnpm package:mac   # macOS Intel + Apple Silicon，DMG / ZIP
 pnpm package:win   # Windows x64，NSIS
 ```
 
-测试需要桌面显示环境，Linux 无显示环境使用 `xvfb-run -a pnpm test`。构建与安装包输出到 `out/`，测试产物写入 `.local/`，均不提交。macOS 打包脚本与 CI 默认关闭签名自动发现，正式分发仍需配置签名与公证。
+默认测试需要桌面显示环境，Linux 无显示环境使用 `xvfb-run -a pnpm test`。打包只执行单元测试，不启动应用。构建与安装包输出到 `out/`，测试产物写入 `.local/`，均不提交。macOS 打包脚本与 CI 默认关闭签名自动发现，正式分发仍需配置签名与公证。
 
 ## 许可证
 

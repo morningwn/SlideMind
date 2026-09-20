@@ -50,7 +50,8 @@ function readZipEntries(bytes: Buffer): Map<string, Buffer> {
 }
 
 describe.skipIf(
-  !existsSync(options.binaryPath) || !existsSync(options.referencePath),
+  process.env.SLIDEMIND_PANDOC_INTEGRATION !== '1' &&
+    (!existsSync(options.binaryPath) || !existsSync(options.referencePath)),
 )('Pandoc Word export integration', () => {
   it('preserves headings, numbering, tables, links and media relationships', async () => {
     const directory = await mkdtemp(

@@ -92,7 +92,7 @@ export function resolveTikaRuntimeOptions(
       javaBinary: resourcePath(value.javaBinary),
       missingRuntimeMessage: options.isPackaged
         ? '内置 Tika 运行时不完整，请重新安装应用'
-        : 'Tika 开发运行时未准备，请先运行 pnpm tika:prepare',
+        : 'Tika 开发运行时未准备，请先运行 node scripts/tika-p0/prepare-runtime.mjs',
       tikaJar: resourcePath(value.tikaJar),
       tikaVersion: value.tikaVersion,
     }
@@ -107,7 +107,7 @@ export function resolveTikaRuntimeOptions(
     javaBinary,
     missingRuntimeMessage: options.isPackaged
       ? '内置 Tika 运行时不完整，请重新安装应用'
-      : 'Tika 开发运行时未准备，请先运行 pnpm tika:prepare',
+      : 'Tika 开发运行时未准备，请先运行 node scripts/tika-p0/prepare-runtime.mjs',
     tikaJar: join(runtimeRoot, 'runtime/tika/tika-server-standard-4.0.0.jar'),
     tikaVersion: '4.0.0',
   }

@@ -109,3 +109,20 @@ describe('packaged dependencies', () => {
     },
   )
 })
+
+describe('package validation commands', () => {
+  const { scripts } = JSON.parse(readFileSync('package.json', 'utf8'))
+  it.each(['package', 'package:mac', 'package:win'])(
+    '%s runs only unit tests and does not execute package probes',
+    (name) => {
+      const command = scripts[name]
+      expect(command.match(/pnpm test[^&]*/g)).toEqual(['pnpm test --unit '])
+      expect(command).not.toContain('verify.mjs')
+      expect(command).not.toContain('verify-package.mjs')
+      expect(command).not.toContain('test-renderer')
+      expect(command.indexOf('pnpm test --unit')).toBeLessThan(
+        command.indexOf('electron-vite build'),
+      )
+    },
+  )
+})
