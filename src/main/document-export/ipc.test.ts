@@ -95,7 +95,7 @@ describe('document export IPC', () => {
     ).resolves.toEqual({ status: 'canceled' })
     expect(electron.dialog.showSaveDialog).toHaveBeenCalledWith(
       owner,
-      expect.objectContaining({ defaultPath: '/Desktop/notes.docx' }),
+      expect.objectContaining({ defaultPath: join('/Desktop', 'notes.docx') }),
     )
     expect(service.export).not.toHaveBeenCalled()
   })

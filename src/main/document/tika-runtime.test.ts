@@ -1,4 +1,4 @@
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const existsSync = vi.hoisted(() => vi.fn())
@@ -37,19 +37,14 @@ describe('resolveTikaRuntimeOptions', () => {
     })
 
     const platform = `${process.platform}-${process.arch}`
+    const runtimeRoot = resolve('/resources', 'tika-runtime', platform)
     expect(result.javaBinary).toBe(
-      join('/resources/tika-runtime', platform, 'runtime/java/bin/java.exe'),
+      join(runtimeRoot, 'runtime/java/bin/java.exe'),
     )
     expect(result.tikaJar).toBe(
-      join(
-        '/resources/tika-runtime',
-        platform,
-        'runtime/tika/tika-server-standard-4.0.0.jar',
-      ),
+      join(runtimeRoot, 'runtime/tika/tika-server-standard-4.0.0.jar'),
     )
-    expect(result.configPath).toBe(
-      join('/resources/tika-runtime', platform, 'tika-config.json'),
-    )
+    expect(result.configPath).toBe(join(runtimeRoot, 'tika-config.json'))
   })
 
   it('rejects absolute paths from a packaged manifest', () => {
