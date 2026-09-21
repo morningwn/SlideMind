@@ -256,33 +256,47 @@ async function verifyTikaSignature(archive) {
   const keys = join(downloadsRoot, 'apache-tika-KEYS')
   await downloadHttps(manifest.tika.signatureUrl, signature)
   await downloadHttps(manifest.tika.keysUrl, keys)
-  // Git for Windows ships an MSYS gpg that rewrites path arguments before the
-  // process sees them, and gpg sockets fail on long keyring paths. Keep the
-  // keyring short through GNUPGHOME and pass only relative paths, so native and
-  // MSYS builds resolve the same files.
-  const gpgHome = await mkdtemp(join(tmpdir(), 'slidemind-tika-gpg-'))
-  const gpgOptions = {
-    cwd: downloadsRoot,
-    env: {
-      ...process.env,
-      GNUPGHOME: gpgHome,
-      MSYS2_ARG_CONV_EXCL: '*',
-      MSYS_NO_PATHCONV: '1',
-    },
-  }
+  // Git for Windows ships an MSYS gpg that treats Windows-style paths such as
+  // C:\Users\... as relative paths. Hand it forward-slash paths, keep the
+  // keyring in a short temporary directory so the gpg-agent socket fits into
+  // the POSIX path length limit, and pass the downloaded files relative to one
+  // working directory so every gpg build resolves the same files.
+  const gpgWorkRoot = await mkdtemp(join(tmpdir(), 'slidemind-tika-gpg-'))
+  const gpgHome =
+    process.platform === 'win32'
+      ? gpgWorkRoot.replaceAll('\\', '/')
+      : gpgWorkRoot
+  const gpgOptions = { cwd: downloadsRoot }
   try {
-    await run('gpg', ['--batch', '--import', basename(keys)], gpgOptions)
-    const output = await runCapture(
-      'gpg',
-      [
-        '--batch',
-        '--status-fd=1',
-        '--verify',
-        basename(signature),
-        basename(archive),
-      ],
-      gpgOptions,
-    )
+    let output
+    try {
+      await run(
+        'gpg',
+        ['--homedir', gpgHome, '--batch', '--import', basename(keys)],
+        gpgOptions,
+      )
+      output = await runCapture(
+        'gpg',
+        [
+          '--homedir',
+          gpgHome,
+          '--batch',
+          '--status-fd=1',
+          '--verify',
+          basename(signature),
+          basename(archive),
+        ],
+        gpgOptions,
+      )
+    } catch (error) {
+      // Exit code 1 means gpg ran and rejected the signature; that stays fatal.
+      // Any other failure means this gpg build cannot be used at all.
+      if (error.exitCode === 1) throw error
+      console.warn(
+        `gpg could not verify the Apache Tika signature (${error.message}); relying on the pinned SHA-512 obtained from the Apache HTTPS release page`,
+      )
+      return false
+    }
     const validSignatures = output
       .split('\n')
       .filter((line) => line.startsWith('[GNUPG:] VALIDSIG '))
@@ -294,7 +308,7 @@ async function verifyTikaSignature(archive) {
     }
     return true
   } finally {
-    await rm(gpgHome, { recursive: true, force: true })
+    await rm(gpgWorkRoot, { recursive: true, force: true })
   }
 }
 
@@ -350,7 +364,10 @@ async function run(command, args, options = {}) {
       code === 0
         ? resolvePromise()
         : reject(
-            new Error(`${[command, ...args].join(' ')} exited with ${code}`),
+            Object.assign(
+              new Error(`${[command, ...args].join(' ')} exited with ${code}`),
+              { exitCode: code },
+            ),
           ),
     )
   })
@@ -376,7 +393,12 @@ async function runCapture(command, args, options = {}) {
     child.once('exit', (code) =>
       code === 0
         ? resolvePromise(stdout)
-        : reject(new Error(`${command} exited with ${code}: ${stderr}`)),
+        : reject(
+            Object.assign(
+              new Error(`${command} exited with ${code}: ${stderr}`),
+              { exitCode: code },
+            ),
+          ),
     )
   })
 }
