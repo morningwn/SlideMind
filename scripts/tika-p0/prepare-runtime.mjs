@@ -14,7 +14,7 @@ import {
   writeFile,
 } from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { tmpdir } from 'node:os'
@@ -256,18 +256,33 @@ async function verifyTikaSignature(archive) {
   const keys = join(downloadsRoot, 'apache-tika-KEYS')
   await downloadHttps(manifest.tika.signatureUrl, signature)
   await downloadHttps(manifest.tika.keysUrl, keys)
+  // Git for Windows ships an MSYS gpg that rewrites path arguments before the
+  // process sees them, and gpg sockets fail on long keyring paths. Keep the
+  // keyring short through GNUPGHOME and pass only relative paths, so native and
+  // MSYS builds resolve the same files.
   const gpgHome = await mkdtemp(join(tmpdir(), 'slidemind-tika-gpg-'))
+  const gpgOptions = {
+    cwd: downloadsRoot,
+    env: {
+      ...process.env,
+      GNUPGHOME: gpgHome,
+      MSYS2_ARG_CONV_EXCL: '*',
+      MSYS_NO_PATHCONV: '1',
+    },
+  }
   try {
-    await run('gpg', ['--homedir', gpgHome, '--batch', '--import', keys])
-    const output = await runCapture('gpg', [
-      '--homedir',
-      gpgHome,
-      '--batch',
-      '--status-fd=1',
-      '--verify',
-      signature,
-      archive,
-    ])
+    await run('gpg', ['--batch', '--import', basename(keys)], gpgOptions)
+    const output = await runCapture(
+      'gpg',
+      [
+        '--batch',
+        '--status-fd=1',
+        '--verify',
+        basename(signature),
+        basename(archive),
+      ],
+      gpgOptions,
+    )
     const validSignatures = output
       .split('\n')
       .filter((line) => line.startsWith('[GNUPG:] VALIDSIG '))
@@ -334,7 +349,9 @@ async function run(command, args, options = {}) {
     child.once('exit', (code) =>
       code === 0
         ? resolvePromise()
-        : reject(new Error(`${command} exited with ${code}`)),
+        : reject(
+            new Error(`${[command, ...args].join(' ')} exited with ${code}`),
+          ),
     )
   })
 }
