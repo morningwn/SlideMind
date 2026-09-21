@@ -30,14 +30,15 @@ describe('resolveTikaRuntimeOptions', () => {
       }),
     )
 
+    const platform = `${process.platform}-${process.arch}`
+    const resourcesPath = resolve('/resources')
     const result = resolveTikaRuntimeOptions({
       appPath: '/application',
       isPackaged: true,
-      resourcesPath: '/resources',
+      resourcesPath,
     })
 
-    const platform = `${process.platform}-${process.arch}`
-    const runtimeRoot = resolve('/resources', 'tika-runtime', platform)
+    const runtimeRoot = join(resourcesPath, 'tika-runtime', platform)
     expect(result.javaBinary).toBe(
       join(runtimeRoot, 'runtime/java/bin/java.exe'),
     )
